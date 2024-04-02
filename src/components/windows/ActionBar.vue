@@ -23,7 +23,7 @@
       <svg class="w-16px h-16px color-[--action-bar-icon-color] cursor-pointer"><use href="#left-bar"></use></svg>
     </div>
     <!-- 最小化 -->
-    <div v-if="minW" @click="appWindow.minimize()" class="hover-box">
+    <div v-if="minW" @click="getCurrent().minimize()" class="hover-box">
       <svg class="w-24px h-24px color-[--action-bar-icon-color] opacity-66 cursor-pointer">
         <use href="#maximize"></use>
       </svg>
@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrent } from '@tauri-apps/api/window'
 import Mitt from '@/utils/Bus'
 import { useWindow } from '@/hooks/useWindow.ts'
 import { alwaysOnTop } from '@/stores/alwaysOnTop.ts'
@@ -85,7 +85,7 @@ import { emit, listen } from '@tauri-apps/api/event'
 import { CloseBxEnum, EventEnum, MittEnum } from '@/enums'
 import { storeToRefs } from 'pinia'
 import { PersistedStateOptions } from 'pinia-plugin-persistedstate'
-import { exit } from '@tauri-apps/api/process'
+import { exit } from '@tauri-apps/plugin-process'
 
 /**
  * 新版defineProps可以直接结构 { minW, maxW, closeW } 如果需要使用默认值withDefaults的时候使用新版解构方式会报错
@@ -130,12 +130,12 @@ const alwaysOnTopStatus = computed(() => {
 watchEffect(() => {
   tipsRef.type = tips.value.type
   if (alwaysOnTopStatus.value) {
-    appWindow.setAlwaysOnTop(alwaysOnTopStatus.value as boolean)
+    getCurrent().setAlwaysOnTop(alwaysOnTopStatus.value as boolean)
   }
   listen(EventEnum.LOGOUT, async () => {
     /* 退出账号前把窗口全部关闭 */
-    if (appWindow.label !== 'login') {
-      await appWindow.close()
+    if (getCurrent().label !== 'login') {
+      await getCurrent().close()
     }
   })
   listen(EventEnum.EXIT, async () => {
@@ -152,9 +152,9 @@ watchEffect(() => {
 /* 恢复窗口大小 */
 const restoreWindow = async () => {
   if (windowMaximized.value) {
-    await appWindow.unmaximize()
+    await getCurrent().unmaximize()
   } else {
-    await appWindow.maximize()
+    await getCurrent().maximize()
   }
 }
 
@@ -174,7 +174,7 @@ const handleAlwaysOnTop = async () => {
   if (topWinLabel.value !== void 0) {
     const isTop = !alwaysOnTopStatus.value
     alwaysOnTopStore.setWindowTop(topWinLabel.value, isTop)
-    await appWindow.setAlwaysOnTop(isTop)
+    await getCurrent().setAlwaysOnTop(isTop)
   }
 }
 
@@ -187,7 +187,7 @@ const handleConfirm = async () => {
     await emit(EventEnum.EXIT)
   } else {
     await nextTick(() => {
-      appWindow.hide()
+      getCurrent().hide()
     })
   }
 }
@@ -202,14 +202,16 @@ const isEsc = (e: PersistedStateOptions) => {
 
 // 判断当前是否是最大化
 const handleResize = () => {
-  appWindow.isMaximized().then((res) => {
-    windowMaximized.value = res
-  })
+  getCurrent()
+    .isMaximized()
+    .then((res) => {
+      windowMaximized.value = res
+    })
 }
 
 /* 处理关闭窗口事件 */
 const handleCloseWin = async () => {
-  if (appWindow.label === 'home') {
+  if (getCurrent().label === 'home') {
     if (!tips.value.notTips) {
       tipsRef.show = true
     } else {
@@ -217,13 +219,13 @@ const handleCloseWin = async () => {
         await emit(EventEnum.EXIT)
       } else {
         await nextTick(() => {
-          appWindow.hide()
+          getCurrent().hide()
         })
       }
     }
   } else {
-    await emit(EventEnum.WIN_CLOSE, appWindow.label)
-    await appWindow.close()
+    await emit(EventEnum.WIN_CLOSE, getCurrent().label)
+    await getCurrent().close()
   }
 }
 

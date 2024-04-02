@@ -63,8 +63,8 @@
 </template>
 <script setup lang="ts">
 import { dynamicList } from '@/mock'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrent } from '@tauri-apps/api/window'
 import { useWindowState } from '@/hooks/useWindowState.ts'
 
-useWindowState(appWindow.label)
+useWindowState(getCurrent().label)
 </script>

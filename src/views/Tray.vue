@@ -43,11 +43,11 @@
 </template>
 <script setup lang="tsx">
 import { useWindow } from '@/hooks/useWindow.ts'
-import { invoke } from '@tauri-apps/api/tauri'
-import { exit } from '@tauri-apps/api/process'
+import { invoke } from '@tauri-apps/api/core'
+import { exit } from '@tauri-apps/plugin-process'
 import { statusItem } from './home-window/onlineStatus/config.ts'
 import { onlineStatus } from '@/stores/onlineStatus.ts'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrent } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 
 const { checkWinExist, createWebviewWindow } = useWindow()
@@ -59,7 +59,7 @@ const division = () => {
 
 const toggleStatus = (url: string, title: string) => {
   OLStatusStore.setOnlineStatus(url, title)
-  appWindow.hide()
+  getCurrent().hide()
 }
 
 onMounted(() => {

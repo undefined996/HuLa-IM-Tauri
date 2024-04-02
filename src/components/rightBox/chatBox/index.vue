@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { MockItem } from '@/services/types.ts'
 import { listen } from '@tauri-apps/api/event'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrent } from '@tauri-apps/api/window'
 
 const { activeItem } = defineProps<{
   activeItem?: MockItem
@@ -26,7 +26,7 @@ watchEffect(() => {
   activeItemRef.value = { ...activeItem! }
 })
 
-listen(appWindow.label, (e) => {
+listen(getCurrent().label, (e) => {
   activeItemRef.value = e.payload as any
 })
 </script>

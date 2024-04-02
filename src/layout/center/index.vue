@@ -5,7 +5,7 @@
       v-if="shrinkStatus"
       :shrink-status="!shrinkStatus"
       :max-w="false"
-      :current-label="appWindow.label" />
+      :current-label="getCurrent().label" />
 
     <!--    <div class="resize-handle" @mousedown="initDrag"></div>-->
 
@@ -46,7 +46,7 @@
 import Mitt from '@/utils/Bus.ts'
 import router from '@/router'
 import { MittEnum } from '@/enums'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrent } from '@tauri-apps/api/window'
 
 // const minWidth = 160 // 设置最小宽度
 // const maxWidth = 320 // 设置最大宽度

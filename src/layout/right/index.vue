@@ -1,6 +1,6 @@
 <template>
   <main class="flex-1 bg-[--right-bg-color] h-full w-100vw">
-    <ActionBar :current-label="appWindow.label" />
+    <ActionBar :current-label="getCurrent().label" />
     <!-- 需要判断当前路由是否是信息详情界面 -->
     <ChatBox :active-item="activeItem" v-if="msgBoxShow && isChat && activeItem !== -1" />
 
@@ -19,7 +19,7 @@ import router from '@/router'
 import { setting } from '@/stores/setting.ts'
 import { storeToRefs } from 'pinia'
 import { MittEnum, ThemeEnum } from '@/enums'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrent } from '@tauri-apps/api/window'
 
 const settingStore = setting()
 const { themes } = storeToRefs(settingStore)
