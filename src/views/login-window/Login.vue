@@ -128,7 +128,7 @@
       </n-flex>
     </n-flex>
 
-    <!-- 顶部操作栏 -->
+    <!-- 底部操作栏 -->
     <n-flex justify="center" class="text-14px">
       <div class="color-#13987f cursor-pointer" @click="router.push('/qrCode')">扫码登录</div>
       <div class="w-1px h-14px bg-#ccc"></div>

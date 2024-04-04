@@ -7,8 +7,7 @@ use crate::common::plugins::{ reset_set_window };
 mod common;
 
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let context = tauri::generate_context!();
     tauri::Builder::default()
         .setup(|app| {

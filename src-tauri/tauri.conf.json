@@ -37,14 +37,13 @@
     "windows": [
       {
         "title": "登录",
-        "label": "login",
+        "label": "hula-login",
         "url": "/login",
         "fullscreen": false,
         "resizable": false,
         "center": true,
         "width": 320,
         "height": 448,
-        "skipTaskbar": false,
         "decorations": false,
         "transparent": true
       },

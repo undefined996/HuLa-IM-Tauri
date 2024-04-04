@@ -1,6 +1,5 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { LogicalSize } from '@tauri-apps/api/dpi'
-import { invoke } from '@tauri-apps/api/core'
 
 export const useWindow = () => {
   /**
@@ -34,7 +33,7 @@ export const useWindow = () => {
         return label
       }
     })
-    const webview = new WebviewWindow(label, {
+    const webview = new WebviewWindow(`hula-${label}`, {
       title: title,
       url: `/${checkLabel.value}`,
       fullscreen: false,
@@ -49,11 +48,7 @@ export const useWindow = () => {
       transparent: true,
       fileDropEnabled: isDrag
     })
-
     await webview.once('tauri://created', async () => {
-      await invoke('reset_set_window', { label }).catch((error) => {
-        console.error('设置窗口阴影失败:', error)
-      })
       if (wantCloseWindow) {
         const win = WebviewWindow.getByLabel(wantCloseWindow)
         win?.close()
