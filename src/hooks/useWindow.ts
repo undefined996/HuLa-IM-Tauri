@@ -45,19 +45,21 @@ export const useWindow = () => {
       minWidth: minW,
       skipTaskbar: false,
       decorations: false,
-      transparent: true,
-      fileDropEnabled: isDrag
+      transparent: true
     })
-    await webview.once('tauri://created', async () => {
-      if (wantCloseWindow) {
-        const win = WebviewWindow.getByLabel(wantCloseWindow)
-        win?.close()
-      }
+    await webview.once('tauri://created', () => {
+      nextTick(() => {
+        if (wantCloseWindow) {
+          const win = WebviewWindow.getByLabel(`hula-${wantCloseWindow}`)
+          win?.close()
+        }
+      })
     })
 
     await webview.once('tauri://error', async () => {
+      console.log(isDrag)
       // TODO 这里利用错误处理的方式来查询是否是已经创建了窗口,如果一开始就使用WebviewWindow.getByLabel来查询在刷新的时候就会出现问题 (nyh -> 2024-03-06 23:54:17)
-      await checkWinExist(label)
+      await checkWinExist(`hula-${label}`)
     })
 
     return webview
@@ -70,7 +72,7 @@ export const useWindow = () => {
    * @param height 窗口高度
    * */
   const resizeWindow = async (label: string, width: number, height: number) => {
-    const webview = WebviewWindow.getByLabel(label)
+    const webview = WebviewWindow.getByLabel(`hula-${label}`)
     // TODO 使用webview?.setSize重新设置窗口尺寸的时候高度会自动增加20px(bug?) (nyh -> 2024-02-22 03:52:54)
     // 创建一个新的尺寸对象
     const newSize = new LogicalSize(width, height)

@@ -87,12 +87,12 @@
           @click="pageJumps(item.url)"
           :class="[
             { active: activeUrl === item.url && item.url !== 'dynamic' },
-            openWindowsList.has(item.url) ? 'p-[6px_8px] color-#13987f' : 'top-action'
+            openWindowsList.has(`hula-${item.url}`) ? 'p-[6px_8px] color-#13987f' : 'top-action'
           ]">
           <n-badge :value="item.badge" :max="99">
             <svg class="w-22px h-22px">
               <use
-                :href="`#${activeUrl === item.url || openWindowsList.has(item.url) ? item.iconAction : item.icon}`"></use>
+                :href="`#${activeUrl === item.url || openWindowsList.has(`hula-${item.url}`) ? item.iconAction : item.icon}`"></use>
             </svg>
           </n-badge>
         </div>
@@ -104,9 +104,9 @@
           v-for="(item, index) in itemsBottom"
           :key="index"
           @click="openContent(item.title, item.label)"
-          :class="openWindowsList.has(item.url.substring(1)) ? 'p-[6px_8px] color-#13987f' : 'bottom-action'">
+          :class="openWindowsList.has(`hula-${item.url.substring(1)}`) ? 'p-[6px_8px] color-#13987f' : 'bottom-action'">
           <svg class="w-22px h-22px">
-            <use :href="`#${openWindowsList.has(item.url.substring(1)) ? item.iconAction : item.icon}`"></use>
+            <use :href="`#${openWindowsList.has(`hula-${item.url.substring(1)}`) ? item.iconAction : item.icon}`"></use>
           </svg>
         </div>
 

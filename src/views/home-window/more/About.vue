@@ -23,11 +23,18 @@ import { type, arch, version } from '@tauri-apps/plugin-os'
 const _pkg = reactive({
   version: pkg.version
 })
-const osVersion = await version()
-const osType = await type()
+const osVersion = ref()
+const osType = ref()
 const osArch = ref()
 
 onMounted(() => {
+  version().then((e) => {
+    console.log(e)
+    osVersion.value = e
+  })
+  type().then((e) => {
+    osType.value = e
+  })
   arch().then((e) => {
     if (e.includes('64')) {
       osArch.value = '64位'

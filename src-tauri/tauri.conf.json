@@ -45,7 +45,7 @@
         "width": 320,
         "height": 448,
         "decorations": false,
-        "transparent": true
+        "transparent": false
       },
       {
         "label": "tray",

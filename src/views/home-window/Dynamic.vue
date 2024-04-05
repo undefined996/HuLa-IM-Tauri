@@ -1,6 +1,6 @@
 <template>
   <main class="size-full bg-[--right-bg-color]">
-    <ActionBar :shrink="false" :max-w="false" :top-win-label="appWindow.label" :current-label="appWindow.label" />
+    <ActionBar :shrink="false" :max-w="false" :top-win-label="getCurrent().label" :current-label="getCurrent().label" />
     <article class="flex flex-col items-center text-[--text-color] size-full bg-[--right-bg-color]">
       <n-scrollbar
         style="max-height: calc(100vh - 20px)"
