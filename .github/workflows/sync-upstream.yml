@@ -1,0 +1,29 @@
+name: Weekly Upstream Sync (No Push)
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # 每周一 UTC 时间 03:00 执行（北京时间 11:00）
+  workflow_dispatch:      # 手动触发也支持
+
+jobs:
+  sync-only:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current fork (undefined996/page-spy-web)
+        uses: actions/checkout@v4
+
+      - name: Set Git config
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/HuLaSpark/HuLa.git
+          git fetch upstream
+
+      - name: Rebase from upstream/main (no push)
+        run: |
+          git checkout master
+          git rebase upstream/main
