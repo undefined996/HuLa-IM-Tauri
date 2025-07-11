@@ -23,7 +23,7 @@ jobs:
           git remote add upstream https://github.com/HuLaSpark/HuLa.git
           git fetch upstream
 
-      - name: Rebase from upstream/main (no push)
+      - name: Rebase from upstream/master (no push)
         run: |
           git checkout master
-          git rebase upstream/main
+          git rebase upstream/master
