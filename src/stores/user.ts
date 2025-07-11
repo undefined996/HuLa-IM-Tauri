@@ -1,34 +1,24 @@
+import apis from '@/services/apis'
 import { defineStore } from 'pinia'
+import type { UserInfoType } from '@/services/types'
+import { StoresEnum } from '@/enums'
 
-type IState = {
-  loginInfo: {
-    avatarUrl: string
-    email: string
-    nickname: string
-    ipaddress: string
-    username: string
-    token: string
-  }
-}
+export const useUserStore = defineStore(StoresEnum.USER, () => {
+  const userInfo = ref<Partial<UserInfoType>>({})
+  const isSign = ref(false)
 
-export const userStore = defineStore('localUserInfo', {
-  state: (): IState =>
-    <IState>{
-      loginInfo: {}
-    },
-  getters: {
-    getBearerToken(): any {
-      return this.loginInfo.token ? this.loginInfo.token : ''
-    }
-  },
-  actions: {
-    setLoginInfo(loginInfo: any) {
-      this.loginInfo = loginInfo
-    },
-    logout() {
-      this.$reset()
-      //删除localStorage中的用户信息
-      localStorage.removeItem('localUserInfo')
-    }
+  const getUserDetailAction = () => {
+    apis
+      .getUserDetail()
+      .then((res) => {
+        userInfo.value = { ...userInfo.value, ...res }
+      })
+      .catch(() => {
+        // 删除缓存
+        localStorage.removeItem('TOKEN')
+        localStorage.removeItem('REFRESH_TOKEN')
+      })
   }
+
+  return { userInfo, isSign, getUserDetailAction }
 })

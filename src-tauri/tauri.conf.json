@@ -1,99 +1,63 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HuLa",
+  "version": "2.6.13",
+  "identifier": "com.hula.pc",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
-    "devPath": "http://localhost:6130",
-    "distDir": "../dist",
-    "withGlobalTauri": true
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:6130"
   },
-  "package": {
-    "productName": "HuLa",
-    "version": "1.5.0"
-  },
-  "tauri": {
-    "updater": {
-      "windows": {
-        "installMode": "basicUi"
-      }
-    },
-    "allowlist": {
-      "all": false,
-      "notification": {
-        "all": true
-      },
-      "os": {
-        "all": true
-      },
-      "process": {
-        "all": true
-      },
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "http": {
-        "scope": ["http://**", "https://**"]
-      },
-      "fs": {
-        "all": true,
-        "scope": ["*/**"]
-      },
-      "window": {
-        "all": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "resources": ["tray"],
-      "targets": "all",
-      "identifier": "com.tauri.build",
-      "windows": {
-        "wix": {
-          "language": "zh-CN"
-        }
-      },
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
-    },
-    "security": {
-      "csp": null
-    },
-    "macOSPrivateApi": true,
-    "windows": [
-      {
-        "title": "登录",
-        "label": "login",
-        "url": "/login",
-        "fullscreen": false,
-        "resizable": false,
-        "center": true,
-        "width": 320,
-        "height": 448,
-        "skipTaskbar": false,
-        "decorations": false,
-        "transparent": true
-      },
-      {
-        "label": "tray",
-        "url": "/tray",
-        "resizable": false,
-        "center": false,
-        "visible": false,
-        "width": 130,
-        "height": 44,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "decorations": false
-      }
+  "bundle": {
+    "category": "SocialNetworking",
+    "copyright": "HuLaSpark",
+    "licenseFile": "./copyright/License.rtf",
+    "resources": ["tray"],
+    "createUpdaterArtifacts": true,
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png",
+      "icons/Square30x30Logo.png",
+      "icons/Square44x44Logo.png",
+      "icons/Square71x71Logo.png",
+      "icons/Square89x89Logo.png",
+      "icons/Square107x107Logo.png",
+      "icons/Square142x142Logo.png",
+      "icons/Square150x150Logo.png",
+      "icons/Square284x284Logo.png",
+      "icons/Square310x310Logo.png",
+      "icons/StoreLogo.png"
     ],
-    "systemTray": {
-      "iconPath": "icons/icon.ico",
-      "iconAsTemplate": true
+    "windows": {},
+    "macOS": {}
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null,
+      "capabilities": ["default-capability", "mobile-capability", "desktop-capability"],
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    },
+    "macOSPrivateApi": true
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "windows": {
+        "installMode": "passive"
+      },
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1NkNENEZFNzg1MjVFMEEKUldRS1hsSjQvdFJzbGJXcnNPNXBYZ2RlTmlRRFZYYVI3YXhiWGpYZXFwVUtucThZUnJHUGw5dVUK",
+      "endpoints": ["https://gitee.com/HuLaSpark/HuLa/releases/download/latest/latest.json"]
     }
   }
 }

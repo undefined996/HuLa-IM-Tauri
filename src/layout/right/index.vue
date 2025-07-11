@@ -1,33 +1,44 @@
 <template>
-  <main class="flex-1 bg-[--right-bg-color] h-full w-100vw">
-    <ActionBar :current-label="appWindow.label" />
-    <!-- 需要判断当前路由是否是信息详情界面 -->
-    <ChatBox :active-item="activeItem" v-if="msgBoxShow && isChat && activeItem !== -1" />
+  <main data-tauri-drag-region class="flex-1 bg-[--right-bg-color] h-full w-100vw min-w-600px">
+    <div class="size-full" :style="{ background: isChat ? 'var(--right-theme-bg-color)' : '' }" data-tauri-drag-region>
+      <ActionBar :current-label="appWindow.label" />
 
-    <Details :content="DetailsContent" v-else-if="detailsShow && isDetails" />
+      <!-- 需要判断当前路由是否是信息详情界面 -->
+      <ChatBox :active-item="activeItem" :key="activeItem?.roomId" v-if="msgBoxShow && isChat && activeItem !== -1" />
 
-    <!-- 聊天界面背景图标 -->
-    <div v-else class="flex-center size-full select-none">
-      <img v-if="imgTheme === ThemeEnum.DARK" class="w-130px h-100px" src="@/assets/img/hula_bg_dark.png" alt="" />
-      <img v-else class="w-130px h-100px" src="@/assets/img/hula_bg_light.png" alt="" />
+      <Details :content="DetailsContent" v-else-if="detailsShow && isDetails && DetailsContent.type !== 'apply'" />
+
+      <!-- 好友申请列表 -->
+      <ApplyList v-else-if="DetailsContent && isDetails && DetailsContent.type === 'apply'" />
+
+      <!-- 聊天界面背景图标 -->
+      <div v-else class="flex-center size-full select-none">
+        <img
+          v-if="imgTheme === ThemeEnum.DARK && themes.versatile === 'default' && !isDetails"
+          class="w-110px h-100px"
+          src="@/assets/img/hula_bg_d.svg"
+          alt="" />
+        <img v-else-if="imgTheme === ThemeEnum.DARK" class="w-110px h-100px" src="@/assets/img/hula-bg-h.png" alt="" />
+        <img v-else class="svg-icon w-110px h-100px" src="@/assets/img/hula_bg_l.png" alt="" />
+      </div>
     </div>
   </main>
 </template>
 <script setup lang="ts">
-import Mitt from '@/utils/Bus.ts'
+import { useMitt } from '@/hooks/useMitt.ts'
 import router from '@/router'
-import { setting } from '@/stores/setting.ts'
-import { storeToRefs } from 'pinia'
+import { useSettingStore } from '@/stores/setting.ts'
 import { MittEnum, ThemeEnum } from '@/enums'
-import { appWindow } from '@tauri-apps/api/window'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
-const settingStore = setting()
+const appWindow = WebviewWindow.getCurrent()
+const settingStore = useSettingStore()
 const { themes } = storeToRefs(settingStore)
 const msgBoxShow = ref(false)
 const detailsShow = ref(false)
 const activeItem = ref()
 const DetailsContent = ref()
-const imgTheme = ref(themes.value.content)
+const imgTheme = ref<ThemeEnum>(themes.value.content)
 const prefers = matchMedia('(prefers-color-scheme: dark)')
 // 判断当前路由是否是聊天界面
 const isChat = computed(() => {
@@ -54,20 +65,19 @@ watchEffect(() => {
 })
 
 onMounted(() => {
-  Mitt.on(MittEnum.NOT_MSG, () => {
-    msgBoxShow.value = false
-    activeItem.value = -1
-  })
   if (isChat) {
-    Mitt.on(MittEnum.MSG_BOX_SHOW, (event: any) => {
+    useMitt.on(MittEnum.MSG_BOX_SHOW, (event: any) => {
       msgBoxShow.value = event.msgBoxShow
       activeItem.value = event.item
     })
   }
 
   if (isDetails) {
-    Mitt.on(MittEnum.DETAILS_SHOW, (event: any) => {
-      DetailsContent.value = event.data
+    useMitt.on(MittEnum.APPLY_SHOW, (event: any) => {
+      DetailsContent.value = event.context
+    })
+    useMitt.on(MittEnum.DETAILS_SHOW, (event: any) => {
+      DetailsContent.value = event.context
       detailsShow.value = event.detailsShow as boolean
     })
   }

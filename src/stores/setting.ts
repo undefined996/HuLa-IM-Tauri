@@ -1,40 +1,44 @@
 import { defineStore } from 'pinia'
-import { CloseBxEnum, StoresEnum, ThemeEnum } from '@/enums'
+import { CloseBxEnum, StoresEnum, ShowModeEnum, ThemeEnum } from '@/enums'
+import { type } from '@tauri-apps/plugin-os'
 
-// TODO 使用indexDB或者把配置写出到文件中，还需要根据每个账号来进行配置 (nyh -> 2024-03-26 01:22:12)
-export const setting = defineStore(StoresEnum.SETTING, {
+// TODO 使用indexDB或sqlite缓存数据，还需要根据每个账号来进行配置 (nyh -> 2024-03-26 01:22:12)
+const isDesktop = computed(() => {
+  return type() === 'windows' || type() === 'linux' || type() === 'macos'
+})
+export const useSettingStore = defineStore(StoresEnum.SETTING, {
   state: (): STO.Setting => ({
-    /** 主题设置 */
     themes: {
       content: '',
-      pattern: ''
+      pattern: '',
+      versatile: isDesktop.value ? 'default' : 'simple'
     },
-    /** 是否启用ESC关闭窗口 */
     escClose: true,
-    /** 系统托盘 */
+    showMode: ShowModeEnum.ICON,
+    lockScreen: {
+      enable: false,
+      password: ''
+    },
     tips: {
       type: CloseBxEnum.HIDE,
       notTips: false
     },
-    /** 登录设置 */
     login: {
       autoLogin: false,
-      autoStartup: false,
-      /** 用户保存的登录信息 */
-      accountInfo: {
-        account: '',
-        password: '',
-        name: '',
-        avatar: '',
-        uid: ''
-      }
+      autoStartup: false
     },
-    /** 聊天设置 */
     chat: {
-      /** 发送快捷键 */
       sendKey: 'Enter',
-      /** 是否双击打开独立会话窗口 */
-      isDouble: true
+      isDouble: true,
+      translate: 'tencent'
+    },
+    page: {
+      shadow: true,
+      fonts: 'PingFang',
+      blur: true
+    },
+    update: {
+      dismiss: ''
     }
   }),
   actions: {
@@ -62,13 +66,9 @@ export const setting = defineStore(StoresEnum.SETTING, {
       this.login.autoLogin = autoLogin
       this.login.autoStartup = autoStartup
     },
-    /** 设置用户保存的登录信息 */
-    setAccountInfo(accountInfo: STO.Setting['login']['accountInfo']) {
-      this.login.accountInfo = accountInfo
-    },
-    /** 清空账号信息 */
-    clearAccount() {
-      this.login.accountInfo = { account: '', avatar: '', name: '', password: '', uid: '' }
+    /** 设置菜单显示模式 */
+    setShowMode(showMode: ShowModeEnum): void {
+      this.showMode = showMode
     }
   },
   share: {

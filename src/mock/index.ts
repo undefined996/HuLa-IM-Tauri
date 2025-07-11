@@ -25,7 +25,7 @@ export const MockList = ref<MockItem[]>(
       key: i,
       avatar: `${avatars}?${i}`,
       type: type,
-      accountId: `${i}`,
+      accountId: i,
       accountName: generateRandomString(Math.floor(Math.random() * 10) + 1, type)
     }
   })
@@ -45,5 +45,15 @@ export const dynamicList = Array.from({ length: 10 }, (_, i) => {
     user: `泰勒斯威夫特 ${i}`,
     img: imgList,
     isAuth: i % 2 === 0
+  }
+})
+
+/** 动态评论 */
+export const dynamicCommentList = Array.from({ length: 50 }, (_, i) => {
+  return {
+    id: i,
+    avatar: `${avatars}?${i}`,
+    user: `泰勒斯威夫特${i}`,
+    content: '点赞了你的动态'
   }
 })

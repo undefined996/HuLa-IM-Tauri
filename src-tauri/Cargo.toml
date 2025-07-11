@@ -1,33 +1,105 @@
 [package]
 name = "hula"
-version = "1.5.0"
+version = "2.6.13"
 description = "hula"
 authors = ["nongyehong"]
 license = ""
 repository = ""
-edition = "2021"
+edition = "2024"
 
 [profile.release]
-panic = "abort" # 去掉昂贵的恐慌清理逻辑
+panic = "abort"   # 去掉昂贵的恐慌清理逻辑
 codegen-units = 1 # 一个接一个地编译包，这样编译器就可以更好地优化
-lto = true # 启用链接到优化
-opt-level = "s" # 优化二进制文件大小,并且不会太大消耗性能,"z"极致优化大小但是会消耗性能
-strip = true # 删除调试符号
+lto = true        # 启用链接到优化
+opt-level = "s"   # 优化二进制文件大小,并且不会太大消耗性能,"z"极致优化大小但是会消耗性能
+strip = true      # 删除调试符号
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "hula_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2.3.0", features = [] }
 
 [dependencies]
-tauri = { version = "1.6.1", features = [ "os-all", "process-all", "notification-all", "macos-private-api", "fs-all", "window-all", "system-tray", "shell-open", "icon-png", "icon-ico"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-window-shadows = "0.2.2" # windows 阴影和圆角
-window-vibrancy = "0.4.3" # windows 磨砂背景 tauri-v1.x版本最好使用0.4.3版本
-tokio = { version = "1.36.0", features = ["macros", "windows-sys", "rt-multi-thread", "time"] }
+# Tauri 官方依赖
+tauri = { version = "2.6.2", features = [ "protocol-asset",
+    "macos-private-api",
+    "tray-icon",
+    "image-png",
+    "rustls-tls",
+] }
+tauri-plugin-os = "2.3.0"
+tauri-plugin-shell = "2.3.0"
+tauri-plugin-http = { version = "2.5.0", features = [
+    "unsafe-headers",
+    "rustls-tls",
+] }
+tauri-plugin-process = "2.3.0"
+tauri-plugin-fs = "2.3.0"
+tauri-plugin-dialog = "2.3.0"
+tauri-plugin-upload = "2.3.0"
+tauri-plugin-global-shortcut = "2.3.0"
+tauri-plugin-clipboard-manager = "2.3.0"
+tauri-plugin-updater = "2.9.0"
+tauri-plugin-sql = { version = "2.3.0", features = ["sqlite"] }
+tauri-plugin-single-instance = "2.3.0"
+tauri-plugin-notification = "2.3.0"
+tauri-plugin-opener = "2.3.0"
+mime_guess = "2.0.5"
+[target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
+tauri-plugin-autostart = "2.5.0"
+# Tauri 非官方依赖
+tauri-plugin-mic-recorder = "2.0.0"
+
+# 其他依赖
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+lazy_static = "1.4"
+screenshots = "0.5.4"
+base64 = "0.22.1"
+rodio = "0.17.3"
+image = { version = "0.25", features = ["jpeg", "png"] }
+reqwest = { version = "0.11", features = [
+    "json",
+    "socks",
+    "rustls-tls",
+    "blocking",
+] }
+tungstenite = { version = "0.26.2", features = ["rustls-tls-webpki-roots"] }
+tokio = { version = "1", features = ["full"] }
+surge-ping = "0.8.0"
+rand = "0.8.5"
+
+# mac平台需要依赖
+[target."cfg(target_os =\"macos\")".dependencies]
+cocoa = "0.26.0"
+objc = "0.2.7"
+core-foundation = "0.10.1"
+core-graphics = "0.25.0"
+
+# windows平台需要依赖
+[target."cfg(target_os = \"windows\")".dependencies]
+windows = { version = "0.52", features = [
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_Graphics_Gdi",
+    "Win32_Foundation",
+    "Win32_System_Ole",
+    "Win32_Storage_FileSystem",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [features]
-# this feature is used for production builds or when `devPath` points to the filesystem
-# DO NOT REMOVE!!
+# by default Tauri runs in production mode
+# when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is a URL
+default = ["custom-protocol"]
+# this feature is used for production builds where `devPath` points to the filesystem
+# DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]

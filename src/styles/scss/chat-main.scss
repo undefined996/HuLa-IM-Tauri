@@ -1,7 +1,21 @@
 /** 气泡样式 */
 @mixin bubble {
-  @apply w-fit max-w-35vw min-h-1em p-[8px_12px] text-15px line-height-22px bg-[--bg-bubble] rounded-[2px_18px_18px];
-  word-break: break-all; /** 强制连续文本换行 */
+  @apply w-fit min-h-1em p-[8px_12px] text-14px line-height-22px bg-[--bg-bubble] rounded-[2px_18px_18px] custom-shadow;
+  max-width: var(--bubble-max-width, 32vw); /** 默认为群聊宽度 */
+  white-space: pre-wrap; /** 保留空白符号并正常换行，支持特殊字符 */
+  word-break: break-word; /** 优先在单词边界换行，必要时在单词内换行 */
+  overflow-wrap: anywhere; /** 在任何位置都可以换行，包括特殊字符 */
+  word-wrap: break-word; /** 兼容旧版浏览器 */
+  -webkit-white-space: pre-wrap; /** 兼容webkit浏览器 */
+  -webkit-word-break: break-word;
+  -webkit-overflow-wrap: anywhere;
+  hyphens: auto; /** 行尾自动断开长单词 */
+  -webkit-hyphens: auto;
+  line-break: anywhere; /** 支持任意位置换行，包括特殊字符和符号 */
+  user-select: text; /** 只允许选中文本 */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
   &.active {
     background-color: var(--bg-bubble-active);
     color: var(--text-color);
@@ -15,20 +29,52 @@
   }
 }
 .bubble {
+  &::selection {
+    background: var(--select-bg-color, rgba(19, 152, 127, 0.3)); /* 设置选中背景颜色 */
+  }
   @include bubble;
+
+  /* 确保子元素中非文本元素不可选 */
+  img,
+  svg,
+  .emoji,
+  button,
+  [role='button'] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 }
 .bubble-oneself {
   @include bubble;
   @apply rounded-[18px_2px_18px_18px] color-#fff;
   background-color: var(--bg-active-msg);
+
+  &::selection {
+    background: var(--select-bg-color-self, rgba(255, 255, 255, 0.3)); /* 自己消息选中背景颜色 */
+  }
+
+  /* 确保子元素中非文本元素不可选 */
+  img,
+  svg,
+  .emoji,
+  button,
+  [role='button'] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 }
 /**! 气泡动画 */
 .bubble-animation {
+  @apply transform-gpu;
   animation: bubble-twinkle 0.4s ease-out forwards;
 }
 .photo-wall {
   @extend .bubble-oneself;
-  @apply flex flex-col items-start gap-6px max-w-380px;
+  @apply flex flex-col items-start gap-6px flex-1;
 }
 .float-header {
   @include float;
@@ -37,13 +83,18 @@
   @include float(bottom);
 }
 .float-box {
-  background-color: #fff;
+  background-color: var(--right-bg-color);
   border-radius: 50px;
   padding: 6px 8px;
   box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.16);
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   &:hover {
-    background-color: rgb(195, 221, 216);
+    background-color: var(--float-hover-bg-color);
+  }
+}
+.mac-close:hover {
+  svg {
+    display: block;
   }
 }
 /** 浮标达到最大值时候的样式 */
@@ -52,12 +103,19 @@
 }
 /** 回复气泡的样式 */
 .reply-bubble {
-  @apply text-12px text-[--reply-color] bg-[--bg-reply-bubble] rounded-8px p-4px cursor-pointer select-none;
+  @apply text-12px text-[--reply-color] bg-[--right-chat-reply-color] rounded-8px p-4px cursor-pointer select-none;
   svg,
   span {
     transition: color 0.4s ease-in-out;
   }
+  .reply-avatar {
+    filter: grayscale(60%);
+    transition: filter 0.4s ease-in-out;
+  }
   &:hover {
+    .reply-avatar {
+      filter: grayscale(0);
+    }
     svg {
       color: #13987f;
     }
@@ -66,11 +124,7 @@
     }
   }
   .content-span {
-    width: fit-content;
-    max-width: 250px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    @apply max-w-232px w-fit truncate flex-1;
   }
   /** 回复图片的计数器样式 */
   .reply-img-sub {
@@ -79,11 +133,11 @@
 }
 /** emoji回复气泡的样式 */
 .emoji-reply-bubble {
-  @apply relative rounded-8px p-[4px_8px] cursor-pointer select-none bg-#13987F66 text-14px w-fit;
+  @apply relative flex-y-center gap-4px rounded-50px p-[4px_8px] cursor-pointer select-none bg-#13987F66 text-14px w-fit border-(1px solid #13987F) custom-shadow;
 }
 /** 跳转到回复内容时候显示的样式 */
 .active-reply {
-  background-color: var(--bg-reply-active);
+  background-color: var(--right-chat-reply-active-color);
   border-radius: 8px;
   margin: 0 8px;
   transition: all 0.4s ease-in-out;
@@ -95,6 +149,78 @@
   border-radius: 0;
   transition: all 0.4s ease-in-out;
 }
+
+/** 翻译气泡的样式 */
+.translated-text {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background-color: var(--bg-translate-bubble);
+  line-height: 22px;
+  margin-top: 6px;
+  max-width: var(--bubble-max-width);
+  width: fit-content;
+}
+
+/** 时间搓显示时候的动画(单聊) */
+.fade-single-enter-active,
+.fade-single-leave-active {
+  transition: opacity 0.4s ease-in-out;
+}
+.fade-single-enter-from,
+.fade-single-leave-to {
+  opacity: 0;
+}
+
+/** 时间搓显示时候的动画(群聊) */
+.fade-group-enter-active,
+.fade-group-leave-active {
+  transition: opacity 0.4s ease-in-out;
+}
+.fade-group-enter-from,
+.fade-group-leave-to {
+  opacity: 0;
+}
+
+/** 初始化加载动画 */
+.chat-init-enter-active,
+.chat-init-leave-active {
+  transition: opacity 0.4s ease-in-out;
+}
+.chat-init-enter-from,
+.fchat-init-leave-to {
+  opacity: 0;
+}
+
+/** 翻译动画 */
+.fade-translate-enter-active,
+.fade-translate-leave-active {
+  transition: opacity 0.4s ease-in-out;
+}
+.fade-translate-enter-from,
+.fade-translate-leave-to {
+  opacity: 0;
+}
+
+// 置顶公告样式
+.feishu-announcement {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background-color: var(--bg-notice, rgba(19, 152, 127, 0.08));
+  border-radius: 8px;
+  border: 1px solid var(--bg-notice, rgba(19, 152, 127, 0.2));
+  margin: 6px 12px 0 12px;
+  height: 34px;
+  transition: all 0.3s ease-in-out;
+  z-index: 10;
+}
+
+.announcement-hover {
+  background-color: var(--bg-notice-hover, rgba(19, 152, 127, 0.14));
+}
+
 /**! 替换ait的字体颜色 */
 :deep(#aitSpan) {
   @apply text-inherit cursor-pointer;

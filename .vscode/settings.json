@@ -1,0 +1,7 @@
+{
+    "css.customData": [
+        ".vscode/tailwindcss.json"
+    ],
+    "java.configuration.updateBuildConfiguration": "disabled",
+    "typescript.tsdk": "node_modules/typescript/lib",
+}

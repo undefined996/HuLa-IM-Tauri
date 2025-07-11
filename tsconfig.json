@@ -24,9 +24,13 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["./*"],
-      "@/*": ["./src/*"]
-    }
+      "@/*": ["./src/*"],
+      "#/*": ["./src/mobile/*"]
+    },
+    "types": ["vitest/globals", "@vue/test-utils"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "include": ["scripts/**/*", "src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.test.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

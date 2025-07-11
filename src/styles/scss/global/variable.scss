@@ -1,12 +1,29 @@
+@use 'fonts';
+* {
+  font-family: var(--font-family), sans-serif !important;
+  font-weight: 500 !important;
+  caret-color: #13987f !important; /* 改变输入框光标的颜色 */
+}
+html,
+body,
+svg {
+  outline: none;
+  overscroll-behavior: none; // 禁止mac的"触底反弹"效果
+}
 /**! 主题变量 */
+/* todo: 这里只需要定义单个颜色的变量即可无需重复定义组件的颜色 */
 :root {
-  // 整体布局背景
-  --left-bg-color: rgba(255, 255, 255, 0.6);
-  --left-active-color: rgba(193, 193, 193, 0.6);
+  // 是否启用阴影
+  --shadow-enabled: 1;
+  // 字体
+  --font-family: 'PingFang';
+  // 是否启用透明高斯模糊
+  --blur-enabled: 1;
+
   --center-bg-color: #fff;
   --right-bg-color: #f1f1f1;
   // 阴影样式的颜色
-  --box-shadow-color: rgba(0,0,0,0.08);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
   // 文字颜色
   --text-color: #18181c;
   // 整体图标颜色
@@ -30,45 +47,84 @@
   --bg-menu-hover: rgba(10, 20, 28, 0.1);
   --line-color: #e3e3e3;
   // 通用左边菜单栏的hover样式
-  --bg-left-menu: rgba(255, 255, 255, 0.1);
+  --bg-left-menu: rgba(241, 241, 241, 1);
   --bg-left-menu-hover: rgba(90, 90, 90, 0.1);
   --bg-left-active: rgba(90, 90, 90, 0.2);
+  //通用按钮样式
+  --button-bg-color: #f1f1f1;
   // 通用禁用时的样式
   --disabled-color: #c1c1c1;
   // 气泡背景颜色
   --bg-bubble: rgb(253, 253, 253);
-  --bg-bubble-active: #dedede;
+  --bg-bubble-active: #f1f1f1;
+  // 翻译气泡背景色
+  --bg-translate-bubble: rgba(200, 200, 200, 0.4);
   // 头像状态的背景颜色
-  --bg-avatar: #e3e3e3;
+  --bg-avatar: rgba(241, 241, 241, 1);
   // 个人信息框背景颜色
-  --info-hover: #eee;
-  --info-text-color: #505050;
+  --info-hover: #eeeeee70;
+  --info-text-color: #202020;
   // 系统托盘hover样式
   --tray-hover: #eee;
   --tray-hover-e: #f5dce1;
-  // 群聊列表hover颜色
-  --bg-group-hover: #e3e3e3;
   // 信息框背景颜色
-  --bg-info: rgba(255, 255, 255, 0.8);
+  --bg-info: rgba(255, 255, 255);
   // 表情框样式
   --bg-emoji: rgba(255, 255, 255, 0.6);
   --emoji-hover: #e3e3e3;
+  --emoji-active-color: #13987f;
   // 回复消息样式
-  --bg-reply-active: #e3e3e3;
-  --bg-reply-bubble: #d3d3d3;
   --reply-color: #909090;
   --reply-hover: #505050;
   --bg-reply-img-count: #e3e3e3;
+  // 编辑资料背景颜色
+  --bg-edit: #f0f0f0;
+  // 聊天框时间戳样式
+  --time-color: #e3e3e3;
+  // chat模块样式
+  --chat-bt-color: #fff;
+  --chat-left-bg: #cef9ec;
+  --chat-right-bg: #f1f1f1;
+  --chat-text-color: #505050;
+  --chat-hover-color: #e3e3e3;
+  // 搜索框内样式
+  --search-color: #eee;
+  // bate
+  --bate-color: #a789d9;
+  --bate-bg: #d9ccf7;
+  // 卡片hover样式
+  --card-bg: #13987f60;
+  // 安装进度条样式
+  --progress-bg: #e0e9fc;
+  // 回复消息框背景
+  --reply-bg: rgba(204, 204, 204, 0.4);
+  // 危险样式
+  --danger-text: #c14053;
+  --danger-bg: #f6dfe3;
+  // 警告样式
+  --warning-text: #f7b668ff;
+  --warning-bg: #fdeeddff;
+  // 头像边框颜色
+  --avatar-border-color: #fff;
+  // hover头像样式
+  --avatar-hover-bg: rgba(255, 255, 255, 0.1);
+  // 插件背景颜色
+  --plugin-bg-color: #eee;
+  // 列表悬浮的颜色
+  --float-block-hover-color: #767676;
+  // 悬浮按钮hover样式
+  --float-hover-bg-color: rgb(221, 240, 236);
+  // 群公告列表背景色
+  --group-notice-list-bg: #ffffffb6;
+  // 文件文本的背景颜色
+  --file-bg-color: #fdfdfd;
 }
 
 html[data-theme='dark'] {
-  // 整体布局背景
-  --left-bg-color: rgba(0, 0, 0, 0.7);
-  --left-active-color: rgba(193, 193, 193, 0.1);
   --center-bg-color: #1b1b1b;
-  --right-bg-color: #111111;
+  --right-bg-color: #161616;
   // 阴影样式的颜色
-  --box-shadow-color: rgba(90,90,90,0.1);
+  --box-shadow-color: rgba(90, 90, 90, 0.1);
   // 文字颜色
   --text-color: #fff;
   // 整体图标颜色
@@ -92,35 +148,77 @@ html[data-theme='dark'] {
   --bg-menu-hover: #323232;
   --line-color: #404040;
   // 通用左边菜单栏的hover样式
-  --bg-left-menu: rgba(0, 0, 0, 0.8);
+  --bg-left-menu: rgba(22, 22, 22, 1);
   --bg-left-menu-hover: #3b3b3b;
   --bg-left-active: #444444;
+  //通用按钮样式
+  --button-bg-color: #3f3f3f;
   // 通用禁用时的样式
   --disabled-color: #575757;
   // 气泡背景颜色
   --bg-bubble: rgb(38, 38, 38);
-  --bg-bubble-active: #202020;
+  --bg-bubble-active: rgba(66, 66, 66, 0.8);
+  // 翻译气泡背景色
+  --bg-translate-bubble: rgba(144, 144, 144, 0.2);
   // 头像状态的背景颜色
-  --bg-avatar: #3f3f3f;
+  --bg-avatar: rgba(22, 22, 22, 1);
   // 个人信息框背景颜色
-  --info-hover: #3b3b3b;
+  --info-hover: #3b3b3b60;
   --info-text-color: #eee;
   // 系统托盘hover样式
   --tray-hover: #3b3b3b;
   --tray-hover-e: #bb8188;
-  // 群聊列表hover颜色
-  --bg-group-hover: #3f3f3f;
   // 信息框背景颜色
-  --bg-info: rgba(27, 27, 27, 0.8);
+  --bg-info: rgba(27, 27, 27);
   // 表情框样式
   --bg-emoji: rgba(27, 27, 27, 0.8);
   --emoji-hover: #3b3b3b;
+  --emoji-active-color: #13987f;
   // 回复消息样式
-  --bg-reply-active: #3b3b3b;
-  --bg-reply-bubble: #505050;
   --reply-color: #e3e3e3;
   --reply-hover: #b1b1b1;
   --bg-reply-img-count: #505050;
+  // 编辑资料背景颜色
+  --bg-edit: #262626;
+  // 聊天框时间戳样式
+  --time-color: #3b3b3b;
+  // chat模块样式
+  --chat-bt-color: #3b3b3b;
+  --chat-left-bg: #355b55;
+  --chat-right-bg: #161616;
+  --chat-text-color: #b1b1b1;
+  --chat-hover-color: #262626;
+  // 搜索框内样式
+  --search-color: #333;
+  // bate
+  --bate-color: #a789d9;
+  --bate-bg: #403555;
+  // 卡片hover样式
+  --card-bg: #13987f20;
+  // 安装进度条样式
+  --progress-bg: transparent;
+  // 回复消息框背景
+  --reply-bg: rgba(30, 30, 30, 0.6);
+  // 危险样式
+  --danger-text: #da8583;
+  --danger-bg: #37292c;
+  // 警告样式
+  --warning-text: #f4c375ff;
+  --warning-bg: #402f1dff;
+  // 头像边框颜色
+  --avatar-border-color: #1b1b1b;
+  // hover头像样式
+  --avatar-hover-bg: rgba(30, 30, 30, 0.6);
+  // 插件背景颜色
+  --plugin-bg-color: #3b3b3b;
+  // 列表悬浮的颜色
+  --float-block-hover-color: #fff;
+  // 悬浮按钮hover样式
+  --float-hover-bg-color: rgb(25, 50, 45);
+  // 群公告列表背景色
+  --group-notice-list-bg: #262626;
+  // 文件文本的背景颜色
+  --file-bg-color: #222;
 }
 /**! end */
 // 线性动画
@@ -171,12 +269,22 @@ html[data-theme='dark'] {
   right: 0;
   top: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur($blur);
 }
+
+// 使用CSS变量来控制模糊效果
+html[data-blur="1"] {
+  .n-modal-mask,
+  .n-drawer-mask {
+    background-color: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+}
+
 .n-modal-mask {
   @include mask-style;
 }
+
 .n-drawer-mask {
   @include mask-style(2px);
 }
@@ -190,7 +298,10 @@ html[data-theme='dark'] {
 }
 
 /**! 修改naive-ui滚动条的间距 */
-:deep(.n-scrollbar > .n-scrollbar-rail.n-scrollbar-rail--vertical, .n-scrollbar + .n-scrollbar-rail.n-scrollbar-rail--vertical) {
+:deep(
+    .n-scrollbar > .n-scrollbar-rail.n-scrollbar-rail--vertical,
+    .n-scrollbar + .n-scrollbar-rail.n-scrollbar-rail--vertical
+  ) {
   right: 0;
 }
 
@@ -208,6 +319,7 @@ html[data-theme='dark'] {
   background: var(--bg-menu);
   color: var(--text-color);
   border-radius: 6px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.08),
@@ -250,4 +362,11 @@ html[data-theme='dark'] {
       }
     }
   }
+}
+
+/** 修改默认的naive-ui的选择器样式 */
+:deep(.n-base-selection) {
+  --n-box-shadow-active: 0 0 0 2px rgba(19, 152, 127, 0.2) !important;
+  --n-border-active: 1px solid #13987f !important;
+  --n-border-hover: 1px solid #13987f !important;
 }

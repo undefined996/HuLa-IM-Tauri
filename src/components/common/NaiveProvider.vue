@@ -8,8 +8,10 @@
       <n-dialog-provider>
         <n-notification-provider :max="notificMax">
           <n-message-provider :max="messageMax">
-            <slot></slot>
-            <naive-provider-content />
+            <n-modal-provider>
+              <slot></slot>
+              <naive-provider-content />
+            </n-modal-provider>
           </n-message-provider>
         </n-notification-provider>
       </n-dialog-provider>
@@ -18,12 +20,11 @@
 </template>
 
 <script setup lang="ts">
-import { setting } from '@/stores/setting.ts'
-import { storeToRefs } from 'pinia'
+import { useSettingStore } from '@/stores/setting.ts'
 import { dateZhCN, darkTheme, lightTheme, GlobalThemeOverrides, zhCN } from 'naive-ui'
 import { ThemeEnum } from '@/enums'
 
-const settingStore = setting()
+const settingStore = useSettingStore()
 const { themes } = storeToRefs(settingStore)
 /**监听深色主题颜色变化*/
 const globalTheme = ref<any>(themes.value.content)
@@ -69,13 +70,17 @@ const commonTheme: GlobalThemeOverrides = {
   },
   Button: {
     borderRadiusMedium: '10px',
+    borderRadiusSmall: '6px',
     colorPrimary: '#13987f'
   },
   Tabs: {
     tabTextColorSegment: '#707070',
-    tabTextColorActiveSegment: '#13987f',
-    tabTextColorHoverSegment: '#13987f',
-    tabPaddingMediumSegment: '4px'
+    tabPaddingMediumSegment: '4px',
+    tabTextColorActiveLine: '#13987f',
+    tabTextColorHoverLine: '#13987f',
+    tabTextColorActiveBar: '#13987f',
+    tabTextColorHoverBar: '#13987f',
+    barColor: '#13987f'
   },
   Popover: {
     padding: '5px',
@@ -101,7 +106,23 @@ const commonTheme: GlobalThemeOverrides = {
   Message: {
     iconColorSuccess: '#13987f',
     iconColorLoading: '#13987f',
-    loadingColor: '#13987f'
+    loadingColor: '#13987f',
+    borderRadius: '8px'
+  },
+  Slider: {
+    handleSize: '12px',
+    fontSize: '10px',
+    markFontSize: '8px',
+    fillColor: '#13987f',
+    fillColorHover: '#13987f',
+    indicatorBorderRadius: '8px'
+  },
+  Notification: {
+    borderRadius: '8px'
+  },
+  Steps: {
+    indicatorBorderColorProcess: '#13987f',
+    indicatorColorProcess: '#52aea3'
   }
 }
 
@@ -111,6 +132,10 @@ const lightThemeOverrides: GlobalThemeOverrides = {
   Scrollbar: {
     color: '#d5d5d5',
     colorHover: '#c5c5c5'
+  },
+  Skeleton: {
+    color: 'rgba(200, 200, 200, 0.6)',
+    colorEnd: 'rgba(200, 200, 200, 0.2)'
   }
 }
 
@@ -135,6 +160,7 @@ const registerNaiveTools = () => {
   window.$dialog = useDialog()
   window.$message = useMessage()
   window.$notification = useNotification()
+  window.$modal = useModal()
 }
 
 const NaiveProviderContent = defineComponent({
