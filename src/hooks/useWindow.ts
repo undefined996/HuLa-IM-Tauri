@@ -1,26 +1,27 @@
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { EventEnum } from '@/enums'
-import { LogicalSize } from '@tauri-apps/api/dpi'
-import { type } from '@tauri-apps/plugin-os'
-import { UserAttentionType } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { LogicalSize } from '@tauri-apps/api/dpi'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { UserAttentionType } from '@tauri-apps/api/window'
+import { info } from '@tauri-apps/plugin-log'
+import { EventEnum } from '@/enums'
+import { isCompatibility, isWindows } from '@/utils/PlatformConstants'
 
 /** 判断是兼容的系统 */
-const isCompatibility = computed(() => type() === 'windows' || type() === 'linux')
+const isCompatibilityMode = computed(() => isCompatibility())
 export const useWindow = () => {
   /**
    * 创建窗口
    * @param title 窗口标题
    * @param label 窗口名称
-   * @param wantCloseWindow 创建后需要关闭的窗口
    * @param width 窗口宽度
    * @param height 窗口高度
+   * @param wantCloseWindow 创建后需要关闭的窗口
    * @param resizable 调整窗口大小
    * @param minW 窗口最小宽度
    * @param minH 窗口最小高度
    * @param transparent 是否透明
    * @param visible 是否显示
+   * @param queryParams URL查询参数
    * */
   const createWebviewWindow = async (
     title: string,
@@ -32,7 +33,8 @@ export const useWindow = () => {
     minW = 330,
     minH = 495,
     transparent?: boolean,
-    visible = false
+    visible = false,
+    queryParams?: Record<string, string | number | boolean>
   ) => {
     const checkLabel = computed(() => {
       /** 如果是打开独立窗口就截取label中的固定label名称 */
@@ -42,9 +44,19 @@ export const useWindow = () => {
         return label
       }
     })
+    // 构建URL，包含查询参数
+    let url = `/${checkLabel.value}`
+    if (queryParams && Object.keys(queryParams).length > 0) {
+      const searchParams = new URLSearchParams()
+      Object.entries(queryParams).forEach(([key, value]) => {
+        searchParams.append(key, String(value))
+      })
+      url += `?${searchParams.toString()}`
+    }
+
     const webview = new WebviewWindow(label, {
       title: title,
-      url: `/${checkLabel.value}`,
+      url: url,
       fullscreen: false,
       resizable: resizable,
       center: true,
@@ -53,8 +65,8 @@ export const useWindow = () => {
       minHeight: minH,
       minWidth: minW,
       skipTaskbar: false,
-      decorations: !isCompatibility.value,
-      transparent: transparent || isCompatibility.value,
+      decorations: !isCompatibilityMode.value,
+      transparent: transparent || isCompatibilityMode.value,
       titleBarStyle: 'overlay', // mac覆盖标签栏
       hiddenTitle: true, // mac隐藏标题栏
       visible: visible
@@ -68,6 +80,7 @@ export const useWindow = () => {
     })
 
     await webview.once('tauri://error', async () => {
+      info('窗口创建失败')
       // TODO 这里利用错误处理的方式来查询是否是已经创建了窗口,如果一开始就使用WebviewWindow.getByLabel来查询在刷新的时候就会出现问题 (nyh -> 2024-03-06 23:54:17)
       await checkWinExist(label)
     })
@@ -126,13 +139,15 @@ export const useWindow = () => {
    * // 需要时手动取消监听
    * unlisten()
    */
-  async function getWindowPayloadListener<T>(this: any, windowLabel: string, callback: (event: any) => void) {
-    const listenLabel = `${windowLabel}:update`
+  // async function getWindowPayloadListener<T>(this: any, windowLabel: string, callback: (event: any) => void) {
+  //   const listenLabel = `${windowLabel}:update`
 
-    return listen<T>(listenLabel, (event) => {
-      callback.call(this, event)
-    })
-  }
+  //   return addListener(
+  //     listen<T>(listenLabel, (event) => {
+  //       callback.call(this, event)
+  //     })
+  //   )
+  // }
 
   /**
    * 创建模态子窗口
@@ -165,9 +180,10 @@ export const useWindow = () => {
       minWidth: 500,
       minHeight: 500,
       focus: true,
+      minimizable: false,
       parent: parentWindow ? parentWindow : parent,
-      decorations: !isCompatibility.value,
-      transparent: isCompatibility.value,
+      decorations: !isCompatibilityMode.value,
+      transparent: isCompatibilityMode.value,
       titleBarStyle: 'overlay', // mac覆盖标签栏
       hiddenTitle: true, // mac隐藏标题栏
       visible: false
@@ -175,7 +191,7 @@ export const useWindow = () => {
 
     // 监听窗口创建完成事件
     modalWindow.once('tauri://created', async () => {
-      if (type() === 'windows') {
+      if (isWindows()) {
         // 禁用父窗口，模拟模态窗口效果
         await parentWindow?.setEnabled(false)
       }
@@ -256,7 +272,6 @@ export const useWindow = () => {
     checkWinExist,
     setResizable,
     sendWindowPayload,
-    getWindowPayload,
-    getWindowPayloadListener
+    getWindowPayload
   }
 }

@@ -13,9 +13,9 @@
       justify="center"
       :size="20"
       class="login-box relative h-160px w-full select-none">
-      <n-avatar :size="120" round bordered :src="AvatarUtils.getAvatarUrl(userStore.userInfo.avatar!)" />
+      <n-avatar :size="120" round bordered :src="AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar!)" />
       <n-flex vertical justify="center" :size="20">
-        <p class="text-(24px [--chat-text-color]) font-500">{{ userStore.userInfo.name }}</p>
+        <p class="text-(24px [--chat-text-color]) font-500">{{ userStore.userInfo!.name }}</p>
 
         <n-flex align="center" justify="space-between" :size="30" class="mt-5px">
           <template v-for="item in titleList" :key="item.label">
@@ -37,7 +37,7 @@
     <!-- 动态列表 -->
     <div class="flex flex-col items-center text-[--text-color] bg-[--right-bg-color]">
       <n-scrollbar
-        style="max-height: calc(100vh - 180px)"
+        style="max-height: calc(100vh / var(--page-scale, 1) - 184px)"
         class="w-full rounded-b-8px bg-[--center-bg-color] border-(solid 1px [--line-color]) p-[10px_0] box-border">
         <n-flex justify="center">
           <!--  动态内容框   -->
@@ -98,16 +98,16 @@
     <n-modal v-model:show="infoTip.modalShow" class="w-450px border-rd-8px">
       <div class="bg-[--bg-popover] h-full p-6px box-border flex flex-col">
         <div
-          v-if="type() === 'macos'"
+          v-if="isMac()"
           @click="infoTip.modalShow = false"
           class="mac-close relative size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none">
-          <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+          <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
             <use href="#close"></use>
           </svg>
         </div>
 
         <svg
-          v-if="type() === 'windows'"
+          v-if="isWindows()"
           @click="infoTip.modalShow = false"
           class="w-12px h-12px ml-a cursor-pointer select-none">
           <use href="#close"></use>
@@ -133,15 +133,12 @@
   </main>
 </template>
 <script setup lang="ts">
-import { dynamicList, dynamicCommentList } from '@/mock'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useWindowState } from '@/hooks/useWindowState.ts'
-import { type } from '@tauri-apps/plugin-os'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { dynamicCommentList, dynamicList } from '@/mock'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
+import { isMac, isWindows } from '@/utils/PlatformConstants'
 
-useWindowState(WebviewWindow.getCurrent().label)
 const userStore = useUserStore()
 const infoTip = ref({
   value: dynamicCommentList.length,

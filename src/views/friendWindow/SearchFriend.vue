@@ -52,7 +52,7 @@
 
           <!-- 初始加载状态 -->
           <template v-if="initialLoading">
-            <n-spin class="flex-center" style="height: calc(100vh - 200px)" size="large" />
+            <n-spin class="flex-center" style="height: calc(100vh / var(--page-scale, 1) - 200px)" size="large" />
           </template>
 
           <!-- 搜索结果 -->
@@ -61,12 +61,17 @@
               :data-source="searchResults"
               item-key="id"
               :item-height="64"
-              max-height="calc(100vh - 128px)"
+              max-height="calc(100vh / var(--page-scale, 1) - 128px)"
               style-id="search-hover-classes">
               <template #item="{ item }">
                 <div class="p-[0_20px] box-border">
                   <n-flex align="center" :size="12" class="p-[8px_0] rounded-lg">
-                    <n-avatar :size="48" :src="AvatarUtils.getAvatarUrl(item.avatar)" fallback-src="/logo.png" round />
+                    <n-avatar
+                      :size="48"
+                      :src="AvatarUtils.getAvatarUrl(item.avatar)"
+                      :color="themes.content === ThemeEnum.DARK ? '' : '#fff'"
+                      :fallback-src="themes.content === ThemeEnum.DARK ? '/logoL.png' : '/logoD.png'"
+                      round />
                     <n-flex vertical justify="center" :size="10" class="flex-1">
                       <n-space align="center" :size="10">
                         <span class="text-(14px [--text-color])">{{ item.name }}</span>
@@ -106,17 +111,23 @@
 
           <!-- 搜索中状态 -->
           <template v-else-if="loading">
-            <n-spin class="flex-center" style="height: calc(100vh - 200px)" size="large" />
+            <n-spin class="flex-center" style="height: calc(100vh / var(--page-scale, 1) - 200px)" size="large" />
           </template>
 
           <!-- 搜索无结果状态 -->
           <template v-else-if="hasSearched">
-            <n-empty class="flex-center" style="height: calc(100vh - 200px)" description="未找到相关结果" />
+            <n-empty
+              class="flex-center"
+              style="height: calc(100vh / var(--page-scale, 1) - 200px)"
+              description="未找到相关结果" />
           </template>
 
           <!-- 默认空状态 -->
           <template v-else>
-            <n-empty style="height: calc(100vh - 200px)" class="flex-center" description="输入关键词搜索">
+            <n-empty
+              style="height: calc(100vh / var(--page-scale, 1) - 200px)"
+              class="flex-center"
+              description="输入关键词搜索">
               <template #icon>
                 <n-icon>
                   <svg><use href="#explosion"></use></svg>
@@ -131,26 +142,29 @@
 </template>
 
 <script setup lang="ts">
-import { WebviewWindow, getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useWindow } from '@/hooks/useWindow'
-import { debounce } from 'lodash-es'
-import { AvatarUtils } from '@/utils/AvatarUtils'
 import { emitTo } from '@tauri-apps/api/event'
-import { RoomTypeEnum } from '@/enums/index.ts'
-import { useCachedStore } from '@/stores/cached'
-import { useBadgeInfo } from '@/hooks/useCached.ts'
+import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { debounce } from 'lodash-es'
 import FloatBlockList from '@/components/common/FloatBlockList.vue'
+import { ThemeEnum } from '@/enums'
+import { RoomTypeEnum } from '@/enums/index.ts'
+import { useBadgeInfo } from '@/hooks/useCached.ts'
+import { useWindow } from '@/hooks/useWindow'
+import type { ContactItem, GroupDetailReq } from '@/services/types'
 import { useContactStore } from '@/stores/contacts'
-import { ContactItem, GroupListReq } from '@/services/types'
-import { useUserStore } from '@/stores/user'
 import { useGlobalStore } from '@/stores/global'
-import apis from '@/services/apis'
+import { useGroupStore } from '@/stores/group'
+import { useSettingStore } from '@/stores/setting'
+import { useUserStore } from '@/stores/user'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { searchFriend, searchGroup } from '@/utils/ImRequestUtils'
 
 const { createWebviewWindow } = useWindow()
-const cachedStore = useCachedStore()
 const contactStore = useContactStore()
 const userStore = useUserStore()
 const globalStore = useGlobalStore()
+const settingStore = useSettingStore()
+const { themes } = storeToRefs(settingStore)
 
 // 定义标签页
 const tabs = ref([
@@ -180,7 +194,7 @@ const initialLoading = ref(true)
 // 从缓存存储中获取用户数据
 const getCachedUsers = () => {
   // 从缓存中获取所有用户
-  const users = Object.values(cachedStore.userCachedList)
+  const users = groupStore.allUserInfo
   console.log(users)
 
   // 筛选出需要显示的用户（ID在20016-20030之间的用户）
@@ -240,8 +254,8 @@ const handleSearch = debounce(async () => {
   try {
     if (searchType.value === 'group') {
       // 调用群聊搜索接口
-      const res = await apis.searchGroup({ account: searchValue.value })
-      searchResults.value = res.map((group) => ({
+      const res = await searchGroup({ account: searchValue.value })
+      searchResults.value = res.map((group: any) => ({
         account: group.account,
         name: group.name,
         avatar: group.avatar,
@@ -251,8 +265,8 @@ const handleSearch = debounce(async () => {
       }))
     } else if (searchType.value === 'user') {
       // 调用好友搜索接口
-      const res = await apis.searchFriend({ key: searchValue.value })
-      searchResults.value = res.map((user) => ({
+      const res = await searchFriend({ key: searchValue.value })
+      searchResults.value = res.map((user: any) => ({
         uid: user.uid,
         name: user.name,
         avatar: user.avatar,
@@ -284,10 +298,10 @@ const handleTypeChange = () => {
     searchResults.value = getCachedUsers()
   }
 }
-
+const groupStore = useGroupStore()
 // 判断是否已加入群聊
 const isInGroup = (roomId: string) => {
-  return contactStore.groupChatList.some((group: GroupListReq) => group.roomId === roomId)
+  return groupStore.groupDetails.some((group: GroupDetailReq) => group.roomId === roomId)
 }
 
 // 通用排序函数
@@ -330,7 +344,7 @@ const isFriend = (uid: string) => {
 
 // 判断是否是当前登录用户
 const isCurrentUser = (uid: string) => {
-  return userStore.userInfo.uid === uid
+  return userStore.userInfo!.uid === uid
 }
 
 // 获取按钮文本
@@ -405,18 +419,11 @@ const handleEditProfile = async () => {
 
 // 处理发送消息
 const handleSendMessage = async (item: any) => {
-  // 获取主窗口
-  const homeWindow = await WebviewWindow.getByLabel('home')
-
-  // 激活主窗口
-  await homeWindow?.setFocus()
   emitTo('home', 'search_to_msg', { uid: item.uid, roomType: RoomTypeEnum.SINGLE })
 }
 
 // 处理发送群消息
 const handleSendGroupMessage = async (item: any) => {
-  const homeWindow = await WebviewWindow.getByLabel('home')
-  await homeWindow?.setFocus()
   emitTo('home', 'search_to_msg', {
     uid: item.roomId,
     roomType: RoomTypeEnum.GROUP

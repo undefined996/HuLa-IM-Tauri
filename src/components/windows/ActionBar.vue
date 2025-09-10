@@ -2,10 +2,15 @@
   <!--  user-select: none让元素不可以选中-->
   <div
     :data-tauri-drag-region="isDrag"
-    :class="isCompatibility ? 'flex justify-end select-none' : 'h-24px select-none w-full'">
-    <template v-if="isCompatibility">
+    :class="isCompatibility() ? 'flex justify-end select-none' : 'h-24px select-none w-full'">
+    <!-- win 和 linux 的DOM -->
+    <template v-if="isCompatibility()">
       <!--  登录窗口的代理按钮  -->
-      <div v-if="proxy" @click="router.push('/network')" class="w-30px h-24px flex-center">
+      <div
+        v-if="proxy"
+        @click="router.push('/network')"
+        :class="{ network: isWindows() }"
+        class="w-30px h-24px flex-center">
         <svg class="size-16px color-#404040 cursor-pointer">
           <use href="#settings"></use>
         </svg>
@@ -85,17 +90,18 @@
 </template>
 
 <script setup lang="ts">
+import { emit } from '@tauri-apps/api/event'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { info } from '@tauri-apps/plugin-log'
+import { exit } from '@tauri-apps/plugin-process'
+import { CloseBxEnum, EventEnum, MittEnum } from '@/enums'
 import { useMitt } from '@/hooks/useMitt.ts'
+import { useTauriListener } from '@/hooks/useTauriListener'
 import { useWindow } from '@/hooks/useWindow.ts'
+import router from '@/router'
 import { useAlwaysOnTopStore } from '@/stores/alwaysOnTop.ts'
 import { useSettingStore } from '@/stores/setting.ts'
-import { emit } from '@tauri-apps/api/event'
-import { CloseBxEnum, EventEnum, MittEnum } from '@/enums'
-import { type } from '@tauri-apps/plugin-os'
-import router from '@/router'
-import { exit } from '@tauri-apps/plugin-process'
-import { useTauriListener } from '@/hooks/useTauriListener'
+import { isCompatibility, isMac, isWindows } from '@/utils/PlatformConstants'
 
 const appWindow = WebviewWindow.getCurrent()
 const {
@@ -119,7 +125,7 @@ const {
   isDrag?: boolean
 }>()
 const { getWindowTop, setWindowTop } = useAlwaysOnTopStore()
-const { pushListeners } = useTauriListener()
+const { addListener, cleanup } = useTauriListener()
 const settingStore = useSettingStore()
 const { tips, escClose } = storeToRefs(settingStore)
 const { resizeWindow } = useWindow()
@@ -130,18 +136,16 @@ const tipsRef = reactive({
 })
 // 窗口是否最大化状态
 const windowMaximized = ref(false)
-/** 判断是兼容的系统 */
-const isCompatibility = computed(() => type() === 'windows' || type() === 'linux')
 // 窗口是否置顶状态
 const alwaysOnTopStatus = computed(() => {
   if (topWinLabel === void 0) return false
   return getWindowTop(topWinLabel)
 })
-/** 判断当前是windows还是mac系统 */
-const osType = ref()
 
 // macOS 关闭按钮拦截的 unlisten 函数
 let unlistenCloseRequested: (() => void) | null = null
+// resized 事件的 unlisten 函数
+let unlistenResized: (() => void) | null = null
 // 是否是程序内部触发的关闭操作
 let isProgrammaticClose = false
 
@@ -150,69 +154,7 @@ watchEffect(() => {
   if (alwaysOnTopStatus.value) {
     appWindow.setAlwaysOnTop(alwaysOnTopStatus.value as boolean)
   }
-
-  // 添加 macOS 关闭按钮拦截逻辑 - 只拦截 home 窗口
-  if (type() === 'macos' && appWindow.label === 'home' && !unlistenCloseRequested) {
-    // 监听 macOS 原生关闭按钮事件
-    appWindow
-      .onCloseRequested((event) => {
-        // 如果是程序内部触发的关闭操作，不拦截
-        if (isProgrammaticClose) {
-          return
-        }
-        // 阻止默认关闭行为
-        event.preventDefault()
-        if (!tips.value.notTips) {
-          tipsRef.show = true
-        } else {
-          if (tips.value.type === CloseBxEnum.CLOSE) {
-            // 用户选择直接退出
-            console.log('用户设置为直接退出应用')
-            emit(EventEnum.EXIT)
-          } else {
-            // 用户选择最小化到托盘
-            console.log('用户设置为最小化到托盘')
-            appWindow.hide()
-          }
-        }
-      })
-      .then((unlisten) => {
-        console.log('macOS home窗口关闭按钮事件监听器已设置')
-        unlistenCloseRequested = unlisten
-      })
-      .catch((error) => {
-        console.error('设置 macOS home窗口关闭按钮监听器失败:', error)
-      })
-  }
-
-  pushListeners([
-    appWindow.listen(EventEnum.LOGOUT, async () => {
-      /** 退出账号前把窗口全部关闭 */
-      if (appWindow.label !== 'login') {
-        await nextTick()
-        // 设置程序内部关闭标志
-        isProgrammaticClose = true
-        // 针对不同系统采用不同关闭策略
-        if (type() === 'macos') {
-          // macOS 上先隐藏窗口，然后延迟关闭
-          await appWindow.hide()
-          setTimeout(async () => {
-            await appWindow.close()
-          }, 300)
-        } else {
-          // Windows/Linux 直接关闭
-          await appWindow.close()
-        }
-      }
-    }),
-    appWindow.listen(EventEnum.EXIT, async () => {
-      // 设置程序内部关闭标志
-      isProgrammaticClose = true
-      await exit(0)
-    })
-  ])
-
-  if (escClose.value && type() === 'windows') {
+  if (escClose.value && isWindows()) {
     window.addEventListener('keydown', (e) => isEsc(e))
   } else {
     window.removeEventListener('keydown', (e) => isEsc(e))
@@ -272,11 +214,15 @@ const isEsc = (e: KeyboardEvent) => {
   }
 }
 
-// 判断当前是否是最大化
-const handleResize = () => {
-  appWindow.isMaximized().then((res) => {
-    windowMaximized.value = res
-  })
+// 统一更新窗口放大状态（仅 macOS 视为“最大化或全屏”；其他平台仅“最大化”）
+const updateWindowMaximized = async () => {
+  const maximized = await appWindow.isMaximized()
+  if (isMac()) {
+    const fullscreen = await appWindow.isFullscreen()
+    windowMaximized.value = maximized || fullscreen
+  } else {
+    windowMaximized.value = maximized
+  }
 }
 
 /** 处理关闭窗口事件 */
@@ -297,9 +243,10 @@ const handleCloseWin = async () => {
     await exit(0)
   } else {
     if (appWindow.label.includes('modal-')) {
-      const home = await WebviewWindow.getByLabel('home')
-      await home?.setEnabled(true)
-      await home?.setFocus()
+      const webviews = await WebviewWindow.getAll()
+      const need = webviews.find((item) => item.label === 'home' || item.label === 'login')
+      await need?.setEnabled(true)
+      await need?.setFocus()
     }
     await emit(EventEnum.WIN_CLOSE, appWindow.label)
     await appWindow.close()
@@ -307,21 +254,57 @@ const handleCloseWin = async () => {
 }
 
 useMitt.on('handleCloseWin', handleCloseWin)
-// 添加和移除resize事件监听器
+
 onMounted(async () => {
-  window.addEventListener('resize', handleResize)
-  osType.value = type()
+  // 初始化状态
+  await updateWindowMaximized()
+
+  unlistenResized = await appWindow.onResized?.(() => {
+    updateWindowMaximized()
+  })
+
+  await addListener(
+    appWindow.listen(EventEnum.EXIT, async () => {
+      await exit(0)
+    }),
+    EventEnum.EXIT
+  )
+
+  // 监听 home 窗口的关闭事件
+  if (appWindow.label === 'home') {
+    appWindow.onCloseRequested((event) => {
+      info('[ActionBar]监听[home]窗口关闭事件')
+      if (isProgrammaticClose) {
+        // 清理监听器
+        info('[ActionBar]清理[home]窗口的监听器')
+        cleanup()
+        exit(0)
+      }
+      info('[ActionBar]阻止[home]窗口关闭事件')
+      event.preventDefault()
+      appWindow.hide()
+    })
+  }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', (e) => isEsc(e))
+
+  if (unlistenResized) {
+    unlistenResized()
+    unlistenResized = null
+  }
 
   // 清理 macOS 关闭按钮事件监听器
   if (unlistenCloseRequested) {
     unlistenCloseRequested()
     unlistenCloseRequested = null
   }
+})
+
+// 暴露 windowMaximized 状态
+defineExpose({
+  windowMaximized
 })
 </script>
 

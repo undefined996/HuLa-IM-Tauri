@@ -1,17 +1,17 @@
 <template>
-  <div class="size-full bg-#222 relative flex flex-col select-none">
+  <div class="size-full bg-#000 relative flex flex-col select-none">
     <!-- 顶部操作栏 -->
     <ActionBar class="bg-#000 z-9999" :shrink="false" :current-label="currentLabel" />
 
     <!-- 主体内容区域 -->
     <div class="flex-1 overflow-auto">
       <!-- 视频展示区域 -->
-      <div class="min-h-[calc(100vh-124px)] flex-center w-full h-full">
+      <div style="min-height: calc(100vh / var(--page-scale, 1) - 124px)" class="flex-center w-full h-full">
         <video
           ref="videoRef"
           :src="currentVideo"
           controls
-          class="w-full h-full object-cover"
+          :class="videoClass"
           @loadeddata="onVideoLoaded"
           @ended="onVideoEnded"
           @pause="onVideoPaused"
@@ -87,13 +87,13 @@
 </template>
 
 <script setup lang="ts">
-import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import { dirname, join } from '@tauri-apps/api/path'
+import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { readDir } from '@tauri-apps/plugin-fs'
-import { join, dirname } from '@tauri-apps/api/path'
 import ActionBar from '@/components/windows/ActionBar.vue'
-import { useVideoViewer } from '@/stores/videoViewer.ts'
 import { useTauriListener } from '@/hooks/useTauriListener'
+import { useVideoViewer } from '@/stores/videoViewer.ts'
 
 const { addListener } = useTauriListener()
 const videoViewerStore = useVideoViewer()
@@ -111,6 +111,8 @@ const isMuted = ref(false)
 const videoRef = ref<HTMLVideoElement>()
 const showTip = ref(false)
 const tipText = ref('')
+const videoWidth = ref(0)
+const videoHeight = ref(0)
 
 // 当前显示的视频URL
 const currentVideo = computed(() => {
@@ -126,6 +128,14 @@ const currentVideo = computed(() => {
     return convertFileSrc(videoUrl)
   }
   return videoUrl
+})
+
+// 视频样式类
+const videoClass = computed(() => {
+  if (videoWidth.value > 0 && videoWidth.value < 800) {
+    return 'w-full h-full object-contain aspect-video'
+  }
+  return 'w-full h-full object-cover aspect-video'
 })
 
 // 是否可以切换到上一个视频
@@ -218,6 +228,10 @@ const muteUnmute = () => {
 // 自动播放视频
 const onVideoLoaded = () => {
   if (videoRef.value) {
+    // 获取视频原始尺寸
+    videoWidth.value = videoRef.value.videoWidth
+    videoHeight.value = videoRef.value.videoHeight
+
     videoRef.value
       .play()
       .then(() => {
@@ -261,7 +275,7 @@ const previousVideo = async () => {
     // 如果是本地视频，从文件夹获取视频列表
     const folderVideos = await getVideosFromCurrentFolder(currentVideoPath)
     if (folderVideos.length > 0) {
-      const currentVideoIndex = folderVideos.findIndex((path) => path === currentVideoPath)
+      const currentVideoIndex = folderVideos.indexOf(currentVideoPath)
       if (currentVideoIndex > 0) {
         const previousVideoPath = folderVideos[currentVideoIndex - 1]
         videoList.value[currentIndex.value] = previousVideoPath
@@ -309,7 +323,7 @@ const nextVideo = async () => {
     // 如果是本地视频，从文件夹获取视频列表
     const folderVideos = await getVideosFromCurrentFolder(currentVideoPath)
     if (folderVideos.length > 0) {
-      const currentVideoIndex = folderVideos.findIndex((path) => path === currentVideoPath)
+      const currentVideoIndex = folderVideos.indexOf(currentVideoPath)
       if (currentVideoIndex < folderVideos.length - 1) {
         const nextVideoPath = folderVideos[currentVideoIndex + 1]
         videoList.value[currentIndex.value] = nextVideoPath

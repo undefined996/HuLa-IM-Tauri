@@ -38,11 +38,11 @@
   </main>
 </template>
 <script setup lang="ts">
-import { useUserStatusStore } from '@/stores/userStatus'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import apis from '@/services/apis.ts'
+import type { UserState } from '@/services/types'
 import { useUserStore } from '@/stores/user'
-import { UserState } from '@/services/types'
+import { useUserStatusStore } from '@/stores/userStatus'
+import { changeUserState } from '@/utils/ImRequestUtils'
 
 const userStatusStore = useUserStatusStore()
 const userStore = useUserStore()
@@ -60,10 +60,10 @@ watchEffect(() => {
  */
 const handleActive = async (item: UserState) => {
   try {
-    await apis.changeUserState(item.id)
+    await changeUserState({ id: item.id })
 
     stateId.value = item.id
-    userStore.userInfo.userStateId = item.id
+    userStore.userInfo!.userStateId = item.id
 
     window.$message?.success('状态更新成功')
   } catch (error) {

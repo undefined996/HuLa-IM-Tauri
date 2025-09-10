@@ -15,6 +15,10 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
   })
 
   const currentTool = ref('')
+  // 标记当前一次绘制过程中是否实际产生了绘制
+  const hasDrawn = ref(false)
+  // 是否可以撤回（当存在已保存的绘制动作时）
+  const canUndo = computed(() => drawConfig.value.actions.length > 0)
 
   const draw = (type: string) => {
     const { clientWidth: containerWidth, clientHeight: containerHeight } = drawCanvas.value
@@ -31,6 +35,7 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
   const handleMouseDown = (event: MouseEvent) => {
     const { offsetX, offsetY } = event
     drawConfig.value.isDrawing = true
+    hasDrawn.value = false
 
     // 限制起点坐标在框选矩形区域内
     drawConfig.value.startX = Math.min(
@@ -48,14 +53,30 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
     if (!drawConfig.value.isDrawing || !drawCtx.value) return
 
     // 限制绘制区域在框选矩形区域内
-    const limitedX = Math.min(
+    let limitedX = Math.min(
       Math.max(offsetX * drawConfig.value.scaleX, screenConfig.value.startX),
       screenConfig.value.endX
     )
-    const limitedY = Math.min(
+    let limitedY = Math.min(
       Math.max(offsetY * drawConfig.value.scaleY, screenConfig.value.startY),
       screenConfig.value.endY
     )
+
+    // 对于马赛克工具，需要考虑边框宽度和画笔半径偏移，避免涂抹到选区边框
+    if (currentTool.value === 'mosaic') {
+      const borderWidth = 2
+      const halfBrushSize = drawConfig.value.brushSize / 2
+      const safeMargin = borderWidth + halfBrushSize
+
+      limitedX = Math.min(
+        Math.max(offsetX * drawConfig.value.scaleX, screenConfig.value.startX + safeMargin),
+        screenConfig.value.endX - safeMargin
+      )
+      limitedY = Math.min(
+        Math.max(offsetY * drawConfig.value.scaleY, screenConfig.value.startY + safeMargin),
+        screenConfig.value.endY - safeMargin
+      )
+    }
 
     drawConfig.value.endX = limitedX
     drawConfig.value.endY = limitedY
@@ -77,6 +98,7 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
     switch (currentTool.value) {
       case 'rect':
         drawRectangle(drawCtx.value, x, y, width, height)
+        hasDrawn.value = true
         break
       case 'circle':
         drawCircle(
@@ -86,6 +108,7 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
           drawConfig.value.endX,
           drawConfig.value.endY
         )
+        hasDrawn.value = true
         break
       case 'arrow':
         drawArrow(
@@ -95,9 +118,11 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
           drawConfig.value.endX,
           drawConfig.value.endY
         )
+        hasDrawn.value = true
         break
       case 'mosaic':
         drawMosaic(drawCtx.value, limitedX, limitedY, drawConfig.value.brushSize)
+        hasDrawn.value = true
         break
       default:
         break
@@ -107,6 +132,11 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
   const handleMouseUp = () => {
     // const { offsetX, offsetY } = event;
     drawConfig.value.isDrawing = false
+
+    // 没有实际绘制时不保存动作，避免误触（例如点击工具栏按钮时）
+    if (!hasDrawn.value) {
+      return
+    }
 
     drawCtx.value.drawImage(drawCanvas.value!, 0, 0, drawCanvas.value.width, drawCanvas.value.height)
 
@@ -176,9 +206,28 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
 
   // 实时马赛克涂抹
   const drawMosaic = (context: any, x: any, y: any, size: any) => {
-    const imageData = imgCtx.value.getImageData(x - size, y - size, size, size)
-    const blurredData = blurImageData(imageData, size)
-    context.putImageData(blurredData, x - size, y - size)
+    // 确保马赛克绘制区域不会超出选区边界（考虑边框和画笔半径）
+    const borderWidth = 2
+    const halfSize = size / 2
+
+    // 考虑画笔半径的安全边距，确保画笔边缘不会涂抹到边框
+    const safeMargin = borderWidth + halfSize
+
+    // 计算实际绘制区域，确保完全在选区内容区域内
+    const drawX = Math.max(x - halfSize, screenConfig.value.startX + safeMargin)
+    const drawY = Math.max(y - halfSize, screenConfig.value.startY + safeMargin)
+    const maxDrawX = Math.min(x + halfSize, screenConfig.value.endX - safeMargin)
+    const maxDrawY = Math.min(y + halfSize, screenConfig.value.endY - safeMargin)
+
+    // 计算实际绘制尺寸
+    const drawWidth = Math.max(0, maxDrawX - drawX)
+    const drawHeight = Math.max(0, maxDrawY - drawY)
+
+    if (drawWidth > 0 && drawHeight > 0) {
+      const imageData = imgCtx.value.getImageData(drawX, drawY, drawWidth, drawHeight)
+      const blurredData = blurImageData(imageData, Math.min(drawWidth, drawHeight))
+      context.putImageData(blurredData, drawX, drawY)
+    }
   }
 
   const blurImageData = (imageData: ImageData, size: any): ImageData => {
@@ -251,15 +300,55 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
     }
   }
 
+  // 一键清空所有绘制内容
+  const clearAll = () => {
+    closeListen()
+    drawConfig.value.actions = []
+    drawConfig.value.undoStack = []
+    if (drawCtx.value && drawCanvas.value) {
+      drawCtx.value.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height)
+    }
+  }
+
+  // 重置绘图状态，清除所有绘制历史
+  const resetState = () => {
+    drawConfig.value.actions = []
+    drawConfig.value.undoStack = []
+    drawConfig.value.isDrawing = false
+    currentTool.value = ''
+    console.log('🔄 绘图状态已重置，历史记录已清除')
+  }
+
+  // 停止当前绘图操作
+  const stopDrawing = () => {
+    drawConfig.value.isDrawing = false
+    currentTool.value = ''
+    closeListen()
+    console.log('⏹️ 绘图操作已停止')
+  }
+
+  // 清除事件监听
+  const clearEvents = () => {
+    closeListen()
+    console.log('🧹 绘图事件监听已清除')
+  }
+
   const startListen = () => {
-    document.addEventListener('mousedown', handleMouseDown)
-    document.addEventListener('mousemove', handleMouseMove)
+    const el = drawCanvas.value
+    if (!el) return
+    // 仅在绘图画布上监听按下与移动，避免点击工具栏也触发绘图流程
+    el.addEventListener('mousedown', handleMouseDown)
+    el.addEventListener('mousemove', handleMouseMove)
+    // mouseup 放在 document 上，确保拖出画布后仍能结束一次绘制
     document.addEventListener('mouseup', handleMouseUp)
   }
 
   const closeListen = () => {
-    document.removeEventListener('mousedown', handleMouseDown)
-    document.removeEventListener('mousemove', handleMouseMove)
+    const el = drawCanvas.value
+    if (el) {
+      el.removeEventListener('mousedown', handleMouseDown)
+      el.removeEventListener('mousemove', handleMouseMove)
+    }
     document.removeEventListener('mouseup', handleMouseUp)
   }
 
@@ -270,6 +359,11 @@ export function useCanvasTool(drawCanvas: any, drawCtx: any, imgCtx: any, screen
     drawCircle,
     drawArrow,
     undo,
-    redo
+    redo,
+    clearAll,
+    resetState,
+    stopDrawing,
+    clearEvents,
+    canUndo
   }
 }

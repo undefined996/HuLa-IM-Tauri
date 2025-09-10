@@ -4,7 +4,7 @@
     <ActionBar :max-w="false" :shrink="false" proxy data-tauri-drag-region />
 
     <n-flex vertical :size="12" align="center" class="pt-10px">
-      <span class="text-(16px #70938c) font-bold textFont">网络设置</span>
+      <span class="text-(16px #70938c) textFont">网络设置</span>
 
       <n-tabs type="line" animated justify-content="center" @update:value="handleTab">
         <n-tab-pane name="api" tab="API">
@@ -98,7 +98,6 @@
       </n-tabs>
 
       <n-flex align="center" justify="center" :size="40" class="pt-10px">
-        <p @click="proxyTest" class="text-(14px #13987f) cursor-pointer">测试</p>
         <p @click="handleSave" class="text-(14px #13987f) cursor-pointer">保存</p>
         <p @click="router.push('/login')" class="text-(14px #707070) cursor-pointer">返回</p>
       </n-flex>
@@ -108,7 +107,6 @@
 <script setup lang="ts">
 import { lightTheme } from 'naive-ui'
 import router from '@/router'
-import { invoke } from '@tauri-apps/api/core'
 
 const apiOptions = [
   {
@@ -154,7 +152,7 @@ const savedProxy = reactive({
 
 // 从本地存储加载设置
 onMounted(() => {
-  let proxySettings = localStorage.getItem('proxySettings')
+  const proxySettings = localStorage.getItem('proxySettings')
   if (proxySettings) {
     const parse = JSON.parse(proxySettings)
     savedProxy.apiType = parse.apiType
@@ -215,41 +213,6 @@ const handleSave = async () => {
     }, 1000)
   } catch (error) {
     window.$message.error('网络设置失败：' + error)
-  }
-}
-
-// 测试网络连接
-const proxyTest = async () => {
-  if (
-    (savedProxy.apiType && (!savedProxy.apiIp || !savedProxy.apiPort)) ||
-    (savedProxy.wsType && (!savedProxy.wsIp || !savedProxy.wsPort))
-  ) {
-    window.$message.warning('请填写完整的网络信息')
-    return
-  }
-
-  try {
-    window.$message.loading('正在测试网络连接...', {
-      duration: 0
-    })
-
-    const result = await invoke(proxy.value === 'api' ? 'test_api_proxy' : 'test_ws_proxy', {
-      proxyType: proxy.value === 'api' ? savedProxy.apiType : savedProxy.wsType,
-      proxyHost: proxy.value === 'api' ? savedProxy.apiIp : savedProxy.wsIp,
-      proxyPort: Number(proxy.value === 'api' ? savedProxy.apiPort : savedProxy.wsPort),
-      proxySuffix: proxy.value === 'api' ? savedProxy.apiSuffix : savedProxy.wsSuffix
-    })
-
-    if (result) {
-      window.$message.success('网络连接测试成功')
-    } else {
-      window.$message.error('网络连接测试失败')
-    }
-  } catch (error) {
-    // 显示具体的错误信息
-    window.$message.error(`网络测试失败: ${error}`)
-  } finally {
-    window.$message.destroyAll() // 清除loading消息
   }
 }
 </script>

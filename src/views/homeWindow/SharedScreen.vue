@@ -10,18 +10,23 @@
   </div>
 </template>
 <script setup lang="ts">
-import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { emit } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useTauriListener } from '@/hooks/useTauriListener'
 
 const appWindow = WebviewWindow.getCurrent()
 const { addListener } = useTauriListener()
 const video = ref<HTMLVideoElement>()
-let peerConnection = new RTCPeerConnection()
+const peerConnection = new RTCPeerConnection()
 
-// TODO 需要建立信令服务器 (nyh -> 2024-04-01 18:05:58)
-watchEffect(() => {
-  addListener(
+peerConnection.ontrack = (event) => {
+  if (video.value) {
+    video.value.srcObject = event.streams[0]
+  }
+}
+
+onBeforeUnmount(async () => {
+  await addListener(
     appWindow.listen('offer', async (event) => {
       console.log(event.payload)
       await peerConnection.setRemoteDescription(new RTCSessionDescription(event.payload as RTCSessionDescriptionInit))
@@ -33,12 +38,6 @@ watchEffect(() => {
     })
   )
 })
-
-peerConnection.ontrack = function (event) {
-  if (video.value) {
-    video.value.srcObject = event.streams[0]
-  }
-}
 
 onMounted(async () => {
   await getCurrentWebviewWindow().show()

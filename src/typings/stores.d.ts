@@ -52,6 +52,15 @@ declare namespace STO {
       /** 翻译提供商 */
       translate: 'youdao' | 'tencent'
     }
+    /** 快捷键设置 */
+    shortcuts: {
+      /** 截图快捷键 */
+      screenshot: string
+      /** 打开主面板快捷键 */
+      openMainPanel: string
+      /** 全局快捷键开关 */
+      globalEnabled: boolean
+    }
     /** 界面设置 */
     page: {
       /** 是否开启阴影 */
@@ -65,6 +74,11 @@ declare namespace STO {
     update: {
       /** 忽略更新版本 */
       dismiss: string
+    }
+    /** 截图设置 */
+    screenshot: {
+      /** 截图时是否隐藏窗口 */
+      isConceal: boolean
     }
   }
 
@@ -108,4 +122,12 @@ declare namespace STO {
     progress: number
     miniShow: boolean
   } & OPT.L.Common
+
+  /**
+   * 引导状态
+   */
+  type Guide = {
+    /** 引导完成状态 */
+    isGuideCompleted: boolean
+  }
 }

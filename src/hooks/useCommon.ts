@@ -1,18 +1,20 @@
-import { LimitEnum, MittEnum, MsgEnum, RoomTypeEnum } from '@/enums'
-import { Ref } from 'vue'
-import GraphemeSplitter from 'grapheme-splitter'
-import router from '@/router'
-import apis from '@/services/apis.ts'
-import { useMitt } from '@/hooks/useMitt.ts'
-import { useGlobalStore } from '@/stores/global.ts'
-import { useChatStore } from '@/stores/chat.ts'
-import { useMessage } from '@/hooks/useMessage.ts'
-import { useUserStore } from '@/stores/user.ts'
-import { getImageCache } from '@/utils/PathUtil.ts'
-import { AvatarUtils } from '@/utils/AvatarUtils'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { BaseDirectory, create, exists, mkdir } from '@tauri-apps/plugin-fs'
+import { info } from '@tauri-apps/plugin-log'
+import GraphemeSplitter from 'grapheme-splitter'
+import type { Ref } from 'vue'
+import { LimitEnum, MittEnum, MsgEnum } from '@/enums'
+import { useMessage } from '@/hooks/useMessage.ts'
+import { useMitt } from '@/hooks/useMitt.ts'
+import router from '@/router'
+import { useChatStore } from '@/stores/chat.ts'
+import { useGlobalStore } from '@/stores/global.ts'
+import { useUserStore } from '@/stores/user.ts'
+import { AvatarUtils } from '@/utils/AvatarUtils'
 import { removeTag } from '@/utils/Formatting'
+import { getSessionDetailWithFriends } from '@/utils/ImRequestUtils'
+import { getImageCache } from '@/utils/PathUtil.ts'
+import { invokeWithErrorHandler } from '../utils/TauriInvokeHandler'
 
 export interface SelectionRange {
   range: Range
@@ -76,7 +78,7 @@ export const useCommon = () => {
   const userStore = useUserStore()
   const { handleMsgClick } = useMessage()
   /** 当前登录用户的uid */
-  const userUid = computed(() => userStore.userInfo.uid)
+  const userUid = computed(() => userStore.userInfo!.uid)
   /** 回复消息 */
   const reply = ref({
     avatar: '',
@@ -812,26 +814,26 @@ export const useCommon = () => {
    */
   const openMsgSession = async (uid: string, type: number = 2) => {
     // 获取home窗口实例
-    const label = await WebviewWindow.getCurrent().label
+    const label = WebviewWindow.getCurrent().label
     if (route.name !== '/message' && label === 'home') {
       router.push('/message')
     }
 
-    const res = await apis.sessionDetailWithFriends({ id: uid, roomType: type })
+    info('打开消息会话')
+    const res = await getSessionDetailWithFriends({ id: uid, roomType: type })
     // 把隐藏的会话先显示
     try {
-      await apis.hideSession({ roomId: res.roomId, hide: false })
-    } catch (error) {
+      await invokeWithErrorHandler('hide_contact_command', { data: { roomId: res.roomId, hide: false } })
+    } catch (_error) {
       window.$message.error('显示会话失败')
     }
-    globalStore.currentSession.roomId = res.roomId
-    globalStore.currentSession.type = RoomTypeEnum.SINGLE
+    globalStore.updateCurrentSessionRoomId(res.roomId)
 
     // 先检查会话是否已存在
     const existingSession = chatStore.getSession(res.roomId)
     if (!existingSession) {
       // 只有当会话不存在时才更新会话列表顺序
-      chatStore.updateSessionLastActiveTime(res.roomId, res)
+      chatStore.updateSessionLastActiveTime(res.roomId)
       // 如果会话不存在，需要重新获取会话列表，但保持当前选中的会话
       await chatStore.getSessionList(true)
     }

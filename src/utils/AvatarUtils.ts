@@ -4,14 +4,14 @@
 export class AvatarUtils {
   private static readonly DEFAULT_AVATAR_RANGE = {
     start: '001',
-    end: '021'
+    end: '022'
   }
 
   private static readonly RANGE_START = parseInt(AvatarUtils.DEFAULT_AVATAR_RANGE.start, 10)
   private static readonly RANGE_END = parseInt(AvatarUtils.DEFAULT_AVATAR_RANGE.end, 10)
 
   /**
-   * 检查头像字符串是否为默认头像 (001-021)
+   * 检查头像字符串是否为默认头像 (001-022)
    * @param avatar - 要检查的头像字符串
    * @returns 布尔值指示是否是默认头像
    */
@@ -24,7 +24,7 @@ export class AvatarUtils {
     if (isNaN(num)) return false
 
     // 数字范围检查 (001-021)
-    return num >= this.RANGE_START && num <= this.RANGE_END
+    return num >= AvatarUtils.RANGE_START && num <= AvatarUtils.RANGE_END
   }
 
   /**
@@ -33,8 +33,8 @@ export class AvatarUtils {
    * @returns 头像字符串或URL
    */
   public static getAvatarUrl(avatar: string): string {
-    if (this.isDefaultAvatar(avatar)) {
-      return `/avatar/${avatar}.png`
+    if (AvatarUtils.isDefaultAvatar(avatar)) {
+      return `/avatar/${avatar}.webp`
     }
     return avatar
   }

@@ -14,16 +14,16 @@
           alt="" />
 
         <div
-          v-if="type() === 'macos'"
+          v-if="isMac()"
           @click="isShow = false"
           class="mac-close z-10 relative size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none">
-          <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+          <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
             <use href="#close"></use>
           </svg>
         </div>
 
         <svg
-          v-if="type() === 'windows'"
+          v-if="isWindows()"
           @click="isShow = false"
           class="z-10 color-#333 w-12px h-12px absolute top-6px right-6px cursor-pointer select-none">
           <use href="#close"></use>
@@ -65,8 +65,8 @@
   </n-modal>
 </template>
 <script setup lang="ts">
-import { type } from '@tauri-apps/plugin-os'
 import { usePluginsStore } from '@/stores/plugins.ts'
+import { isMac, isWindows } from '@/utils/PlatformConstants'
 import Card from './Card.vue'
 import List from './List.vue'
 

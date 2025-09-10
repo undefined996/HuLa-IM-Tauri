@@ -96,23 +96,23 @@
         </n-scrollbar>
       </div>
       <n-flex justify="end" class="mt-10px">
-        <n-button :onclick="dismissUpdate" secondary> 忽略更新</n-button>
-        <n-button :onclick="doUpdate" secondary type="primary"> 立即更新</n-button>
+        <n-button :onclick="dismissUpdate" secondary>忽略更新</n-button>
+        <n-button :onclick="doUpdate" secondary type="primary">立即更新</n-button>
       </n-flex>
     </n-flex>
   </div>
 </template>
 <script setup lang="ts">
-import { confirm } from '@tauri-apps/plugin-dialog'
-import { check } from '@tauri-apps/plugin-updater'
-import { handRelativeTime } from '@/utils/Day.ts'
 import { getVersion } from '@tauri-apps/api/app'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useSettingStore } from '@/stores/setting.ts'
-import { useWindow } from '@/hooks/useWindow.ts'
 import { currentMonitor, PhysicalPosition } from '@tauri-apps/api/window'
-import { type } from '@tauri-apps/plugin-os'
-import { invoke } from '@tauri-apps/api/core'
+import { confirm } from '@tauri-apps/plugin-dialog'
+import { check } from '@tauri-apps/plugin-updater'
+import { useWindow } from '@/hooks/useWindow.ts'
+import { useSettingStore } from '@/stores/setting.ts'
+import { handRelativeTime } from '@/utils/Day.ts'
+import { isMac } from '@/utils/PlatformConstants'
+import { invokeSilently } from '@/utils/TauriInvokeHandler.ts'
 
 const settingStore = useSettingStore()
 const { createWebviewWindow, resizeWindow, setResizable } = useWindow()
@@ -128,8 +128,6 @@ const logVisible = ref(false)
 /** 版本更新日期 */
 const versionTime = ref('')
 const newVersionTime = ref('')
-// 获取操作系统类型
-const osType = type()
 
 const commitTypeMap: { [key: string]: string } = {
   feat: 'comet',
@@ -220,7 +218,7 @@ const checkUpdate = async () => {
       }
       newVersion.value = e.version
       // 检查版本之间不同的提交信息和提交日期
-      let url = `https://gitee.com/api/v5/repos/HuLaSpark/HuLa/releases/tags/v${newVersion.value}?access_token=${import.meta.env.VITE_GITEE_TOKEN}`
+      const url = `https://gitee.com/api/v5/repos/HuLaSpark/HuLa/releases/tags/v${newVersion.value}?access_token=${import.meta.env.VITE_GITEE_TOKEN}`
       await getCommitLog(url, true)
       text.value = '立即更新'
     })
@@ -246,7 +244,7 @@ const moveWindowToBottomRight = async () => {
     let y = 0
     let x = 0
 
-    if (osType === 'macos') {
+    if (isMac()) {
       // macOS - 放置在右上角
       y = 50 // 为顶部菜单栏留出空间
       x = Math.floor(monitor.size.width - size.width - 10)
@@ -290,10 +288,10 @@ const init = async () => {
   await moveWindowToBottomRight()
   loading.value = true
   currentVersion.value = await getVersion()
-  if (osType === 'macos') {
+  if (isMac()) {
     // 隐藏标题栏按钮
     try {
-      await invoke('hide_title_bar_buttons', { windowLabel: 'checkupdate' })
+      await invokeSilently('hide_title_bar_buttons', { windowLabel: 'checkupdate' })
     } catch (error) {
       console.error('隐藏标题栏按钮失败:', error)
     }

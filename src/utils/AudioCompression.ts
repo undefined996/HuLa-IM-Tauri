@@ -44,8 +44,9 @@ export async function compressAudioToMp3(audioBuffer: ArrayBuffer, config: Audio
     // 使用lamejs进行MP3编码
     const mp3Data = encodeToMp3(samples, finalConfig)
 
-    // 创建MP3 Blob
-    const blob = new Blob(mp3Data, { type: 'audio/mp3' })
+    // 创建MP3 Blob - 将 Int8Array 转换为 Uint8Array
+    const uint8Arrays = mp3Data.map((data) => new Uint8Array(data))
+    const blob = new Blob(uint8Arrays, { type: 'audio/mp3' })
 
     // 清理AudioContext
     await audioContext.close()
@@ -98,13 +99,15 @@ async function resampleAudio(audioBuffer: AudioBuffer, targetSampleRate: number)
 function convertToInt16Array(audioBuffer: AudioBuffer, targetChannels: number): Int16Array {
   const length = audioBuffer.length
   const samples = new Int16Array(length * targetChannels)
+  const AMPLIFY = 10 // 10倍响度
 
   if (targetChannels === 1) {
     // 转换为单声道
     const channelData = audioBuffer.numberOfChannels > 1 ? mixToMono(audioBuffer) : audioBuffer.getChannelData(0)
 
     for (let i = 0; i < length; i++) {
-      samples[i] = Math.max(-1, Math.min(1, channelData[i])) * 0x7fff
+      const sample = channelData[i] * AMPLIFY
+      samples[i] = Math.max(-1, Math.min(1, sample)) * 0x7fff
     }
   } else {
     // 保持立体声
@@ -112,8 +115,10 @@ function convertToInt16Array(audioBuffer: AudioBuffer, targetChannels: number): 
     const rightChannel = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : leftChannel
 
     for (let i = 0; i < length; i++) {
-      samples[i * 2] = Math.max(-1, Math.min(1, leftChannel[i])) * 0x7fff
-      samples[i * 2 + 1] = Math.max(-1, Math.min(1, rightChannel[i])) * 0x7fff
+      const l = leftChannel[i] * AMPLIFY
+      const r = rightChannel[i] * AMPLIFY
+      samples[i * 2] = Math.max(-1, Math.min(1, l)) * 0x7fff
+      samples[i * 2 + 1] = Math.max(-1, Math.min(1, r)) * 0x7fff
     }
   }
 

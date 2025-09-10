@@ -25,7 +25,7 @@
         <p class="text-(12px [--chat-text-color]) flex-1 truncate">在搜索框内搜索</p>
       </n-flex>
 
-      <n-scrollbar style="max-height: calc(100vh - 212px)">
+      <n-scrollbar style="max-height: calc(100vh / var(--page-scale, 1) - 212px)">
         <template v-for="(item, _index) in historyList" :key="_index">
           <n-flex
             align="center"
@@ -43,7 +43,7 @@
     <template v-else-if="searchResults.length > 0">
       <p class="text-(12px #909090) mb-6px">搜索结果</p>
 
-      <n-scrollbar style="max-height: calc(100vh - 142px)">
+      <n-scrollbar style="max-height: calc(100vh / var(--page-scale, 1) - 118px)">
         <template v-for="item in searchResults" :key="item.roomId">
           <n-flex
             align="center"
@@ -59,7 +59,7 @@
 
     <!-- 没有搜索结果时 -->
     <template v-else-if="searchQuery && searchResults.length === 0">
-      <div style="height: calc(100vh - 212px)" class="flex-col-center gap-12px">
+      <div style="height: calc(100vh / var(--page-scale, 1) - 212px)" class="flex-col-center gap-12px">
         <img class="size-64px" src="/msgAction/exploding-head.png" />
         <p class="text-(12px [--chat-text-color])">未找到相关结果</p>
       </div>
@@ -68,12 +68,12 @@
 </template>
 
 <script setup lang="ts">
-import { AvatarUtils } from '@/utils/AvatarUtils'
-import { useChatStore } from '@/stores/chat.ts'
 import { useRouter } from 'vue-router'
-import { useCommon } from '@/hooks/useCommon.ts'
 import { MittEnum, RoomTypeEnum } from '@/enums'
+import { useCommon } from '@/hooks/useCommon.ts'
 import { useMitt } from '@/hooks/useMitt'
+import { useChatStore } from '@/stores/chat.ts'
+import { AvatarUtils } from '@/utils/AvatarUtils'
 
 type SessionItem = {
   avatar: string
@@ -114,18 +114,10 @@ const handleSearch = (value: string) => {
     searchResults.value = []
     return
   }
-  // 从chatStore获取会话列表并根据关键字进行过滤
-  const sessionList = chatStore.sessionList
   // 根据名称和最后一条消息内容进行搜索匹配
-  searchResults.value = sessionList.filter((session) => {
+  searchResults.value = chatStore.sessionList.filter((session) => {
     // 在名称中搜索
     const nameMatch = session.name.toLowerCase().includes(value.toLowerCase())
-    // 在最后一条消息中搜索
-    // const lastMsgMatch = session.lastMsg && session.lastMsg.toLowerCase().includes(value.toLowerCase())
-
-    // 返回名称或最后一条消息匹配的结果
-    // return nameMatch || lastMsgMatch
-
     return nameMatch
   })
   // 如果有搜索关键词，这里可以保存到关键词历史记录（当前实现还不保存搜索关键词）

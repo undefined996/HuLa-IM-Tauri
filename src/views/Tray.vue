@@ -50,35 +50,30 @@
   </n-flex>
 </template>
 <script setup lang="tsx">
-import { useWindow } from '@/hooks/useWindow.ts'
-import { exit } from '@tauri-apps/plugin-process'
-import { useUserStatusStore } from '@/stores/userStatus'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useSettingStore } from '@/stores/setting.ts'
-import { useGlobalStore } from '@/stores/global.ts'
 import { TrayIcon } from '@tauri-apps/api/tray'
-import { type } from '@tauri-apps/plugin-os'
-import { useTauriListener } from '@/hooks/useTauriListener'
-import { UserState } from '@/services/types'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { exit } from '@tauri-apps/plugin-process'
+import { useWindow } from '@/hooks/useWindow.ts'
+import type { UserState } from '@/services/types'
+import { useGlobalStore } from '@/stores/global.ts'
+import { useSettingStore } from '@/stores/setting.ts'
+import { useUserStore } from '@/stores/user'
+import { useUserStatusStore } from '@/stores/userStatus'
+import { changeUserState } from '@/utils/ImRequestUtils'
+import { isWindows } from '@/utils/PlatformConstants'
 
 const appWindow = WebviewWindow.getCurrent()
-const { checkWinExist, createWebviewWindow } = useWindow()
+const { checkWinExist, createWebviewWindow, resizeWindow } = useWindow()
 const userStatusStore = useUserStatusStore()
+const userStore = useUserStore()
 const settingStore = useSettingStore()
 const globalStore = useGlobalStore()
 const { lockScreen } = storeToRefs(settingStore)
 const { stateList, stateId } = storeToRefs(userStatusStore)
 const { tipVisible, isTrayMenuShow } = storeToRefs(globalStore)
-const { addListener } = useTauriListener()
 const isFocused = ref(false)
-let home: WebviewWindow | null = null
 // 状态栏图标是否显示
 const iconVisible = ref(false)
-// 创建Timer Worker实例
-let timerWorker: Worker | null = null
-// Worker健康检测
-let workerHealthTimer: NodeJS.Timeout | null = null
-let lastWorkerResponse = Date.now()
 
 const division = () => {
   return <div class={'h-1px bg-[--line-color] w-full'}></div>
@@ -93,170 +88,73 @@ const handleExit = () => {
   exit(0)
 }
 
-const toggleStatus = (item: UserState) => {
-  stateId.value = item.id
-  appWindow.hide()
+const toggleStatus = async (item: UserState) => {
+  try {
+    await changeUserState({ id: item.id })
+
+    stateId.value = item.id
+    userStore.userInfo!.userStateId = item.id
+    appWindow.hide()
+  } catch (error) {
+    console.error('更新状态失败:', error)
+    appWindow.hide()
+  }
 }
 
-// 初始化Timer Worker
-const initWorker = () => {
-  if (!timerWorker) {
-    timerWorker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url))
+let blinkTask: NodeJS.Timeout | null = null
 
-    // 监听Worker消息
-    timerWorker.onmessage = async (e) => {
-      const { type, msgId } = e.data
+const startBlinkTask = () => {
+  blinkTask = setInterval(async () => {
+    // 定时器触发时，切换图标状态
+    const tray = await TrayIcon.getById('tray')
+    tray?.setIcon(iconVisible.value ? 'tray/icon.png' : null)
+    iconVisible.value = !iconVisible.value
+  }, 500)
+}
 
-      // 处理定时器超时消息
-      if (type === 'timeout' && msgId === 'trayIconBlink') {
-        // 更新最后响应时间
-        lastWorkerResponse = Date.now()
+const stopBlinkTask = async () => {
+  if (blinkTask) {
+    clearInterval(blinkTask)
+    blinkTask = null
 
-        // 定时器触发时，切换图标状态
-        const tray = await TrayIcon.getById('tray')
-        tray?.setIcon(iconVisible.value ? null : 'tray/icon.png')
-        iconVisible.value = !iconVisible.value
-
-        // 如果仍需闪烁，重新启动定时器
-        if (tipVisible.value && !isFocused.value) {
-          startBlinkTimer()
-        }
-      }
+    // 恢复托盘图标为默认状态，防止图标消失
+    try {
+      const tray = await TrayIcon.getById('tray')
+      await tray?.setIcon('tray/icon.png')
+    } catch (e) {
+      console.warn('[Tray] 恢复托盘图标失败:', e)
     }
-
-    // 添加错误处理和重新初始化机制
-    timerWorker.onerror = (error) => {
-      console.error('[Tray Worker Error]', error)
-      // Worker出错时重新初始化
-      setTimeout(() => {
-        terminateWorker()
-        if (tipVisible.value && !isFocused.value) {
-          initWorker()
-          startBlinkTimer()
-        }
-      }, 1000)
-    }
-  }
-}
-
-// 启动图标闪烁定时器
-const startBlinkTimer = () => {
-  if (!timerWorker) {
-    initWorker()
-  }
-
-  // 确保timerWorker已初始化
-  if (timerWorker) {
-    // 重置健康检测时间
-    lastWorkerResponse = Date.now()
-
-    // 启动Worker健康检测
-    if (!workerHealthTimer) {
-      workerHealthTimer = setInterval(() => {
-        const timeSinceLastResponse = Date.now() - lastWorkerResponse
-        // 如果超过3秒没有响应，认为Worker可能已经停止工作
-        if (timeSinceLastResponse > 3000 && tipVisible.value && !isFocused.value) {
-          console.warn('[Tray] Worker可能已停止工作，重新初始化')
-          terminateWorker()
-          initWorker()
-          startBlinkTimer()
-        }
-      }, 2000)
-    }
-
-    // 启动新的定时器，500ms间隔
-    timerWorker.postMessage({
-      type: 'startTimer',
-      msgId: 'trayIconBlink',
-      duration: 500 // 闪烁间隔时间
-    })
-  }
-}
-
-// 停止图标闪烁定时器
-const stopBlinkTimer = () => {
-  if (timerWorker) {
-    timerWorker.postMessage({
-      type: 'clearTimer',
-      msgId: 'trayIconBlink'
-    })
-  }
-
-  // 清理健康检测定时器
-  if (workerHealthTimer) {
-    clearInterval(workerHealthTimer)
-    workerHealthTimer = null
-  }
-}
-
-// 终止Worker
-const terminateWorker = () => {
-  if (timerWorker) {
-    stopBlinkTimer()
-    timerWorker.terminate()
-    timerWorker = null
-  }
-
-  // 清理健康检测定时器
-  if (workerHealthTimer) {
-    clearInterval(workerHealthTimer)
-    workerHealthTimer = null
+    iconVisible.value = false
   }
 }
 
 watchEffect(async () => {
-  if (type() === 'windows') {
+  if (isWindows()) {
     if (tipVisible.value && !isFocused.value) {
-      initWorker() // 确保Worker已初始化
-      startBlinkTimer() // 启动图标闪烁
+      startBlinkTask()
     } else {
-      stopBlinkTimer() // 停止图标闪烁
-      const tray = await TrayIcon.getById('tray')
-      if (tray) {
-        // 确保图标可见并恢复默认状态
-        await tray.setVisible(true)
-        await tray.setIcon('tray/icon.png')
-        iconVisible.value = false
-      }
-      isFocused.value = false
-      tipVisible.value = false
+      stopBlinkTask() // 停止图标闪烁
     }
   }
 })
 
-// 可以使用 watch 来观察焦点状态的变化
-watch([isFocused, () => tipVisible.value], ([newFocused, newTipVisible]) => {
-  console.log('Focus or tip state changed:', { focused: newFocused, tipVisible: newTipVisible })
-})
+// 监听托盘窗口尺寸调整事件
+const handleTrayResize = async () => {
+  const islogin = await WebviewWindow.getByLabel('home')
+  await resizeWindow('tray', 130, islogin ? 356 : 44)
+}
 
 onBeforeMount(() => {
   globalStore.setTipVisible(false)
 })
 
-onMounted(async () => {
-  home = await WebviewWindow.getByLabel('home')
-  isFocused.value = (await home?.isFocused()) || false
-
-  if (home) {
-    // 监听窗口焦点变化
-    home.listen('tauri://focus', () => {
-      isFocused.value = true
-    })
-    home.listen('tauri://blur', () => {
-      isFocused.value = false
-    })
-  }
-
-  // 将监听器添加到pushListeners中以便于组件卸载时自动移除
-  await addListener(
-    appWindow.listen('show_tip', async () => {
-      globalStore.setTipVisible(true)
-    })
-  )
+onMounted(() => {
+  // 监听系统缩放变化事件，自动调整托盘窗口尺寸
+  window.addEventListener('resize-needed', handleTrayResize)
 })
 
-onUnmounted(async () => {
-  terminateWorker() // 清理Worker资源
+onUnmounted(() => {
+  window.removeEventListener('resize-needed', handleTrayResize)
 })
 </script>
 

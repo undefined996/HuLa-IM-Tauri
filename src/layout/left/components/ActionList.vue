@@ -55,11 +55,7 @@
           </svg>
         </n-badge>
         <!-- 好友提示 -->
-        <n-badge
-          v-if="item.url === 'friendsList'"
-          :max="99"
-          :value="unReadMark.newFriendUnreadCount"
-          :show="unReadMark.newFriendUnreadCount > 0">
+        <n-badge v-if="item.url === 'friendsList'" :max="99" :value="unreadApplyCount" :show="unreadApplyCount > 0">
           <svg class="size-22px">
             <use
               :href="`#${activeUrl === item.url || openWindowsList.has(item.url) ? item.iconAction : item.icon}`"></use>
@@ -256,17 +252,17 @@
   <DefinePlugins v-model="menuShow" />
 </template>
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { PluginEnum, ShowModeEnum } from '@/enums'
+import { useTauriListener } from '@/hooks/useTauriListener.ts'
+import { useGlobalStore } from '@/stores/global.ts'
+import { useMenuTopStore } from '@/stores/menuTop.ts'
+import { usePluginsStore } from '@/stores/plugins.ts'
+import { useSettingStore } from '@/stores/setting.ts'
 import { itemsBottom, moreList } from '../config.tsx'
 import { leftHook } from '../hook.ts'
 import DefinePlugins from './definePlugins/index.vue'
-import { useMenuTopStore } from '@/stores/menuTop.ts'
-import { usePluginsStore } from '@/stores/plugins.ts'
-import { PluginEnum, ShowModeEnum } from '@/enums'
-import { useSettingStore } from '@/stores/setting.ts'
-import { invoke } from '@tauri-apps/api/core'
-import { useGlobalStore } from '@/stores/global.ts'
-import { useTauriListener } from '@/hooks/useTauriListener.ts'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 const appWindow = WebviewWindow.getCurrent()
 const { addListener } = useTauriListener()
@@ -299,19 +295,23 @@ const handleTipShow = (item: any) => {
   item.dot = false
 }
 
+const unreadApplyCount = computed(() => {
+  return globalStore.unReadMark.newFriendUnreadCount + globalStore.unReadMark.newGroupUnreadCount
+})
+
 const startResize = () => {
   window.dispatchEvent(new Event('resize'))
 }
 
 const handleResize = async (e: Event) => {
-  let windowHeight = (e.target as Window).innerHeight
-  let menuDivHeight = showMode.value === ShowModeEnum.TEXT ? 46 : 34
-  let spaceHeight = 10
-  let newMenuHeight = menuDivHeight + spaceHeight
-  let headerTopHeight = 120
-  let bottomPadding = 15
-  let randomHeight = 3 // 插件菜单的高度比其他菜单高2.66666666667
-  let staticMenuNum = 2
+  const windowHeight = (e.target as Window).innerHeight
+  const menuDivHeight = showMode.value === ShowModeEnum.TEXT ? 46 : 34
+  const spaceHeight = 10
+  const newMenuHeight = menuDivHeight + spaceHeight
+  const headerTopHeight = 120
+  const bottomPadding = 15
+  const randomHeight = 3 // 插件菜单的高度比其他菜单高2.66666666667
+  const staticMenuNum = 2
   const menuNum = Math.floor(
     (windowHeight -
       (menuTop.length + noMiniShowPlugins.value.length + itemsBottom.length + staticMenuNum) * menuDivHeight -
@@ -355,7 +355,8 @@ onMounted(async () => {
   await addListener(
     appWindow.listen('startResize', () => {
       startResize()
-    })
+    }),
+    'startResize'
   )
 
   if (tipShow.value) {

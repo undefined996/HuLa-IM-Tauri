@@ -1,21 +1,20 @@
 import { emit } from '@tauri-apps/api/event'
-import { EventEnum, RoomTypeEnum } from '@/enums'
+import { EventEnum, TauriCommand } from '@/enums'
 import { useWindow } from '@/hooks/useWindow.ts'
-import { useGlobalStore } from '@/stores/global.ts'
-import { type } from '@tauri-apps/plugin-os'
-import { invoke } from '@tauri-apps/api/core'
-import { LoginStatus, useWsLoginStore } from '@/stores/ws'
-import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { useGlobalStore } from '@/stores/global.ts'
+import { LoginStatus, useWsLoginStore } from '@/stores/ws'
+import { isDesktop, isMac, isMobile } from '@/utils/PlatformConstants'
 import { clearListener } from '@/utils/ReadCountQueue'
+import { invokeSilently, invokeWithErrorHandler } from '@/utils/TauriInvokeHandler.ts'
+import { useSettingStore } from '../stores/setting'
 
-const isMobile = computed(() => type() === 'android' || type() === 'ios')
 export const useLogin = () => {
   const { resizeWindow } = useWindow()
   const globalStore = useGlobalStore()
   const loginStore = useWsLoginStore()
-  const userStore = useUserStore()
   const chatStore = useChatStore()
+  const settingStore = useSettingStore()
   const { isTrayMenuShow } = storeToRefs(globalStore)
   /**
    * 设置登录状态(系统托盘图标，系统托盘菜单选项)
@@ -26,7 +25,7 @@ export const useLogin = () => {
       localStorage.removeItem('wsLogin')
     }
     isTrayMenuShow.value = true
-    if (!isMobile.value) {
+    if (!isMobile()) {
       await resizeWindow('tray', 130, 356)
     }
   }
@@ -38,12 +37,18 @@ export const useLogin = () => {
     const { createWebviewWindow } = useWindow()
     isTrayMenuShow.value = false
     try {
+      // ws 退出连接
+      await invokeSilently('ws_disconnect')
+      await invokeSilently(TauriCommand.REMOVE_TOKENS)
+      await invokeSilently(TauriCommand.UPDATE_USER_LAST_OPT_TIME)
       // 创建登录窗口
-      await createWebviewWindow('登录', 'login', 320, 448, 'home', false, 320, 448)
+      await createWebviewWindow('登录', 'login', 320, 448, undefined, false, 320, 448)
+      // 发送登出事件
+      if (isDesktop()) {
+        await emit(EventEnum.LOGOUT)
+      }
       // 调整托盘大小
       await resizeWindow('tray', 130, 44)
-      // 发送登出事件
-      await emit(EventEnum.LOGOUT)
     } catch (error) {
       console.error('创建登录窗口失败:', error)
     }
@@ -60,17 +65,14 @@ export const useLogin = () => {
       localStorage.removeItem('TOKEN')
       localStorage.removeItem('REFRESH_TOKEN')
     }
-    // 2. 重置用户状态
-    userStore.isSign = false
-    userStore.userInfo = {}
+    settingStore.closeAutoLogin()
     loginStore.loginStatus = LoginStatus.Init
-    // 3. 重置当前会话为默认值
-    globalStore.currentSession.roomId = '1'
-    globalStore.currentSession.type = RoomTypeEnum.GROUP
     // 4. 清除未读数
     chatStore.clearUnreadCount()
     // 5. 清除系统托盘图标上的未读数
-    await invoke('set_badge_count', { count: null })
+    if (isMac()) {
+      await invokeWithErrorHandler('set_badge_count', { count: undefined })
+    }
   }
 
   return {

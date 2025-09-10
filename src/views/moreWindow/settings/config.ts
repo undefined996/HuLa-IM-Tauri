@@ -1,8 +1,8 @@
-import { type } from '@tauri-apps/plugin-os'
 import { MacOsKeyEnum, WinKeyEnum } from '@/enums'
+import { isWindows } from '@/utils/PlatformConstants'
 
 const key = computed(() => {
-  return `${type() === 'windows' ? WinKeyEnum.CTRL : MacOsKeyEnum['⌘']}`
+  return `${isWindows() ? WinKeyEnum.CTRL : MacOsKeyEnum['⌘']}`
 })
 /** 侧边栏选项 */
 const sideOptions = ref<OPT.L.SettingSide[]>([
@@ -10,6 +10,16 @@ const sideOptions = ref<OPT.L.SettingSide[]>([
     url: '/general',
     label: '通用',
     icon: 'setting-config'
+  },
+  {
+    url: '/manageStore',
+    label: '存储管理',
+    icon: 'mini-sd-card'
+  },
+  {
+    url: '/shortcut',
+    label: '快捷键管理',
+    icon: 'enter-the-keyboard'
   },
   {
     url: '/loginSetting',

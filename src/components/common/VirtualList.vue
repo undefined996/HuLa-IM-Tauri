@@ -13,8 +13,8 @@
       <img class="size-16px" src="@/assets/img/loading.svg" alt="" />
       <span class="text-(14px #909090)">加载中</span>
     </n-flex>
-    <div class="virtual-list-phantom" :style="{ height: `${totalHeight}px` }"></div>
-    <div class="virtual-list-content" :style="{ transform: `translateY(${offset}px)` }">
+    <div ref="phantomRef" class="virtual-list-phantom"></div>
+    <div ref="contentRef" class="virtual-list-content">
       <div
         v-for="item in visibleData"
         :key="item.message?.id"
@@ -35,6 +35,7 @@ const props = defineProps<{
   buffer?: number
   isLoadingMore?: boolean
   isLast?: boolean
+  listKey?: string | number
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +44,7 @@ const emit = defineEmits<{
   loadMore: []
   mouseenter: []
   mouseleave: []
+  visibleItemsChange: [ids: string[]]
 }>()
 
 // 常量定义
@@ -57,21 +59,101 @@ const DOM_CLEANUP_INTERVAL = 60000 // DOM清理间隔，默认1分钟
 
 // 响应式引用
 const containerRef = ref<HTMLElement | null>(null) // 容器元素引用
-const offset = ref(0) // 内容区域的偏移量
+const phantomRef = ref<HTMLElement | null>(null) // phantom元素引用
+const contentRef = ref<HTMLElement | null>(null) // content元素引用
+// 普通变量（不需要响应式）
+let offset = 0 // 内容区域的偏移量
+let rafId: number | null = null // requestAnimationFrame的ID
+let lastScrollTop = 0 // 上次滚动位置
+let consecutiveStaticFrames = 0 // 连续静止帧计数
+let needsHeightRecalculation = true // 标记是否需要重新计算高度缓存
+let cleanupTimerId: number | null = null // 定时清理DOM的计时器ID
+let resizeObserver: ResizeObserver | null = null // ResizeObserver 实例
+let bottomLockRafId: number | null = null // 吸底稳定锁定的RAF ID
+
+// 响应式变量（需要响应式）
 const heights = ref<Map<string, number>>(new Map()) // 存储每个项目的实际高度，key为消息ID
 const visibleRange = ref({ start: 0, end: 0 }) // 当前可见区域的起始和结束索引
 const isScrolling = ref(false) // 是否正在滚动中
-const rafId = ref<number | null>(null) // requestAnimationFrame的ID
-const lastScrollTop = ref(0) // 上次滚动位置
-const consecutiveStaticFrames = ref(0) // 连续静止帧计数
 const accumulatedHeights = ref<number[]>([]) // 缓存累积高度，优化二分查找
-const needsHeightRecalculation = ref(true) // 标记是否需要重新计算高度缓存
 const hideScrollbar = ref(true) // 滚动条显示/隐藏
-const cleanupTimerId = ref<number | null>(null) // 定时清理DOM的计时器ID
 const previousVisibleIds = ref<Set<string>>(new Set()) // 上一次可见的项目ID集合
 
-// ResizeObserver 实例
-const resizeObserver = ref<ResizeObserver | null>(null)
+// 直接更新phantom元素高度的函数
+const updatePhantomHeight = (height: number) => {
+  if (phantomRef.value) {
+    phantomRef.value.style.height = `${height}px`
+  }
+}
+
+// 直接更新content元素偏移的函数
+const updateContentOffset = (offsetValue: number) => {
+  if (contentRef.value) {
+    contentRef.value.style.transform = `translateY(${offsetValue}px)`
+  }
+}
+
+// 取消底部锁定
+const cancelBottomLock = () => {
+  if (bottomLockRafId !== null) {
+    cancelAnimationFrame(bottomLockRafId)
+    bottomLockRafId = null
+  }
+}
+
+// 启动底部锁定，直到高度与位置稳定
+const lockBottomUntilStable = (timeoutMs = 450, stableFrames = 3) => {
+  const container = containerRef.value
+  if (!container) return
+
+  cancelBottomLock()
+
+  let lastHeight = container.scrollHeight
+  let stable = 0
+  const start = performance.now()
+
+  const tick = () => {
+    if (!containerRef.value) {
+      cancelBottomLock()
+      return
+    }
+
+    const el = containerRef.value
+    const now = performance.now()
+    if (now - start > timeoutMs) {
+      cancelBottomLock()
+      return
+    }
+
+    // 强制吸底
+    const target = Math.max(0, el.scrollHeight - el.clientHeight)
+    if (el.scrollTop !== target) {
+      el.scrollTop = target
+    }
+
+    // 判断高度与位置是否稳定
+    const currentHeight = el.scrollHeight
+    const heightDelta = Math.abs(currentHeight - lastHeight)
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+
+    if (heightDelta <= 1 && distanceFromBottom <= 1) {
+      stable++
+    } else {
+      stable = 0
+    }
+
+    lastHeight = currentHeight
+
+    if (stable >= stableFrames) {
+      cancelBottomLock()
+      return
+    }
+
+    bottomLockRafId = requestAnimationFrame(tick)
+  }
+
+  bottomLockRafId = requestAnimationFrame(tick)
+}
 
 const handleMouseEnter = () => {
   emit('mouseenter')
@@ -104,7 +186,7 @@ const cleanupHeightCache = () => {
         heights.value.delete(key)
       }
       // 标记需要重新计算高度缓存
-      needsHeightRecalculation.value = true
+      needsHeightRecalculation = true
     }
   }
 }
@@ -121,9 +203,9 @@ const visibleData = computed(() => {
 // 计算列表总高度 - 使用记忆化缓存优化性能
 const totalHeight = computed(() => {
   // 如果需要重新计算累积高度，则重置缓存
-  if (needsHeightRecalculation.value) {
+  if (needsHeightRecalculation) {
     updateAccumulatedHeights()
-    needsHeightRecalculation.value = false
+    needsHeightRecalculation = false
   }
 
   // 如果有累积高度缓存，直接使用最后一个值
@@ -160,7 +242,7 @@ watch(
     }
 
     // 标记需要重新计算高度缓存
-    needsHeightRecalculation.value = true
+    needsHeightRecalculation = true
 
     // 数据变化时重新计算可见范围和更新高度
     updateVisibleRange()
@@ -180,6 +262,15 @@ watch(
     previousVisibleIds.value = currentVisibleIds
   },
   { deep: false }
+)
+
+// 监听totalHeight变化，直接更新phantom元素高度
+watch(
+  () => totalHeight.value,
+  (newHeight) => {
+    updatePhantomHeight(newHeight)
+  },
+  { immediate: true }
 )
 
 // 清理不可见的DOM节点
@@ -226,11 +317,11 @@ const cleanupInvisibleDOMNodes = () => {
 
 // 定时清理DOM节点
 const startDOMCleanupTimer = () => {
-  if (cleanupTimerId.value !== null) {
-    clearInterval(cleanupTimerId.value)
+  if (cleanupTimerId !== null) {
+    clearInterval(cleanupTimerId)
   }
 
-  cleanupTimerId.value = window.setInterval(() => {
+  cleanupTimerId = window.setInterval(() => {
     cleanupInvisibleDOMNodes()
   }, DOM_CLEANUP_INTERVAL)
 }
@@ -252,7 +343,7 @@ const updateItemHeight = () => {
       // 只有当高度发生变化时才更新缓存并标记需要重新计算
       if (oldHeight !== height) {
         heights.value.set(id, height)
-        needsHeightRecalculation.value = true
+        needsHeightRecalculation = true
       }
     }
   }
@@ -269,9 +360,9 @@ const updateItemHeight = () => {
 // 根据滚动位置计算起始索引 - 使用缓存优化二分查找
 const getStartIndex = (scrollTop: number) => {
   // 如果需要重新计算累积高度，则更新缓存
-  if (needsHeightRecalculation.value) {
+  if (needsHeightRecalculation) {
     updateAccumulatedHeights()
-    needsHeightRecalculation.value = false
+    needsHeightRecalculation = false
   }
 
   // 二分查找 O(log n)
@@ -294,9 +385,9 @@ const getStartIndex = (scrollTop: number) => {
 // 计算指定索引的偏移量 - 使用累积高度缓存优化
 const getOffsetForIndex = (index: number) => {
   // 如果需要重新计算累积高度，则更新缓存
-  if (needsHeightRecalculation.value) {
+  if (needsHeightRecalculation) {
     updateAccumulatedHeights()
-    needsHeightRecalculation.value = false
+    needsHeightRecalculation = false
   }
 
   // 如果索引在缓存范围内，直接使用缓存值
@@ -337,8 +428,11 @@ const updateVisibleRange = () => {
 
   // 更新可见范围和偏移量
   visibleRange.value = { start, end }
-  // 加上加载中需要的偏移量
-  offset.value = getOffsetForIndex(start) + LOADING_OFFSET
+  // 计算偏移量，为顶部提示预留32px空间（当显示时）
+  const topOffset = (!props.isLoadingMore && props.isLast) || (props.isLoadingMore && !props.isLast) ? 32 : 0
+  const newOffset = getOffsetForIndex(start) + (props.isLoadingMore && !props.isLast ? LOADING_OFFSET : 0) + topOffset
+  offset = newOffset
+  updateContentOffset(newOffset)
 }
 
 // 更新可见范围的帧动画处理
@@ -353,41 +447,42 @@ const updateFrame = () => {
   }
 
   // 检查滚动位置是否变化
-  if (currentScrollTop !== lastScrollTop.value) {
+  if (currentScrollTop !== lastScrollTop) {
     // 发生滚动，重置静止帧计数
-    consecutiveStaticFrames.value = 0
+    consecutiveStaticFrames = 0
     // 发出滚动方向变化事件
-    if (currentScrollTop < lastScrollTop.value) {
+    if (currentScrollTop < lastScrollTop) {
       emit('scrollDirectionChange', 'up')
-    } else if (currentScrollTop > lastScrollTop.value) {
+    } else if (currentScrollTop > lastScrollTop) {
       emit('scrollDirectionChange', 'down')
     }
     updateVisibleRange()
-    lastScrollTop.value = currentScrollTop
+    lastScrollTop = currentScrollTop
   } else {
     // 滚动位置未变化，增加静止帧计数
-    consecutiveStaticFrames.value++
+    consecutiveStaticFrames++
 
     // 如果连续3帧未发生滚动，认为滚动已结束
-    if (consecutiveStaticFrames.value >= 3) {
+    if (consecutiveStaticFrames >= 3) {
       // 滚动结束，更新高度并停止动画
       isScrolling.value = false
       updateItemHeight()
-      if (rafId.value !== null) {
-        cancelAnimationFrame(rafId.value)
-        rafId.value = null
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+        rafId = null
       }
       return
     }
   }
 
   // 继续下一帧
-  rafId.value = requestAnimationFrame(updateFrame)
+  rafId = requestAnimationFrame(updateFrame)
 }
 
 // 使用防抖处理滚动事件
 const debouncedEmitScroll = useDebounceFn((event: Event) => {
   emit('scroll', event)
+  emitVisibleItems()
 }, 16) // 约60fps的频率
 
 // 滚动事件处理
@@ -398,16 +493,28 @@ const handleScroll = (event: Event) => {
   // 标记滚动状态并开始帧动画
   if (!isScrolling.value) {
     isScrolling.value = true
-    consecutiveStaticFrames.value = 0
-    if (rafId.value === null) {
-      rafId.value = requestAnimationFrame(updateFrame)
+    consecutiveStaticFrames = 0
+    if (rafId === null) {
+      rafId = requestAnimationFrame(updateFrame)
     }
   }
+}
+
+const emitVisibleItems = () => {
+  const visibleIds = visibleData.value.map((item) => item.message?.id?.toString()).filter(Boolean) as string[]
+
+  emit('visibleItemsChange', visibleIds)
 }
 
 onMounted(() => {
   // 初始化可见范围
   updateVisibleRange()
+
+  // 初始化DOM样式
+  nextTick(() => {
+    updatePhantomHeight(totalHeight.value)
+    updateContentOffset(offset)
+  })
 
   // 使用 ResizeObserver 监听容器大小变化
   if (containerRef.value) {
@@ -419,10 +526,10 @@ onMounted(() => {
       })
     }, 100)
 
-    resizeObserver.value = new ResizeObserver(() => {
+    resizeObserver = new ResizeObserver(() => {
       debouncedResize()
     })
-    resizeObserver.value.observe(containerRef.value)
+    resizeObserver.observe(containerRef.value)
   }
 
   // 初始化高度计算
@@ -438,21 +545,27 @@ onMounted(() => {
 
 onUnmounted(() => {
   // 清理动画
-  if (rafId.value !== null) {
-    cancelAnimationFrame(rafId.value)
-    rafId.value = null
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+
+  // 清理底部锁定动画
+  if (bottomLockRafId !== null) {
+    cancelAnimationFrame(bottomLockRafId)
+    bottomLockRafId = null
   }
 
   // 清理 ResizeObserver
-  if (resizeObserver.value) {
-    resizeObserver.value.disconnect()
-    resizeObserver.value = null
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
   }
 
   // 清理定时器
-  if (cleanupTimerId.value !== null) {
-    clearInterval(cleanupTimerId.value)
-    cleanupTimerId.value = null
+  if (cleanupTimerId !== null) {
+    clearInterval(cleanupTimerId)
+    cleanupTimerId = null
   }
 
   // 清理缓存
@@ -480,17 +593,24 @@ defineExpose<VirtualListExpose>({
         nextTick(() => {
           updateItemHeight()
           // 确保累积高度已更新
-          if (needsHeightRecalculation.value) {
+          if (needsHeightRecalculation) {
             updateAccumulatedHeights()
-            needsHeightRecalculation.value = false
+            needsHeightRecalculation = false
           }
           nextTick(() => {
             if (containerRef.value) {
-              // 使用 scrollTo 代替直接设置 scrollTop，提高兼容性
+              // 计算正确的滚动位置：scrollHeight - clientHeight
+              const scrollHeight = containerRef.value.scrollHeight
+              const clientHeight = containerRef.value.clientHeight
+              const targetScrollTop = Math.max(0, scrollHeight - clientHeight)
+
               containerRef.value.scrollTo({
-                top: totalHeight.value,
+                top: targetScrollTop,
                 behavior: options.behavior || 'auto'
               })
+
+              // 启用底部锁定，直到高度稳定
+              lockBottomUntilStable()
             }
           })
         })
@@ -503,9 +623,9 @@ defineExpose<VirtualListExpose>({
       } else if (typeof options.index === 'number') {
         // 滚动到指定索引位置
         // 确保累积高度已更新
-        if (needsHeightRecalculation.value) {
+        if (needsHeightRecalculation) {
           updateAccumulatedHeights()
-          needsHeightRecalculation.value = false
+          needsHeightRecalculation = false
         }
         const offset = getOffsetForIndex(options.index)
         containerRef.value.scrollTo({
@@ -515,9 +635,11 @@ defineExpose<VirtualListExpose>({
       }
     }
 
-    // 立即执行一次，并在短暂延迟后再次执行以确保内容已完全加载
+    // 立即执行一次；仅在平滑滚动时再补偿一次
     executeScroll()
-    setTimeout(executeScroll, 100)
+    if (options.behavior === 'smooth') {
+      setTimeout(executeScroll, 100)
+    }
   },
   getContainer: () => containerRef.value
 })
@@ -600,5 +722,6 @@ defineExpose<VirtualListExpose>({
   transform: translateZ(0); /* 启用GPU加速 */
   backface-visibility: hidden; /* 防止闪烁 */
   perspective: 1000; /* 增强3D效果 */
+  z-index: 1; /* 确保内容在提示文字之上 */
 }
 </style>

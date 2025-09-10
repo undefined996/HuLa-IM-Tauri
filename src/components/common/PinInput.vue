@@ -6,16 +6,26 @@
         :key="index"
         type="text"
         maxlength="1"
-        autocomplete="off"
-        disableautocomplete="off"
+        spellCheck="false"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
         :class="[
           'text-center rounded-8px',
-          'size-32px',
           'border-(2px solid transparent)',
           'focus:border-(2px solid #13987f)',
           'focus:outline-none',
+          'box-border',
           inputClass
         ]"
+        :style="{
+          width: size,
+          height: size,
+          minWidth: size,
+          minHeight: size,
+          maxWidth: size,
+          maxHeight: size
+        }"
         v-model="digits[index]"
         @input="handleInput(index)"
         @keydown="handleKeydown($event, index)"
@@ -26,8 +36,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
-
 const props = defineProps({
   /** PIN码长度 */
   length: {
@@ -43,6 +51,11 @@ const props = defineProps({
   modelValue: {
     type: String,
     default: ''
+  },
+  /** 输入框大小 */
+  size: {
+    type: String,
+    default: '42px'
   }
 })
 

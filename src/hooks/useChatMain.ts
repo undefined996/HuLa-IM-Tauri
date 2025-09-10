@@ -1,32 +1,31 @@
-import { useCommon } from '@/hooks/useCommon.ts'
-import { MittEnum, MsgEnum, PowerEnum, RoleEnum, RoomTypeEnum } from '@/enums'
-import { FilesMeta, MessageType, RightMouseMessageItem } from '@/services/types.ts'
-import { useMitt } from '@/hooks/useMitt.ts'
-import { useChatStore } from '@/stores/chat.ts'
-import apis from '@/services/apis.ts'
-import { useContactStore } from '@/stores/contacts'
-import { useUserStore } from '@/stores/user'
-import { useGlobalStore } from '@/stores/global.ts'
-import { isDiffNow } from '@/utils/ComputedTime.ts'
-import { writeText, writeImage } from '@tauri-apps/plugin-clipboard-manager'
-import { detectImageFormat, imageUrlToUint8Array, isImageUrl } from '@/utils/ImageUtils'
-import { translateText } from '@/services/translate'
-import { useSettingStore } from '@/stores/setting.ts'
+import { join, resourceDir } from '@tauri-apps/api/path'
+import { writeImage, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { save } from '@tauri-apps/plugin-dialog'
-import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import { type } from '@tauri-apps/plugin-os'
 import { BaseDirectory } from '@tauri-apps/plugin-fs'
-import { resourceDir } from '@tauri-apps/api/path'
-import { join } from '@tauri-apps/api/path'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import type { FileTypeResult } from 'file-type'
+import { MittEnum, MsgEnum, PowerEnum, RoleEnum, RoomTypeEnum } from '@/enums'
+import { useCommon } from '@/hooks/useCommon.ts'
 import { useDownload } from '@/hooks/useDownload'
-import { useGroupStore } from '@/stores/group'
-import { useWindow } from './useWindow'
-import { useEmojiStore } from '@/stores/emoji'
+import { useMitt } from '@/hooks/useMitt.ts'
 import { useVideoViewer } from '@/hooks/useVideoViewer'
-import { FileDownloadStatus, useFileDownloadStore } from '@/stores/fileDownload'
+import { translateText } from '@/services/translate'
+import type { FilesMeta, MessageType, RightMouseMessageItem } from '@/services/types.ts'
+import { useChatStore } from '@/stores/chat.ts'
+import { useContactStore } from '@/stores/contacts'
+import { useEmojiStore } from '@/stores/emoji'
+import { type FileDownloadStatus, useFileDownloadStore } from '@/stores/fileDownload'
+import { useGlobalStore } from '@/stores/global.ts'
+import { useGroupStore } from '@/stores/group'
+import { useSettingStore } from '@/stores/setting.ts'
+import { useUserStore } from '@/stores/user'
+import { isDiffNow } from '@/utils/ComputedTime.ts'
 import { extractFileName, removeTag } from '@/utils/Formatting'
+import { detectImageFormat, imageUrlToUint8Array, isImageUrl } from '@/utils/ImageUtils'
+import { recallMsg, removeGroupMember } from '@/utils/ImRequestUtils'
 import { detectRemoteFileType, getFilesMeta, getUserAbsoluteVideosDir } from '@/utils/PathUtil'
-import { FileTypeResult } from 'file-type'
+import { isMac } from '@/utils/PlatformConstants'
+import { useWindow } from './useWindow'
 
 export const useChatMain = () => {
   const { openMsgSession, userUid } = useCommon()
@@ -39,7 +38,7 @@ export const useChatMain = () => {
   const groupStore = useGroupStore()
   const chatStore = useChatStore()
   const emojiStore = useEmojiStore()
-  const userStore = useUserStore()?.userInfo
+  const userStore = useUserStore()
   const { downloadFile } = useDownload()
   // const userInfo = useUserStore()?.userInfo
   // const chatMessageList = computed(() => chatStore.chatMessageList)
@@ -104,15 +103,23 @@ export const useChatMain = () => {
       label: '撤回',
       icon: 'corner-down-left',
       click: async (item: MessageType) => {
-        const res = (await apis.recallMsg({ roomId: '1', msgId: item.message.id })) as any
+        const msg = { ...item }
+        const res = await recallMsg({ roomId: globalStore.currentSession!.roomId, msgId: item.message.id })
         if (res) {
           window.$message.error(res)
           return
         }
-        chatStore.updateRecallStatus({
-          recallUid: item.fromUser.uid,
-          msgId: item.message.id,
-          roomId: item.message.roomId
+
+        // 记录撤回的消息，用于重新编辑
+        chatStore.recordRecallMsg({
+          recallUid: userStore.userInfo!.uid,
+          msg
+        })
+        // 发送撤回消息请求，并修改缓存
+        await chatStore.updateRecallMsg({
+          recallUid: userStore.userInfo!.uid,
+          roomId: msg.message.roomId,
+          msgId: msg.message.id
         })
       },
       visible: (item: MessageType) => {
@@ -120,7 +127,7 @@ export const useChatMain = () => {
         if (isDiffNow({ time: item.message.sendTime, unit: 'minute', diff: 2 })) return
         // 判断自己是否是发送者或者是否是管理员
         const isCurrentUser = item.fromUser.uid === userUid.value
-        const isAdmin = userStore?.power === PowerEnum.ADMIN
+        const isAdmin = userStore.userInfo!.power === PowerEnum.ADMIN
         return isCurrentUser || isAdmin
       }
     }
@@ -163,7 +170,7 @@ export const useChatMain = () => {
       }
     },
     {
-      label: type() === 'macos' ? '在Finder中显示' : '在文件夹中打开',
+      label: isMac() ? '在Finder中显示' : '在文件夹中打开',
       icon: 'file2',
       click: async (item: MessageType) => {
         try {
@@ -246,8 +253,8 @@ export const useChatMain = () => {
 
           const fileStatus: FileDownloadStatus = fileDownloadStore.getFileStatus(item.message.body.url)
 
-          const currentChatRoomId = globalStore.currentSession.roomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
-          const currentUserUid = userStore.uid as string
+          const currentChatRoomId = globalStore.currentSession!.roomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
+          const currentUserUid = userStore.userInfo!.uid as string
 
           /**
            * 构建窗口所需的 payload 数据，用于传递文件预览相关的信息。
@@ -366,7 +373,7 @@ export const useChatMain = () => {
       }
     },
     {
-      label: type() === 'macos' ? '在Finder中显示' : '打开文件夹',
+      label: isMac() ? '在Finder中显示' : '打开文件夹',
       icon: 'file2',
       click: async (item: RightMouseMessageItem) => {
         // try {
@@ -413,8 +420,8 @@ export const useChatMain = () => {
         const fileStatus = fileDownloadStore.getFileStatus(fileUrl)
 
         console.log('找到的文件状态：', fileStatus)
-        const currentChatRoomId = globalStore.currentSession.roomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
-        const currentUserUid = userStore.uid as string
+        const currentChatRoomId = globalStore.currentSession!.roomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
+        const currentUserUid = userStore.userInfo!.uid as string
 
         const resourceDirPath = await getUserAbsoluteVideosDir(currentUserUid, currentChatRoomId)
         let absolutePath = await join(resourceDirPath, fileName)
@@ -490,7 +497,7 @@ export const useChatMain = () => {
       }
     },
     {
-      label: type() === 'macos' ? '在Finder中显示' : '打开文件夹',
+      label: isMac() ? '在Finder中显示' : '打开文件夹',
       icon: 'file2',
       click: async (item: MessageType) => {
         try {
@@ -573,7 +580,7 @@ export const useChatMain = () => {
         try {
           await groupStore.addAdmin([targetUid])
           window.$message.success('设置管理员成功')
-        } catch (error) {
+        } catch (_error) {
           window.$message.error('设置管理员失败')
         }
       },
@@ -618,7 +625,7 @@ export const useChatMain = () => {
         try {
           await groupStore.revokeAdmin([targetUid])
           window.$message.success('撤销管理员成功')
-        } catch (error) {
+        } catch (_error) {
           window.$message.error('撤销管理员失败')
         }
       },
@@ -664,11 +671,11 @@ export const useChatMain = () => {
         if (!roomId) return
 
         try {
-          await apis.removeGroupMember({ roomId, uid: targetUid })
+          await removeGroupMember({ roomId, uid: targetUid })
           // 从群成员列表中移除该用户
-          groupStore.filterUser(targetUid)
+          groupStore.removeUserItem(targetUid, roomId)
           window.$message.success('移出群聊成功')
-        } catch (error) {
+        } catch (_error) {
           window.$message.error('移出群聊失败')
         }
       },
@@ -796,7 +803,7 @@ export const useChatMain = () => {
   const checkFriendRelation = (uid: string, type: 'friend' | 'all' = 'all') => {
     const contactStore = useContactStore()
     const userStore = useUserStore()
-    const myUid = userStore.userInfo.uid
+    const myUid = userStore.userInfo!.uid
     const isFriend = contactStore.contactsList.some((item) => item.uid === uid)
     return type === 'friend' ? isFriend && uid !== myUid : isFriend || uid === myUid
   }

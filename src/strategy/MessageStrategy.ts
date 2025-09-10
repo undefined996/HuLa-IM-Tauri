@@ -1,17 +1,17 @@
-import { MessageStatusEnum, MsgEnum, UploadSceneEnum } from '@/enums'
-import { MessageType } from '@/services/types.ts'
-import { AppException } from '@/common/exception.ts'
-import { useUserInfo } from '@/hooks/useCached.ts'
-import { Ref } from 'vue'
-import { parseInnerText } from '@/hooks/useCommon.ts'
-import { BaseDirectory, readFile, writeFile, remove } from '@tauri-apps/plugin-fs'
-import DOMPurify from 'dompurify'
-import { UploadOptions, UploadProviderEnum, useUpload } from '@/hooks/useUpload'
-import { getImageDimensions } from '@/utils/ImageUtils'
-import { getMimeTypeFromExtension, removeTag } from '@/utils/Formatting'
-import { join, appCacheDir } from '@tauri-apps/api/path'
 import { invoke } from '@tauri-apps/api/core'
-import { isVideoUrl, fixFileMimeType } from '@/utils/FileType'
+import { appCacheDir, join } from '@tauri-apps/api/path'
+import { BaseDirectory, readFile, remove, writeFile } from '@tauri-apps/plugin-fs'
+import DOMPurify from 'dompurify'
+import type { Ref } from 'vue'
+import { AppException } from '@/common/exception.ts'
+import { MessageStatusEnum, MsgEnum, UploadSceneEnum } from '@/enums'
+import { parseInnerText } from '@/hooks/useCommon.ts'
+import { type UploadOptions, UploadProviderEnum, useUpload } from '@/hooks/useUpload'
+import type { MessageType } from '@/services/types.ts'
+import { fixFileMimeType, isVideoUrl } from '@/utils/FileType'
+import { getMimeTypeFromExtension, removeTag } from '@/utils/Formatting'
+import { getImageDimensions } from '@/utils/ImageUtils'
+import { useGroupStore } from '../stores/group'
 
 interface MessageStrategy {
   getMsg: (msgInputValue: string, replyValue: any, fileList?: File[]) => any
@@ -42,12 +42,13 @@ abstract class AbstractMessageStrategy implements MessageStrategy {
 
   buildMessageType(messageId: string, messageBody: any, globalStore: any, userUid: Ref<any>): MessageType {
     const currentTime = new Date().getTime()
+    const groupStore = useGroupStore()
     return {
       fromUser: {
         uid: userUid.value || 0,
-        username: useUserInfo(userUid.value)?.value?.name || '',
-        avatar: useUserInfo(userUid.value)?.value?.avatar || '',
-        locPlace: useUserInfo(userUid.value)?.value?.locPlace || ''
+        username: groupStore.getUserInfo(userUid.value)?.name || '',
+        avatar: groupStore.getUserInfo(userUid.value)?.avatar || '',
+        locPlace: groupStore.getUserInfo(userUid.value)?.locPlace || ''
       },
       message: {
         id: messageId,
@@ -189,7 +190,7 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
         height: result.height,
         previewUrl: result.previewUrl!
       }
-    } catch (error) {
+    } catch (_error) {
       throw new AppException('图片加载失败')
     }
   }
@@ -223,7 +224,7 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
         height: result.height,
         size: result.size || 0
       }
-    } catch (error) {
+    } catch (_error) {
       throw new AppException('图片加载失败')
     }
   }
@@ -1076,7 +1077,7 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
         scene: UploadSceneEnum.CHAT
       })
       return result
-    } catch (error) {
+    } catch (_error) {
       throw new AppException('获取视频上传链接失败')
     }
   }
@@ -1144,7 +1145,7 @@ class VoiceMessageStrategyImpl extends AbstractMessageStrategy {
     return {
       type: MsgEnum.VOICE,
       url: assetUrl,
-      size: parseInt(lastVoiceDiv.dataset.size || '0'),
+      size: parseInt(lastVoiceDiv.dataset.size || '0', 10),
       duration: parseFloat(lastVoiceDiv.dataset.duration || '0'),
       filename: lastVoiceDiv.dataset.filename || 'voice.mp3'
     }
@@ -1188,7 +1189,7 @@ class VoiceMessageStrategyImpl extends AbstractMessageStrategy {
 
       const result = await uploadHook.getUploadAndDownloadUrl(path, uploadOptions)
       return result
-    } catch (error) {
+    } catch (_error) {
       throw new AppException('获取语音上传链接失败，请重试')
     }
   }
@@ -1204,9 +1205,105 @@ class VoiceMessageStrategyImpl extends AbstractMessageStrategy {
       if (options?.provider === UploadProviderEnum.QINIU) {
         return { qiniuUrl: result as string }
       }
-    } catch (error) {
+    } catch (_error) {
       throw new AppException('语音文件上传失败，请重试')
     }
+  }
+}
+
+/**
+ * 处理视频通话系统消息
+ * 消息结构
+ */
+class VideoCallMessageStrategyImpl extends AbstractMessageStrategy {
+  constructor() {
+    super(MsgEnum.VIDEO_CALL)
+  }
+
+  getMsg(_msgInputValue: string, callInfo: any): any {
+    return {
+      type: this.msgType,
+      duration: callInfo.duration, // 通话时长（秒）
+      reason: callInfo.reason, // 结束原因：超时/挂断/异常
+      startTime: callInfo.startTime, // 通话开始时间（时间戳）
+      endTime: callInfo.endTime, // 通话结束时间（时间戳）
+      creator: callInfo.creator, // 发起人 UID
+      isGroup: callInfo.isGroup // 是否为群聊通话
+    }
+  }
+
+  buildMessageBody(msg: any): any {
+    return {
+      duration: msg.duration,
+      reason: msg.reason,
+      startTime: msg.startTime,
+      endTime: msg.endTime,
+      creator: msg.creator,
+      isGroup: msg.isGroup
+    }
+  }
+
+  // 系统消息无需上传操作
+  async uploadFile() {
+    return { uploadUrl: '', downloadUrl: '' }
+  }
+
+  async doUpload() {}
+}
+
+/**
+ * 处理音频通话系统消息
+ * 消息结构
+ */
+class AudioCallMessageStrategyImpl extends AbstractMessageStrategy {
+  constructor() {
+    super(MsgEnum.AUDIO_CALL)
+  }
+
+  /**
+   * 构建音频通话消息
+   * @param callInfo 通话元数据
+   * @returns 音频通话消息对象
+   */
+  getMsg(_msgInputValue: string, callInfo: any): any {
+    return {
+      type: this.msgType,
+      duration: callInfo.duration, // 通话时长（秒）
+      reason: callInfo.reason, // 结束原因：超时/挂断/异常
+      startTime: callInfo.startTime, // 通话开始时间（毫秒时间戳）
+      endTime: callInfo.endTime, // 通话结束时间（毫秒时间戳）
+      creator: callInfo.creator, // 发起人 UID
+      isGroup: callInfo.isGroup // 是否为群聊通话
+    }
+  }
+
+  buildMessageBody(msg: any): any {
+    return {
+      duration: msg.duration, // 通话时长（秒）
+      reason: msg.reason, // 结束原因
+      startTime: msg.startTime, // 开始时间戳
+      endTime: msg.endTime, // 结束时间戳
+      creator: msg.creator, // 发起人UID
+      isGroup: msg.isGroup // 群聊标识
+    }
+  }
+
+  /**
+   * 空实现（系统消息无需文件上传）
+   * @returns 固定返回空上传信息
+   */
+  async uploadFile(): Promise<{ uploadUrl: string; downloadUrl: string }> {
+    return {
+      uploadUrl: '',
+      downloadUrl: ''
+    }
+  }
+
+  /**
+   * 空实现（系统消息无需上传操作）
+   */
+  async doUpload(): Promise<void> {
+    return Promise.resolve()
   }
 }
 
@@ -1217,6 +1314,8 @@ const emojiMessageStrategy = new EmojiMessageStrategyImpl()
 const unsupportedMessageStrategy = new UnsupportedMessageStrategyImpl()
 const videoMessageStrategy = new VideoMessageStrategyImpl()
 const voiceMessageStrategy = new VoiceMessageStrategyImpl()
+const videoCallMessageStrategy = new VideoCallMessageStrategyImpl()
+const audioCallMessageStrategy = new AudioCallMessageStrategyImpl()
 
 export const messageStrategyMap: Record<MsgEnum, MessageStrategy> = {
   [MsgEnum.FILE]: fileMessageStrategy,
@@ -1233,5 +1332,8 @@ export const messageStrategyMap: Record<MsgEnum, MessageStrategy> = {
   [MsgEnum.MIXED]: unsupportedMessageStrategy,
   [MsgEnum.AIT]: unsupportedMessageStrategy,
   [MsgEnum.REPLY]: unsupportedMessageStrategy,
-  [MsgEnum.AI]: unsupportedMessageStrategy
+  [MsgEnum.AI]: unsupportedMessageStrategy,
+  [MsgEnum.BOT]: unsupportedMessageStrategy,
+  [MsgEnum.VIDEO_CALL]: videoCallMessageStrategy,
+  [MsgEnum.AUDIO_CALL]: audioCallMessageStrategy
 }

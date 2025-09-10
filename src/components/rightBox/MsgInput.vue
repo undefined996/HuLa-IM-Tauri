@@ -1,155 +1,163 @@
 <template>
   <!-- 录音模式 -->
-  <VoiceRecorder v-if="isVoiceMode" @cancel="handleVoiceCancel" @send="handleVoiceSend" />
+  <VoiceRecorder v-show="isVoiceMode" @cancel="handleVoiceCancel" @send="handleVoiceSend" />
 
-  <!-- 输入框 -->
-  <ContextMenu v-else class="w-full h-110px" @select="$event.click()" :menu="menuList">
-    <n-scrollbar style="max-height: 100px">
-      <div
-        id="message-input"
-        ref="messageInputDom"
-        style="outline: none"
-        contenteditable
-        spellcheck="false"
-        @paste="onPaste($event)"
-        @input="handleInput"
-        @keydown.exact.enter="inputKeyDown"
-        @keydown.exact.meta.enter="inputKeyDown"
-        @keydown="updateSelectionRange"
-        @keyup="updateSelectionRange"
-        @click="updateSelectionRange"
-        @compositionend="updateSelectionRange"
-        @keydown.exact.ctrl.enter="inputKeyDown"
-        data-placeholder="善言一句暖人心，恶语一句伤人心"
-        class="empty:before:content-[attr(data-placeholder)] before:text-(12px #777)"></div>
-    </n-scrollbar>
-  </ContextMenu>
+  <!-- 输入框表单 -->
+  <form
+    v-show="!isVoiceMode"
+    id="message-form"
+    @submit.prevent="handleFormSubmit"
+    class="w-full flex flex-col flex-1 min-h-0">
+    <ContextMenu
+      class="w-full"
+      :style="{ height: `${props.height - 108}px` }"
+      @select="$event.click()"
+      :menu="menuList">
+      <n-scrollbar @click="focusInput">
+        <div
+          id="message-input"
+          ref="messageInputDom"
+          style="outline: none; min-height: 36px"
+          contenteditable
+          spellcheck="false"
+          @paste="onPaste($event)"
+          @input="handleInput"
+          @keydown.exact.enter="inputKeyDown"
+          @keydown.exact.meta.enter="inputKeyDown"
+          @keydown="updateSelectionRange"
+          @keyup="updateSelectionRange"
+          @click="updateSelectionRange"
+          @compositionend="updateSelectionRange"
+          @keydown.exact.ctrl.enter="inputKeyDown"
+          data-placeholder="善言一句暖人心，恶语一句伤人心"
+          class="empty:before:content-[attr(data-placeholder)] before:text-(12px #777) p-2"></div>
+      </n-scrollbar>
+    </ContextMenu>
+    <!-- @提及框  -->
+    <div v-if="ait && activeItem?.type === RoomTypeEnum.GROUP && personList.length > 0" class="ait-options">
+      <n-virtual-list
+        id="image-chat-ait"
+        ref="virtualListInst-ait"
+        style="max-height: 180px"
+        :item-size="36"
+        :items="personList"
+        v-model:selectedKey="selectedAitKey">
+        <template #default="{ item }">
+          <n-flex
+            @mouseover="() => (selectedAitKey = item.uid)"
+            :class="{ active: selectedAitKey === item.uid }"
+            @click="handleAit(item)"
+            :key="item.uid"
+            align="center"
+            class="ait-item">
+            <n-avatar
+              lazy
+              round
+              :size="22"
+              :src="AvatarUtils.getAvatarUrl(item.avatar)"
+              :color="themes.content === ThemeEnum.DARK ? '' : '#fff'"
+              :fallback-src="themes.content === ThemeEnum.DARK ? '/logoL.png' : '/logoD.png'"
+              :render-placeholder="() => null"
+              :intersection-observer-options="{
+                root: '#image-chat-ait'
+              }" />
+            <span>{{ item.name }}</span>
+          </n-flex>
+        </template>
+      </n-virtual-list>
+    </div>
 
-  <!-- @提及框  -->
-  <div
-    v-if="ait && activeItem?.type === RoomTypeEnum.GROUP && personList.length > 0 && !isVoiceMode"
-    class="ait-options">
-    <n-virtual-list
-      id="image-chat-ait"
-      ref="virtualListInst-ait"
-      style="max-height: 180px"
-      :item-size="36"
-      :items="personList"
-      v-model:selectedKey="selectedAitKey">
-      <template #default="{ item }">
-        <n-flex
-          @mouseover="() => (selectedAitKey = item.uid)"
-          :class="{ active: selectedAitKey === item.uid }"
-          @click="handleAit(item)"
-          :key="item.uid"
-          align="center"
-          class="ait-item">
-          <n-avatar
-            lazy
-            round
-            :size="22"
-            :src="AvatarUtils.getAvatarUrl(item.avatar)"
-            fallback-src="/logo.png"
-            :render-placeholder="() => null"
-            :intersection-observer-options="{
-              root: '#image-chat-ait'
-            }" />
-          <span> {{ item.name }}</span>
-        </n-flex>
-      </template>
-    </n-virtual-list>
-  </div>
+    <!-- / 提及框  -->
+    <div
+      v-if="aiDialogVisible && activeItem?.type === RoomTypeEnum.GROUP && groupedAIModels.length > 0"
+      class="AI-options">
+      <n-virtual-list
+        ref="virtualListInst-AI"
+        style="max-height: 180px"
+        :item-size="36"
+        :items="groupedAIModels"
+        v-model:selectedKey="selectedAIKey">
+        <template #default="{ item }">
+          <n-flex
+            @mouseover="() => (selectedAIKey = item.uid)"
+            :class="{ active: selectedAIKey === item.uid }"
+            @click="handleAI(item)"
+            align="center"
+            class="AI-item">
+            <n-flex align="center" justify="space-between" class="w-full pr-6px">
+              <n-flex align="center">
+                <img class="size-18px object-contain" :src="item.avatar" alt="" />
+                <p class="text-(14px [--chat-text-color])">{{ item.name }}</p>
+              </n-flex>
 
-  <!-- / 提及框  -->
-  <div
-    v-if="aiDialogVisible && !isVoiceMode && activeItem?.type === RoomTypeEnum.GROUP && groupedAIModels.length > 0"
-    class="AI-options">
-    <n-virtual-list
-      ref="virtualListInst-AI"
-      style="max-height: 180px"
-      :item-size="36"
-      :items="groupedAIModels"
-      v-model:selectedKey="selectedAIKey">
-      <template #default="{ item }">
-        <n-flex
-          @mouseover="() => (selectedAIKey = item.uid)"
-          :class="{ active: selectedAIKey === item.uid }"
-          @click="handleAI(item)"
-          align="center"
-          class="AI-item">
-          <n-flex align="center" justify="space-between" class="w-full pr-6px">
-            <n-flex align="center">
-              <img class="size-18px object-contain" :src="item.avatar" alt="" />
-              <p class="text-(14px [--chat-text-color])">{{ item.name }}</p>
-            </n-flex>
-
-            <n-flex align="center" :size="6">
-              <div class="ml-6px p-[4px_8px] size-fit bg-[--bate-bg] rounded-6px text-(11px [--bate-color] center)">
-                Beta
-              </div>
-              <n-tag size="small" class="text-10px" :bordered="false" type="success">128k</n-tag>
+              <n-flex align="center" :size="6">
+                <div class="ml-6px p-[4px_8px] size-fit bg-[--bate-bg] rounded-6px text-(11px [--bate-color] center)">
+                  Beta
+                </div>
+                <n-tag size="small" class="text-10px" :bordered="false" type="success">128k</n-tag>
+              </n-flex>
             </n-flex>
           </n-flex>
-        </n-flex>
-      </template>
-    </n-virtual-list>
-  </div>
+        </template>
+      </n-virtual-list>
+    </div>
 
-  <!-- 发送按钮 -->
-  <n-flex v-if="!isVoiceMode" align="center" justify="space-between" :size="12">
-    <n-config-provider :theme="lightTheme">
-      <n-button-group size="small" class="pr-20px">
-        <n-button color="#13987f" :disabled="disabledSend" class="w-65px" @click="send"> 发送 </n-button>
-        <n-button color="#13987f" class="p-[0_6px]">
-          <template #icon>
-            <n-config-provider :theme="themes.content === ThemeEnum.DARK ? darkTheme : lightTheme">
-              <n-popselect
-                v-model:show="arrow"
-                v-model:value="chatKey"
-                :options="sendOptions"
-                trigger="click"
-                placement="top-end">
-                <svg @click="arrow = true" v-if="!arrow" class="w-22px h-22px mt-2px outline-none">
-                  <use href="#down"></use>
-                </svg>
-                <svg @click="arrow = false" v-else class="w-22px h-22px mt-2px outline-none">
-                  <use href="#up"></use>
-                </svg>
-                <template #action>
-                  <n-flex
-                    justify="center"
-                    align="center"
-                    :size="4"
-                    class="text-(12px #777) cursor-default tracking-1 select-none">
-                    <span v-if="chatKey !== 'Enter'">
-                      {{ type() === 'macos' ? MacOsKeyEnum['⌘'] : WinKeyEnum.CTRL }}
-                    </span>
-                    <svg class="size-12px">
-                      <use href="#Enter"></use>
-                    </svg>
-                    发送 /
-                    <n-flex v-if="chatKey !== 'Enter'" align="center" :size="6">
+    <!-- 发送按钮 -->
+    <div class="flex-shrink-0 max-h-52px p-4px border-t border-gray-200/50 flex items-center justify-end">
+      <n-config-provider :theme="lightTheme">
+        <n-button-group size="small" class="pr-20px">
+          <n-button color="#13987f" :disabled="disabledSend" class="w-65px" @click="send">发送</n-button>
+          <n-button color="#13987f" class="p-[0_6px]">
+            <template #icon>
+              <n-config-provider :theme="themes.content === ThemeEnum.DARK ? darkTheme : lightTheme">
+                <n-popselect
+                  v-model:show="arrow"
+                  v-model:value="chatKey"
+                  :options="sendOptions"
+                  trigger="click"
+                  placement="top-end">
+                  <svg @click="arrow = true" v-if="!arrow" class="w-22px h-22px mt-2px outline-none">
+                    <use href="#down"></use>
+                  </svg>
+                  <svg @click="arrow = false" v-else class="w-22px h-22px mt-2px outline-none">
+                    <use href="#up"></use>
+                  </svg>
+                  <template #action>
+                    <n-flex
+                      justify="center"
+                      align="center"
+                      :size="4"
+                      class="text-(12px #777) cursor-default tracking-1 select-none">
+                      <span v-if="chatKey !== 'Enter'">
+                        {{ isMac() ? MacOsKeyEnum['⌘'] : WinKeyEnum.CTRL }}
+                      </span>
                       <svg class="size-12px">
                         <use href="#Enter"></use>
                       </svg>
-                      <p>或</p>
+                      发送 /
+                      <n-flex v-if="chatKey !== 'Enter'" align="center" :size="6">
+                        <svg class="size-12px">
+                          <use href="#Enter"></use>
+                        </svg>
+                        <p>或</p>
+                      </n-flex>
+                      <n-flex align="center" :size="0">
+                        {{ isMac() ? MacOsKeyEnum['⇧'] : WinKeyEnum.SHIFT }}
+                        <svg class="size-12px">
+                          <use href="#Enter"></use>
+                        </svg>
+                      </n-flex>
+                      换行
                     </n-flex>
-                    <n-flex align="center" :size="0">
-                      {{ type() === 'macos' ? MacOsKeyEnum['⇧'] : WinKeyEnum.SHIFT }}
-                      <svg class="size-12px">
-                        <use href="#Enter"></use>
-                      </svg>
-                    </n-flex>
-                    换行
-                  </n-flex>
-                </template>
-              </n-popselect>
-            </n-config-provider>
-          </template>
-        </n-button>
-      </n-button-group>
-    </n-config-provider>
-  </n-flex>
+                  </template>
+                </n-popselect>
+              </n-config-provider>
+            </template>
+          </n-button>
+        </n-button-group>
+      </n-config-provider>
+    </div>
+  </form>
 
   <!-- 文件上传弹窗 -->
   <FileUploadModal
@@ -159,44 +167,51 @@
     @cancel="handleFileCancel" />
 </template>
 <script setup lang="ts">
-import { type Ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { lightTheme, darkTheme, VirtualListInst } from 'naive-ui'
-import { MacOsKeyEnum, MittEnum, RoomTypeEnum, ThemeEnum, WinKeyEnum } from '@/enums'
-import { CacheUserItem, SessionItem } from '@/services/types.ts'
 import { emit } from '@tauri-apps/api/event'
-import { useSettingStore } from '@/stores/setting.ts'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { sendOptions } from '@/views/moreWindow/settings/config.ts'
-import { useMsgInput } from '@/hooks/useMsgInput.ts'
-import { useCommon } from '@/hooks/useCommon.ts'
 import { onKeyStroke } from '@vueuse/core'
-import { type } from '@tauri-apps/plugin-os'
-import { useUserInfo } from '@/hooks/useCached.ts'
+import { darkTheme, lightTheme, type VirtualListInst } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import type { Ref } from 'vue'
+import { MacOsKeyEnum, MittEnum, RoomTypeEnum, ThemeEnum, WinKeyEnum } from '@/enums'
+import { useCommon } from '@/hooks/useCommon.ts'
 import { useMitt } from '@/hooks/useMitt.ts'
-import { AvatarUtils } from '@/utils/AvatarUtils'
+import { useMsgInput } from '@/hooks/useMsgInput.ts'
 import { useTauriListener } from '@/hooks/useTauriListener'
+import { useGlobalStore } from '@/stores/global'
+import { useSettingStore } from '@/stores/setting.ts'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { isMac } from '@/utils/PlatformConstants'
+import { sendOptions } from '@/views/moreWindow/settings/config.ts'
+import { useGroupStore } from '~/src/stores/group'
 
 const appWindow = WebviewWindow.getCurrent()
 const { addListener } = useTauriListener()
 const settingStore = useSettingStore()
 const { themes } = storeToRefs(settingStore)
-const { handlePaste } = useCommon()
+const { handlePaste, processFiles } = useCommon()
 /** 发送按钮旁的箭头 */
 const arrow = ref(false)
 /** 输入框dom元素 */
 const messageInputDom = ref<HTMLElement>()
-const activeItem = ref<SessionItem>()
+const gloabalStore = useGlobalStore()
+const activeItem = gloabalStore.currentSession!
 /** ait 虚拟列表 */
 const virtualListInstAit = useTemplateRef<VirtualListInst>('virtualListInst-ait')
 /** AI 虚拟列表 */
 const virtualListInstAI = useTemplateRef<VirtualListInst>('virtualListInst-AI')
 // 录音模式状态
 const isVoiceMode = ref(false)
+const groupStore = useGroupStore()
 
 // 文件上传弹窗状态
 const showFileModal = ref(false)
 const pendingFiles = ref<File[]>([])
+
+// 输入框滚动区域高度计算
+const props = defineProps<{
+  height: number
+}>()
 
 /** 引入useMsgInput的相关方法 */
 const {
@@ -220,6 +235,19 @@ const {
   updateSelectionRange,
   focusOn
 } = useMsgInput(messageInputDom)
+
+/** 表单提交处理函数 */
+const handleFormSubmit = async (e: Event) => {
+  e.preventDefault()
+  await send()
+}
+
+/** 聚焦输入框函数 */
+const focusInput = () => {
+  if (messageInputDom.value) {
+    focusOn(messageInputDom.value)
+  }
+}
 
 /** 当切换聊天对象时，重新获取焦点 */
 watch(activeItem, () => {
@@ -254,7 +282,6 @@ const showFileModalCallback = (files: File[]) => {
 }
 
 const onPaste = async (e: ClipboardEvent) => {
-  console.log('粘贴：', e)
   if (messageInputDom.value) await handlePaste(e, messageInputDom.value, showFileModalCallback)
 }
 
@@ -273,6 +300,12 @@ const handleFileConfirm = async (files: File[]) => {
 const handleFileCancel = () => {
   showFileModal.value = false
   pendingFiles.value = []
+}
+
+// 添加强制退出语音模式的方法
+const exitVoiceMode = () => {
+  isVoiceMode.value = false
+  console.log('强制退出语音模式')
 }
 
 /** 处理键盘上下键切换提及项 */
@@ -336,18 +369,24 @@ defineExpose({
   getLastEditRange: () => getCursorSelectionRange(),
   updateSelectionRange,
   focus,
-  showFileModal: showFileModalCallback
+  showFileModal: showFileModalCallback,
+  exitVoiceMode,
+  isVoiceMode: readonly(isVoiceMode),
+  handleVoiceCancel
 })
 
 onMounted(async () => {
-  activeItem.value = inject('activeItem') as SessionItem
   onKeyStroke('Enter', () => {
-    if (ait.value && Number(selectedAIKey.value) > -1) {
-      const item = personList.value.find((item) => item.uid === selectedAitKey.value) as CacheUserItem
-      handleAit(item)
+    if (ait.value && Number(selectedAitKey.value) > -1) {
+      const item = personList.value.find((item) => item.uid === selectedAitKey.value)
+      if (item) {
+        handleAit(item)
+      }
     } else if (aiDialogVisible.value && Number(selectedAIKey.value) > -1) {
       const item = groupedAIModels.value.find((item) => item.uid === selectedAIKey.value)
-      handleAI(item)
+      if (item) {
+        handleAI(item)
+      }
     }
   })
   onKeyStroke('ArrowUp', (e) => {
@@ -374,22 +413,40 @@ onMounted(async () => {
   })
   // TODO 应该把打开的窗口的item给存到set中，需要修改输入框和消息展示的搭配，输入框和消息展示模块应该是一体并且每个用户独立的，这样当我点击这个用户框输入消息的时候就可以暂存信息了并且可以判断每个消息框是什么类型是群聊还是单聊，不然会导致比如@框可以在单聊框中出现 (nyh -> 2024-04-09 01:03:59)
   /** 当不是独立窗口的时候也就是组件与组件之间进行通信然后监听信息对话的变化 */
-
-  useMitt.on(MittEnum.MSG_BOX_SHOW, (event: any) => {
-    activeItem.value = event.item
-  })
   useMitt.on(MittEnum.AT, (event: any) => {
-    handleAit(useUserInfo(event).value as any)
+    handleAit(groupStore.getUserInfo(event)!)
   })
   // 监听录音模式切换事件
   useMitt.on(MittEnum.VOICE_RECORD_TOGGLE, () => {
     isVoiceMode.value = !isVoiceMode.value
+    console.log('语音模式切换:', isVoiceMode.value ? '语音模式' : '文本模式')
   })
-  /** 这里使用的是窗口之间的通信来监听信息对话的变化 */
+
+  // 添加ESC键退出语音模式
+  onKeyStroke('Escape', () => {
+    if (isVoiceMode.value) {
+      isVoiceMode.value = false
+      console.log('ESC键退出语音模式')
+    }
+  })
   await addListener(
-    appWindow.listen('aloneData', (event: any) => {
-      activeItem.value = { ...event.payload.item }
-    })
+    appWindow.listen('screenshot', async (e: any) => {
+      // 确保输入框获得焦点
+      if (messageInputDom.value) {
+        messageInputDom.value.focus()
+        try {
+          // 从 ArrayBuffer 数组重建 Blob 对象
+          const buffer = new Uint8Array(e.payload.buffer)
+          const blob = new Blob([buffer], { type: e.payload.mimeType })
+          const file = new File([blob], 'screenshot.png', { type: e.payload.mimeType })
+
+          await processFiles([file], messageInputDom.value, showFileModalCallback)
+        } catch (error) {
+          console.error('处理截图失败:', error)
+        }
+      }
+    }),
+    'screenshot'
   )
   window.addEventListener('click', closeMenu, true)
   window.addEventListener('keydown', disableSelectAll)

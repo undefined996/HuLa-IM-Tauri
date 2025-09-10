@@ -1,6 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-fn main() {
-    hula_app_lib::run()
+use dotenv::dotenv;
+
+fn main() -> std::io::Result<()> {
+    dotenv().ok();
+    hula_app_lib::run();
+    Ok(())
 }

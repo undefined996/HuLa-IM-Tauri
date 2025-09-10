@@ -1,24 +1,29 @@
-import apis from '@/services/apis'
 import { defineStore } from 'pinia'
-import type { UserInfoType } from '@/services/types'
 import { StoresEnum } from '@/enums'
+import type { UserInfoType } from '@/services/types'
+import { getUserDetail } from '@/utils/ImRequestUtils'
 
-export const useUserStore = defineStore(StoresEnum.USER, () => {
-  const userInfo = ref<Partial<UserInfoType>>({})
-  const isSign = ref(false)
+export const useUserStore = defineStore(
+  StoresEnum.USER,
+  () => {
+    const userInfo = ref<UserInfoType>()
 
-  const getUserDetailAction = () => {
-    apis
-      .getUserDetail()
-      .then((res) => {
-        userInfo.value = { ...userInfo.value, ...res }
-      })
-      .catch(() => {
-        // 删除缓存
-        localStorage.removeItem('TOKEN')
-        localStorage.removeItem('REFRESH_TOKEN')
-      })
+    const getUserDetailAction = () => {
+      getUserDetail()
+        .then((res: any) => {
+          userInfo.value = { ...userInfo.value, ...res }
+        })
+        .catch((e) => {
+          console.error('获取用户详情失败:', e)
+        })
+    }
+
+    return { userInfo, getUserDetailAction }
+  },
+  {
+    share: {
+      enable: true,
+      initialize: true
+    }
   }
-
-  return { userInfo, isSign, getUserDetailAction }
-})
+)

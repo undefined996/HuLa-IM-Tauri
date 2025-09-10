@@ -24,20 +24,20 @@
     </n-flex>
 
     <!-- 系统设置 -->
-    <n-flex v-if="type() === 'windows'" vertical class="text-(14px [--text-color])" :size="16">
+    <n-flex v-if="isWindows()" vertical class="text-(14px [--text-color])" :size="16">
       <span class="pl-10px">系统</span>
 
       <n-flex class="item" :size="12" vertical>
         <!-- 关闭面板 -->
-        <n-flex v-if="type() === 'windows'" align="center" justify="space-between">
+        <n-flex v-if="isWindows()" align="center" justify="space-between">
           <span>关闭主面板</span>
 
           <label class="text-(14px #707070) flex gap-6px lh-16px items-center">
-            <n-radio :checked="tips.type === CloseBxEnum.HIDE" @change="tips.type = CloseBxEnum.HIDE" />
+            <n-radio :value="CloseBxEnum.HIDE" />
             <span>最小化到系统托盘</span>
           </label>
           <label class="text-(14px #707070) flex gap-6px lh-16px items-center">
-            <n-radio :checked="tips.type === CloseBxEnum.CLOSE" @change="tips.type = CloseBxEnum.CLOSE" />
+            <n-radio :value="CloseBxEnum.CLOSE" />
             <span>直接退出程序</span>
           </label>
 
@@ -47,10 +47,10 @@
           </label>
         </n-flex>
 
-        <span v-if="type() === 'windows'" class="w-full h-1px bg-[--line-color]"></span>
+        <span v-if="isWindows()" class="w-full h-1px bg-[--line-color]"></span>
 
         <!-- ESC关闭面板 -->
-        <n-flex v-if="type() === 'windows'" align="center" justify="space-between">
+        <n-flex v-if="isWindows()" align="center" justify="space-between">
           <span>是否启用ESC关闭窗口</span>
 
           <n-switch size="small" v-model:value="escClose" />
@@ -63,19 +63,6 @@
       <span class="pl-10px">聊天</span>
 
       <n-flex class="item" :size="12" vertical>
-        <!-- 发送信息 -->
-        <n-flex align="center" justify="space-between">
-          <span>发送信息快捷键</span>
-          <n-select
-            class="w-140px"
-            size="small"
-            label-field="value"
-            v-model:value="chat.sendKey"
-            :options="sendOptions" />
-        </n-flex>
-
-        <span class="w-full h-1px bg-[--line-color]"></span>
-
         <!-- 双击打开独立会话 -->
         <!-- <n-flex align="center" justify="space-between">
           <span>双击会话列表打开独立聊天窗口</span>
@@ -144,22 +131,22 @@
         <n-flex align="center" justify="space-between">
           <span>临时功能: 清除localstorage缓存</span>
 
-          <n-button size="small" secondary type="error" @click="clearLocalstorage"> 清除缓存 </n-button>
+          <n-button size="small" secondary type="error" @click="clearLocalstorage">清除缓存</n-button>
         </n-flex>
       </n-flex>
     </n-flex>
   </n-flex>
 </template>
 <script setup lang="tsx">
-import { useSettingStore } from '@/stores/setting.ts'
-import { CloseBxEnum, ShowModeEnum } from '@/enums'
-import { topicsList } from './model.tsx'
-import { sendOptions, fontOptions, translateOptions } from './config.ts'
-import { type } from '@tauri-apps/plugin-os'
-import { NSwitch } from 'naive-ui'
 import { invoke } from '@tauri-apps/api/core'
 import { emitTo } from '@tauri-apps/api/event'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { NSwitch } from 'naive-ui'
+import { CloseBxEnum, ShowModeEnum } from '@/enums'
+import { useSettingStore } from '@/stores/setting.ts'
+import { isWindows } from '@/utils/PlatformConstants'
+import { fontOptions, translateOptions } from './config.ts'
+import { topicsList } from './model.tsx'
 
 const appWindow = WebviewWindow.getCurrent()
 const settingStore = useSettingStore()

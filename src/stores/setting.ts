@@ -1,17 +1,24 @@
 import { defineStore } from 'pinia'
-import { CloseBxEnum, StoresEnum, ShowModeEnum, ThemeEnum } from '@/enums'
-import { type } from '@tauri-apps/plugin-os'
+import { CloseBxEnum, ShowModeEnum, StoresEnum, ThemeEnum } from '@/enums'
+import { isDesktop, isMac } from '@/utils/PlatformConstants'
+
+// 获取平台对应的默认快捷键
+const getDefaultShortcuts = () => {
+  return {
+    screenshot: isMac() ? 'Cmd+Ctrl+H' : 'Ctrl+Alt+H',
+    openMainPanel: isMac() ? 'Cmd+Ctrl+P' : 'Ctrl+Alt+P',
+    globalEnabled: false // 默认关闭全局快捷键
+  }
+}
 
 // TODO 使用indexDB或sqlite缓存数据，还需要根据每个账号来进行配置 (nyh -> 2024-03-26 01:22:12)
-const isDesktop = computed(() => {
-  return type() === 'windows' || type() === 'linux' || type() === 'macos'
-})
+const isDesktopComputed = computed(() => isDesktop())
 export const useSettingStore = defineStore(StoresEnum.SETTING, {
   state: (): STO.Setting => ({
     themes: {
       content: '',
       pattern: '',
-      versatile: isDesktop.value ? 'default' : 'simple'
+      versatile: isDesktopComputed.value ? 'default' : 'simple'
     },
     escClose: true,
     showMode: ShowModeEnum.ICON,
@@ -32,6 +39,7 @@ export const useSettingStore = defineStore(StoresEnum.SETTING, {
       isDouble: true,
       translate: 'tencent'
     },
+    shortcuts: getDefaultShortcuts(),
     page: {
       shadow: true,
       fonts: 'PingFang',
@@ -39,6 +47,9 @@ export const useSettingStore = defineStore(StoresEnum.SETTING, {
     },
     update: {
       dismiss: ''
+    },
+    screenshot: {
+      isConceal: false
     }
   }),
   actions: {
@@ -67,8 +78,46 @@ export const useSettingStore = defineStore(StoresEnum.SETTING, {
       this.login.autoStartup = autoStartup
     },
     /** 设置菜单显示模式 */
-    setShowMode(showMode: ShowModeEnum): void {
+    setShowMode(showMode: ShowModeEnum) {
       this.showMode = showMode
+    },
+    /** 设置截图快捷键 */
+    setScreenshotShortcut(shortcut: string) {
+      if (!this.shortcuts) {
+        this.shortcuts = getDefaultShortcuts()
+      }
+      this.shortcuts.screenshot = shortcut
+    },
+    /** 设置打开主面板快捷键 */
+    setOpenMainPanelShortcut(shortcut: string) {
+      if (!this.shortcuts) {
+        this.shortcuts = getDefaultShortcuts()
+      }
+      this.shortcuts.openMainPanel = shortcut
+    },
+    /** 设置发送消息快捷键 */
+    setSendMessageShortcut(shortcut: string) {
+      if (!this.chat) {
+        this.chat = { sendKey: 'Enter', isDouble: true, translate: 'tencent' }
+      }
+      this.chat.sendKey = shortcut
+    },
+    /** 设置全局快捷键开关状态 */
+    setGlobalShortcutEnabled(enabled: boolean) {
+      if (!this.shortcuts) {
+        this.shortcuts = getDefaultShortcuts()
+      }
+      this.shortcuts.globalEnabled = enabled
+    },
+    closeAutoLogin() {
+      this.login.autoLogin = false
+    },
+    /** 设置截图时是否隐藏窗口 */
+    setScreenshotConceal(isConceal: boolean) {
+      if (!this.screenshot) {
+        this.screenshot = { isConceal: false }
+      }
+      this.screenshot.isConceal = isConceal
     }
   },
   share: {

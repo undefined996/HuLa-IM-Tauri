@@ -1,13 +1,22 @@
-import { ConfigEnv, defineConfig, loadEnv } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import AutoImport from 'unplugin-auto-import/vite' //自动导入
-import Components from 'unplugin-vue-components/vite' //组件注册
-import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
-import { getRootPath, getSrcPath } from './build/config/getPath'
-import vueJsx from '@vitejs/plugin-vue-jsx'
-import UnoCSS from '@unocss/vite'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import terser from '@rollup/plugin-terser'
+import UnoCSS from '@unocss/vite'
+import vue from '@vitejs/plugin-vue'
+import vueJsx from '@vitejs/plugin-vue-jsx'
+import postcsspxtorem from 'postcss-pxtorem'
+import AutoImport from 'unplugin-auto-import/vite' //自动导入
+import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
+import Components from 'unplugin-vue-components/vite' //组件注册
+import { type ConfigEnv, defineConfig, loadEnv } from 'vite'
 import VueSetupExtend from 'vite-plugin-vue-setup-extend'
+import { getRootPath, getSrcPath } from './build/config/getPath'
+
+// 读取 package.json 依赖
+const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'))
+const dependencies = Object.keys(packageJson.dependencies || {})
+
+const host = process.env.TAURI_DEV_HOST
 
 // https://vitejs.dev/config/
 /**! 不需要优化前端打包(如开启gzip) */
@@ -31,6 +40,19 @@ export default defineConfig(({ mode }: ConfigEnv) => {
           api: 'modern-compiler',
           additionalData: '@use "@/styles/scss/global/variable.scss" as *;' // 加载全局样式，使用scss特性
         }
+      },
+      postcss: {
+        plugins: [
+          postcsspxtorem({
+            rootValue: 16, // 1rem = 16px，可根据设计稿调整
+            propList: ['*'], // 所有属性都转换
+            unitPrecision: 5, // 保留小数位数
+            selectorBlackList: [], // 不转换的类名（可选）
+            replace: true, // 替换原来的 px
+            mediaQuery: false, // 是否在媒体查询中转换
+            minPixelValue: 0 // 最小转换单位
+          })
+        ]
       }
     },
     plugins: [
@@ -68,6 +90,7 @@ export default defineConfig(({ mode }: ConfigEnv) => {
       })
     ],
     build: {
+      target: ['chrome87', 'edge88', 'firefox78', 'safari14'], // 兼容低版本浏览器
       cssCodeSplit: true, // 启用 CSS 代码拆分
       minify: 'terser', // 指定使用哪种混淆器
       // chunk 大小警告的限制(kb)
@@ -78,10 +101,16 @@ export default defineConfig(({ mode }: ConfigEnv) => {
           chunkFileNames: 'static/js/[name]-[hash].js', // 引入文件名的名称
           entryFileNames: 'static/js/[name]-[hash].js', // 包的入口文件名称
           assetFileNames: 'static/[ext]/[name]-[hash].[ext]', // 资源文件像 字体，图片等
-          // 最小化拆分包
+          // 每个依赖单独分割
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              return 'invariable'
+              // 找到匹配的依赖包名
+              const matchedDep = dependencies.find((dep) => id.includes(`node_modules/${dep}`))
+              if (matchedDep) {
+                // 清理包名，移除特殊字符
+                return matchedDep.replace(/[@/]/g, '-')
+              }
+              return 'vendor'
             }
           }
         }
@@ -103,7 +132,17 @@ export default defineConfig(({ mode }: ConfigEnv) => {
           rewrite: (path) => path.replace(/^\/api/, '')
         }
       },
-      hmr: true, // 热更新
+      hmr: host
+        ? {
+            protocol: 'ws',
+            host: '0.0.0.0',
+            port: 6130
+          }
+        : {
+            protocol: 'ws',
+            host: '127.0.0.1',
+            port: 6130
+          },
       cors: true, // 配置 CORS
       host: '0.0.0.0',
       port: 6130,

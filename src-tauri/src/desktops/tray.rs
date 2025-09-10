@@ -1,20 +1,20 @@
 #[cfg(target_os = "windows")]
 use tauri::{
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, PhysicalPosition, Runtime,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
 #[cfg(target_os = "macos")]
 use tauri::{
-    menu::{MenuBuilder, MenuId, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
     Manager, Runtime,
+    menu::{MenuBuilder, MenuId, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 use tauri::{
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, PhysicalPosition, Runtime,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
 pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
@@ -37,17 +37,31 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
             .build()?;
 
         let tray_handler = app.clone();
+        let default_icon = match app.default_window_icon() {
+            Some(icon) => icon.clone(),
+            None => {
+                tracing::error!("Default window icon not found");
+                return Err(tauri::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "未找到默认窗口图标",
+                )));
+            }
+        };
+
         let _ = TrayIconBuilder::with_id("tray")
             .tooltip("HuLa")
-            .icon(app.default_window_icon().unwrap().clone())
-            .menu(&tray_menu)
+            .icon(default_icon)
+            .menu(&tray_menu) // 直接设置菜单，让系统处理右键显示
+            .show_menu_on_left_click(false) // 禁用左键显示菜单
             .on_menu_event(move |app, event| {
                 let id = event.id();
                 if id == &open_id {
                     // 打开主面板
                     let windows = app.webview_windows();
+
+                    // 优先显示已存在的home窗口
                     for (name, window) in windows {
-                        if name == "login" || name == "home" {
+                        if name == "home" {
                             let _ = window.show();
                             let _ = window.unminimize();
                             let _ = window.set_focus();
@@ -59,14 +73,51 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
                     let _ = tray_handler.exit(0);
                 }
             })
+            .on_tray_icon_event(move |tray, event| match event {
+                TrayIconEvent::Click {
+                    id: _,
+                    position: _,
+                    rect: _,
+                    button,
+                    button_state,
+                } => match button {
+                    MouseButton::Left if MouseButtonState::Up == button_state => {
+                        // 左键点击直接打开主面板
+                        let windows = tray.app_handle().webview_windows();
+
+                        // 优先显示已存在的home窗口
+                        for (name, window) in windows {
+                            if name == "home" {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            })
             .build(app)?;
     }
     #[cfg(not(target_os = "macos"))]
     {
         // 为其他系统（非 macOS）创建托盘图标
+        let default_icon = match app.default_window_icon() {
+            Some(icon) => icon.clone(),
+            None => {
+                tracing::error!("Default window icon not found");
+                return Err(tauri::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "未找到默认窗口图标",
+                )));
+            }
+        };
+
         let _ = TrayIconBuilder::with_id("tray")
             .tooltip("HuLa")
-            .icon(app.default_window_icon().unwrap().clone())
+            .icon(default_icon)
             .on_tray_icon_event(|tray, event| match event {
                 TrayIconEvent::Click {
                     id: _,
@@ -79,26 +130,37 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
                         let windows = tray.app_handle().webview_windows();
                         for (name, window) in windows {
                             if name == "login" || name == "home" {
-                                window.show().unwrap();
-                                window.unminimize().unwrap();
-                                window.set_focus().unwrap();
+                                if let Err(e) = window.show() {
+                                    tracing::warn!("Failed to show window {}: {}", name, e);
+                                }
+                                if let Err(e) = window.unminimize() {
+                                    tracing::warn!("Failed to unminimize window {}: {}", name, e);
+                                }
+                                if let Err(e) = window.set_focus() {
+                                    tracing::warn!("Failed to set focus on window {}: {}", name, e);
+                                }
                                 break;
                             }
                         }
                     }
                     MouseButton::Right if MouseButtonState::Down == button_state => {
                         // 状态栏图标按下右键时显示状态栏菜单
-                        let tray_window = tray.app_handle().get_webview_window("tray").unwrap();
-                        if let Ok(outer_size) = tray_window.outer_size() {
-                            tray_window
-                                .set_position(PhysicalPosition::new(
+                        if let Some(tray_window) = tray.app_handle().get_webview_window("tray") {
+                            if let Ok(outer_size) = tray_window.outer_size() {
+                                if let Err(e) = tray_window.set_position(PhysicalPosition::new(
                                     position.x,
                                     position.y - outer_size.height as f64,
-                                ))
-                                .unwrap();
-                            tray_window.set_always_on_top(true).unwrap();
-                            tray_window.show().unwrap();
-                            tray_window.set_focus().unwrap();
+                                )) {
+                                    tracing::warn!("Failed to set tray window position: {}", e);
+                                    return;
+                                }
+
+                                let _ = tray_window.set_always_on_top(true);
+                                let _ = tray_window.show();
+                                let _ = tray_window.set_focus();
+                            }
+                        } else {
+                            tracing::warn!("Tray window not found");
                         }
                     }
                     _ => {}
@@ -109,20 +171,29 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
                     position: _,
                     rect: _,
                 } => {
-                    tray.app_handle()
-                        .emit_to("notify", "notify_enter", &tray.rect().unwrap())
-                        .unwrap();
-                },
+                    if let Ok(rect) = tray.rect() {
+                        match tray.app_handle().emit_to("notify", "notify_enter", &rect) {
+                            Ok(_) => {
+                                tracing::info!("notify_enter event sent successfully");
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to emit notify_enter event: {}", e);
+                            }
+                        }
+                    } else {
+                        tracing::warn!("Failed to get tray rect");
+                    }
+                }
                 #[cfg(target_os = "windows")]
                 TrayIconEvent::Leave {
                     id: _,
                     position: _,
                     rect: _,
                 } => {
-                    tray.app_handle()
-                        .emit_to("notify", "notify_leave", ())
-                        .unwrap();
-                },
+                    if let Err(e) = tray.app_handle().emit_to("notify", "notify_leave", ()) {
+                        tracing::warn!("Failed to emit notify_leave event: {}", e);
+                    }
+                }
                 _ => {}
             })
             .build(app);

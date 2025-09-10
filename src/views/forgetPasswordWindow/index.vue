@@ -6,7 +6,7 @@
     <n-flex vertical class="w-full size-full">
       <!-- 标题 -->
       <n-flex justify="center" class="w-full">
-        <p class="text-18px font-bold select-none">找回密码</p>
+        <p class="text-18px select-none">找回密码</p>
       </n-flex>
 
       <!-- 步骤条 -->
@@ -31,33 +31,6 @@
               autoCorrect="off"
               autoCapitalize="off"
               clearable />
-          </n-form-item>
-
-          <!-- 图片验证码 -->
-          <n-form-item path="imgCode" label="图片验证码">
-            <n-flex :size="8">
-              <n-input
-                :allow-input="noSideSpace"
-                class="border-(1px solid #90909080)"
-                v-model:value="formData.imgCode"
-                placeholder="请输入图片验证码"
-                spellCheck="false"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                maxlength="5" />
-              <n-image
-                width="120"
-                height="40"
-                class="cursor-pointer"
-                :src="captchaImage"
-                preview-disabled
-                @click="getCaptchaImage">
-                <template #placeholder>
-                  <n-skeleton height="40px" width="120px" class="rounded-10px" />
-                </template>
-              </n-image>
-            </n-flex>
           </n-form-item>
 
           <!-- 邮箱验证码 -->
@@ -88,9 +61,10 @@
           <n-button
             :loading="verifyLoading"
             :disabled="nextDisabled"
+            tertiary
+            style="color: #fff"
             @click="verifyEmail"
-            color="#13987f"
-            class="mt-10px w-full">
+            class="mt-10px w-full gradient-button">
             下一步
           </n-button>
         </n-form>
@@ -123,7 +97,7 @@
                   :validator="validateAlphaNumeric" />
                 <Validation
                   :value="passwordForm.password"
-                  message="必须有一个特殊字符!@#¥%.&*"
+                  message="必须有一个特殊字符"
                   :validator="validateSpecialChar" />
               </n-flex>
             </n-flex>
@@ -149,14 +123,19 @@
                 <Validation
                   :value="passwordForm.confirmPassword"
                   message="两次密码输入一致"
-                  :validator="(value) => value === passwordForm.password && value !== ''" />
+                  :validator="(value: string) => value === passwordForm.password && value !== ''" />
               </n-flex>
             </n-flex>
           </n-form-item>
 
           <n-flex :size="16" class="mt-30px">
             <n-button @click="goBack" class="flex-1">上一步</n-button>
-            <n-button color="#13987f" :loading="submitLoading" @click="submitNewPassword" class="flex-1">
+            <n-button
+              :loading="submitLoading"
+              tertiary
+              style="color: #fff"
+              @click="submitNewPassword"
+              class="flex-1 gradient-button">
               提交
             </n-button>
           </n-flex>
@@ -172,7 +151,7 @@
         </n-icon> -->
         <img class="size-98px" src="/emoji/party-popper.webp" alt="" />
 
-        <div class="mt-16px text-18px font-bold">密码修改成功</div>
+        <div class="mt-16px text-18px">密码修改成功</div>
         <div class="mt-16px text-14px text-#666">您已成功重置密码，可以使用新密码登录</div>
       </div>
     </n-flex>
@@ -180,10 +159,10 @@
 </template>
 
 <script setup lang="ts">
-import { lightTheme } from 'naive-ui'
-import apis from '@/services/apis'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { lightTheme } from 'naive-ui'
 import Validation from '@/components/common/Validation.vue'
+import { forgetPassword, getCaptcha, sendCaptcha } from '@/utils/ImRequestUtils'
 
 // 导入Web Worker
 const timerWorker = new Worker(new URL('../../workers/timer.worker.ts', import.meta.url))
@@ -196,7 +175,6 @@ const stepStatus = ref<'error' | 'finish' | 'process' | 'wait' | undefined>('pro
 const formRef = ref(null)
 const formData = ref({
   email: '',
-  imgCode: '',
   emailCode: '',
   uuid: '' // 图片验证码uuid
 })
@@ -232,12 +210,8 @@ const emailRules = {
       trigger: 'blur'
     }
   ],
-  imgCode: [
-    { required: true, message: '请输入图片验证码', trigger: 'blur' },
-    { min: 4, max: 5, message: '验证码长度为4-5位', trigger: 'blur' }
-  ],
   emailCode: [
-    { required: true, message: '请输入邮箱验证码', trigger: 'blur' },
+    { required: true, message: '请输入邮箱验证码', trigger: 'input' },
     { min: 6, max: 6, message: '验证码长度为6位', trigger: 'blur' }
   ]
 }
@@ -270,7 +244,7 @@ const passwordRules = {
 
 // 下一步按钮禁用状态
 const nextDisabled = computed(() => {
-  return !(formData.value.email && formData.value.imgCode && formData.value.emailCode)
+  return !(formData.value.email && formData.value.emailCode)
 })
 
 /** 不允许输入空格 */
@@ -287,7 +261,7 @@ const validateAlphaNumeric = (value: string) => {
 }
 
 /** 检查密码是否包含特殊字符 */
-const validateSpecialChar = (value: string) => /[!@#¥$%.&*]/.test(value)
+const validateSpecialChar = (value: string) => /[!@#¥$%.&*^()_+=-~]/.test(value)
 
 // 获取图片验证码
 const getCaptchaImage = async () => {
@@ -303,7 +277,7 @@ const getCaptchaImage = async () => {
     lastCaptchaTime.value = Date.now()
     captchaInCooldown.value = true
 
-    const result = await apis.getCaptcha()
+    const result = await getCaptcha()
     captchaImage.value = result.img
     formData.value.uuid = result.uuid
 
@@ -333,20 +307,15 @@ const sendEmailCode = async () => {
     return
   }
 
-  if (!formData.value.imgCode) {
-    window.$message.warning('请先输入图片验证码')
-    return
-  }
-
   // 设置loading状态
   sendingEmailCode.value = true
 
   try {
-    await apis.sendCaptcha({
+    await sendCaptcha({
       email: formData.value.email,
-      code: formData.value.imgCode,
       uuid: formData.value.uuid,
-      operationType: 'forgot'
+      operationType: 'forgot',
+      templateCode: 'PASSWORD_EDIT'
     })
 
     window.$message.success('验证码已发送至您的邮箱')
@@ -404,11 +373,13 @@ const submitNewPassword = async () => {
     submitLoading.value = true
 
     // 调用忘记密码接口
-    await apis.forgetPassword({
+    await forgetPassword({
       email: formData.value.email,
       code: formData.value.emailCode,
       uuid: formData.value.uuid,
-      password: passwordForm.value.password
+      password: passwordForm.value.password,
+      confirmPassword: passwordForm.value.confirmPassword,
+      key: 'PASSWORD_EDIT'
     })
 
     currentStep.value = 3
@@ -481,3 +452,6 @@ onBeforeUnmount(() => {
   timerWorker.terminate()
 })
 </script>
+<style scoped lang="scss">
+@use '@/styles/scss/login';
+</style>

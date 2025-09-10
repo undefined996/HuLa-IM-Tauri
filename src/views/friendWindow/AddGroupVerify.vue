@@ -49,11 +49,11 @@
   </div>
 </template>
 <script setup lang="ts">
-import { WebviewWindow, getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useGlobalStore } from '@/stores/global.ts'
-import apis from '@/services/apis.ts'
+import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useCommon } from '@/hooks/useCommon.ts'
+import { useGlobalStore } from '@/stores/global.ts'
 import { useUserStore } from '@/stores/user.ts'
+import { applyGroup } from '@/utils/ImRequestUtils'
 
 const globalStore = useGlobalStore()
 const userStore = useUserStore()
@@ -69,9 +69,9 @@ watch(
 )
 
 const addFriend = async () => {
-  await apis.applyGroup({
+  await applyGroup({
     msg: requestMsg.value,
-    targetGroupId: String(globalStore.addGroupModalInfo.account)
+    account: String(globalStore.addGroupModalInfo.account)
   })
   window.$message.success('已发送群聊申请')
   setTimeout(async () => {
@@ -83,7 +83,7 @@ onMounted(async () => {
   console.log(userInfo.value)
 
   await getCurrentWebviewWindow().show()
-  requestMsg.value = `我是${userStore.userInfo.name}`
+  requestMsg.value = `我是${userStore.userInfo!.name}`
 })
 </script>
 

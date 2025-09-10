@@ -1,6 +1,6 @@
 <template>
   <n-flex vertical :size="6" class="notify" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
-    <n-flex align="center" :size="4" class="m-[8px_0_0_0] text-(12px) font-bold">
+    <n-flex align="center" :size="4" class="m-[8px_0_0_0] text-(12px)">
       <p>新消息</p>
       <p>·</p>
       <p>{{ msgCount }}</p>
@@ -17,7 +17,7 @@
         <n-avatar round :size="44" :src="AvatarUtils.getAvatarUrl(group.avatar)" />
 
         <n-flex class="flex-1" vertical justify="center" :size="8">
-          <span class="text-(16px [--text-color]) font-bold">{{ group.name }}</span>
+          <span class="text-(16px [--text-color])">{{ group.name }}</span>
 
           <n-flex class="w-full" align="center" justify="space-between" :size="10">
             <span class="max-w-150px truncate text-(12px [--text-color])">
@@ -46,17 +46,20 @@
   </n-flex>
 </template>
 <script setup lang="tsx">
-import { useGlobalStore } from '@/stores/global.ts'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { emitTo, Event, listen } from '@tauri-apps/api/event'
 import { PhysicalPosition } from '@tauri-apps/api/dpi'
+import { type Event, emitTo } from '@tauri-apps/api/event'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { info } from '@tauri-apps/plugin-log'
+import { useDebounceFn } from '@vueuse/core'
 import { RoomTypeEnum } from '@/enums'
+import { useReplaceMsg } from '@/hooks/useReplaceMsg.ts'
 import { useWindow } from '@/hooks/useWindow.ts'
-import { useTauriListener } from '@/hooks/useTauriListener'
 import type { MessageType } from '@/services/types.ts'
 import { useChatStore } from '@/stores/chat.ts'
+import { useGlobalStore } from '@/stores/global.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
-import { useReplaceMsg } from '@/hooks/useReplaceMsg.ts'
+
+// import { useTauriListener } from '../hooks/useTauriListener'
 
 // 定义分组消息的类型
 type GroupedMessage = {
@@ -74,7 +77,7 @@ type GroupedMessage = {
 
 const appWindow = WebviewWindow.getCurrent()
 const { checkWinExist, resizeWindow } = useWindow()
-const { pushListeners } = useTauriListener()
+// const { addListener } = useTauriListener()
 const { checkMessageAtMe } = useReplaceMsg()
 const globalStore = useGlobalStore()
 const chatStore = useChatStore()
@@ -108,17 +111,13 @@ const handleClickMsg = async (group: any) => {
   // 找到对应的会话 - 根据roomId而不是消息ID
   const session = chatStore.sessionList.find((s) => s.roomId === group.roomId)
   if (session) {
-    // 获取home窗口实例
-    const home = await WebviewWindow.getByLabel('home')
-
-    // 如果当前不在消息页面且在home窗口，则跳转到消息页面
-    await home?.setFocus()
+    info(`点击消息，打开会话：${JSON.stringify(session)}`)
     emitTo('home', 'search_to_msg', {
-      uid: group.roomType === RoomTypeEnum.SINGLE ? session.id : session.roomId,
+      uid: group.roomType === RoomTypeEnum.SINGLE ? session.detailId : session.roomId,
       roomType: group.roomType
     })
     // 收起通知面板
-    await handleTip()
+    await debouncedHandleTip()
   } else {
     console.error('找不到对应的会话信息')
   }
@@ -127,13 +126,26 @@ const handleClickMsg = async (group: any) => {
 // 取消状态栏闪烁
 const handleTip = async () => {
   globalStore.setTipVisible(false)
-  await WebviewWindow.getCurrent().hide()
+  // 取消窗口置顶
+  await appWindow?.setAlwaysOnTop(false)
+
+  // 隐藏窗口
+  await appWindow?.hide()
+
+  // 清空消息内容
+  content.value = []
+  msgCount.value = 0
+
+  // 重置窗口高度
+  resizeWindow('notify', 280, 140)
 }
+
+const debouncedHandleTip = useDebounceFn(handleTip, 100)
 
 // 处理窗口显示和隐藏的逻辑
 const showWindow = async (event: Event<any>) => {
   if (tipVisible.value) {
-    const notifyWindow = await WebviewWindow.getCurrent()
+    const notifyWindow = WebviewWindow.getCurrent()
     const outerSize = await notifyWindow?.outerSize()
     if (outerSize) {
       await notifyWindow?.setPosition(
@@ -168,40 +180,29 @@ const handleMouseLeave = async () => {
   await hideWindow()
 }
 
-// 对消息进行排序的函数 - 现在直接写在事件处理中
-
-onBeforeMount(async () => {
-  // 确保用户已登录并初始化会话列表
-  await chatStore.getSessionList(true)
-})
-
 onMounted(async () => {
   // 初始化窗口高度
   resizeWindow('notify', 280, 140)
 
-  // 监听全局事件，以及本地窗口事件
-  await pushListeners([
-    // 监听托盘鼠标进入事件
-    appWindow.listen('notify_enter', async (event: Event<any>) => {
-      await showWindow(event)
-    }),
+  appWindow.listen('notify_enter', async (event: Event<any>) => {
+    info('监听到enter事件，打开notify窗口')
+    await showWindow(event)
+  })
 
-    // 监听托盘鼠标离开事件
-    appWindow.listen('notify_leave', async () => {
-      setTimeout(async () => {
-        await hideWindow()
-      }, 300)
-    }),
+  appWindow.listen('notify_leave', async () => {
+    setTimeout(async () => {
+      await hideWindow()
+    }, 300)
+  })
 
-    // 监听隐藏通知的事件，当主窗口获得焦点时触发
-    appWindow.listen('hide_notify', async () => {
-      // 隐藏所有通知并关闭窗口
+  appWindow.listen('hide_notify', async () => {
+    // 只有在tipVisible为true时才需要处理
+    if (tipVisible.value) {
       await handleTip()
-    })
-  ])
+    }
+  })
 
-  // 使用全局事件监听器接收通知消息
-  const contentEventUnlisten = listen('notify_cotent', async (event: Event<MessageType>) => {
+  appWindow.listen('notify_content', async (event: Event<MessageType>) => {
     if (event.payload) {
       // 窗口显示将由notify_enter事件触发
 
@@ -216,7 +217,7 @@ onMounted(async () => {
       const currentTime = Date.now()
 
       // 获取发送者信息
-      const senderName = getMessageSenderName(msg, session?.name || '')
+      const senderName = getMessageSenderName(msg, session?.name || '', session!.roomId)
 
       // 格式化消息内容
       const formattedContent = formatMessageContent(msg, session?.type || RoomTypeEnum.GROUP, senderName, isAtMe)
@@ -254,11 +255,11 @@ onMounted(async () => {
         })
 
         // 调整窗口高度，基础高度140，从第二个分组开始每组增加60px，最多4个分组
-        const baseHeight = 140
-        const groupCount = content.value.length
-        const additionalHeight = Math.min(Math.max(groupCount - 1, 0), 3) * 60
-        const newHeight = baseHeight + additionalHeight
-        resizeWindow('notify', 280, newHeight)
+        // const baseHeight = 140
+        // const groupCount = content.value.length
+        // const additionalHeight = Math.min(Math.max(groupCount - 1, 0), 3) * 60
+        // const newHeight = baseHeight + additionalHeight
+        // resizeWindow('notify', 280, newHeight)
       }
 
       // 对消息进行排序 - 先按置顶状态排序，再按活跃时间排序
@@ -274,9 +275,6 @@ onMounted(async () => {
       msgCount.value = content.value.reduce((acc, group) => acc + group.messageCount, 0)
     }
   })
-
-  // 添加到监听器列表以便在组件卸载时自动清理
-  await pushListeners([contentEventUnlisten])
 })
 </script>
 <style scoped lang="scss">

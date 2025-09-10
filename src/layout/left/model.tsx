@@ -1,35 +1,35 @@
+import { emit } from '@tauri-apps/api/event'
 import {
+  type FormInst,
   NAvatar,
   NButton,
   NFlex,
+  NForm,
   NFormItem,
+  NIcon,
   NInput,
   NModal,
-  NForm,
-  NTimelineItem,
-  NTimeline,
+  NProgress,
   NScrollbar,
   NSkeleton,
-  NIcon,
-  NProgress
+  NTimeline,
+  NTimelineItem
 } from 'naive-ui'
-import { FormInst } from 'naive-ui'
-import { emit } from '@tauri-apps/api/event'
 import { EventEnum } from '@/enums'
 import { handRelativeTime } from '@/utils/Day.ts'
 import './style.scss'
-import { type } from '@tauri-apps/plugin-os'
-import { check } from '@tauri-apps/plugin-updater'
-import { relaunch } from '@tauri-apps/plugin-process'
-import { useUserStore } from '@/stores/user.ts'
-import { useSettingStore } from '@/stores/setting.ts'
-import { AvatarUtils } from '@/utils/AvatarUtils'
-import { confirm } from '@tauri-apps/plugin-dialog'
-import apis from '@/services/apis'
-import { useLogin } from '@/hooks/useLogin'
 import { getVersion } from '@tauri-apps/api/app'
+import { confirm } from '@tauri-apps/plugin-dialog'
+import { relaunch } from '@tauri-apps/plugin-process'
+import { check } from '@tauri-apps/plugin-updater'
+import { useLogin } from '@/hooks/useLogin'
+import { useSettingStore } from '@/stores/setting.ts'
+import { useUserStore } from '@/stores/user.ts'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import * as ImRequestUtils from '@/utils/ImRequestUtils'
+import { isMac } from '@/utils/PlatformConstants'
 
-const { logout, resetLoginState } = useLogin()
+const { logout: sysLogout, resetLoginState } = useLogin()
 const formRef = ref<FormInst | null>()
 const formValue = ref({
   lockPassword: ''
@@ -42,9 +42,9 @@ export const remotelogin = ref({
     const settingStore = useSettingStore()
     const { login } = storeToRefs(settingStore)
     // token已在后端清空，只需要返回登录页
-    await apis.logout(login.value.autoLogin)
+    await ImRequestUtils.logout({ autoLogin: login.value.autoLogin })
     await resetLoginState()
-    await logout()
+    await sysLogout()
     modalShow.value = false
     remotelogin.value.loading = false
   }
@@ -85,11 +85,11 @@ export const LockScreen = defineComponent(() => {
   return () => (
     <NModal v-model:show={modalShow.value} maskClosable={false} class="w-350px border-rd-8px">
       <div class="bg-[--bg-popover] w-360px h-full p-6px box-border flex flex-col">
-        {type() === 'macos' ? (
+        {isMac() ? (
           <div
             onClick={() => (modalShow.value = false)}
             class="mac-close relative size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none">
-            <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+            <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
               <use href="#close"></use>
             </svg>
           </div>
@@ -102,9 +102,9 @@ export const LockScreen = defineComponent(() => {
           <NFlex vertical justify="center" align="center" size={20}>
             <span class="text-(14px center)">锁定屏幕</span>
 
-            <NAvatar bordered round size={80} src={AvatarUtils.getAvatarUrl(userStore.userInfo.avatar!)} />
+            <NAvatar bordered round size={80} src={AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar!)} />
 
-            <p class="text-(14px center [--text-color]) truncate w-200px">{userStore.userInfo.name}</p>
+            <p class="text-(14px center [--text-color]) truncate w-200px">{userStore.userInfo!.name}</p>
           </NFlex>
           <NForm ref={formRef} model={formValue.value} rules={lock.value.rules}>
             <NFormItem label-placement="left" label="锁屏密码" path={'lockPassword'} class="w-full">
@@ -287,11 +287,11 @@ export const CheckUpdate = defineComponent(() => {
   return () => (
     <NModal v-model:show={modalShow.value} maskClosable={false} class="w-350px border-rd-8px">
       <div class="bg-[--bg-popover] w-500px h-full p-6px box-border flex flex-col">
-        {type() === 'macos' ? (
+        {isMac() ? (
           <div
             onClick={() => (modalShow.value = false)}
             class="mac-close relative size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none">
-            <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+            <svg class="hidden size-7px color-#000  select-none absolute top-3px left-3px">
               <use href="#close"></use>
             </svg>
           </div>
@@ -442,11 +442,11 @@ export const RemoteLogin = defineComponent({
         maskClosable={false}
         class="w-350px border-rd-8px select-none cursor-default">
         <div class="bg-[--bg-popover] w-360px h-full p-6px box-border flex flex-col">
-          {type() === 'macos' ? (
+          {isMac() ? (
             <div
               onClick={remotelogin.value.logout}
               class="mac-close relative size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none">
-              <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+              <svg class="hidden size-7px color-#000  select-none absolute top-3px left-3px">
                 <use href="#close"></use>
               </svg>
             </div>
@@ -460,7 +460,7 @@ export const RemoteLogin = defineComponent({
               <span class="text-(14px [--text-color])">下线通知</span>
 
               <div class="relative">
-                <img class="rounded-full size-72px" src={AvatarUtils.getAvatarUrl(userStore.userInfo.avatar!)} />
+                <img class="rounded-full size-72px" src={AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar!)} />
                 <div class="absolute inset-0 bg-[--avatar-hover-bg] backdrop-blur-[2px] rounded-full flex items-center justify-center">
                   <svg class="size-34px text-white animate-pulse">
                     <use href="#cloudError"></use>

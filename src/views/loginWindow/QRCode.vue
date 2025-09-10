@@ -43,17 +43,17 @@
   </n-config-provider>
 </template>
 <script setup lang="ts">
-import router from '@/router'
 import { delay } from 'lodash-es'
 import { lightTheme } from 'naive-ui'
 import { OnlineEnum } from '@/enums'
-import { useMitt } from '@/hooks/useMitt.ts'
 import { useLogin } from '@/hooks/useLogin.ts'
+import { useMitt } from '@/hooks/useMitt.ts'
 import { useWindow } from '@/hooks/useWindow.ts'
-import { LoginStatus, useWsLoginStore } from '@/stores/ws.ts'
+import router from '@/router'
 import { type LoginInitResType, type LoginSuccessResType, WsResponseMessageType } from '@/services/wsType.ts'
-import { useUserStore } from '@/stores/user'
 import { useGroupStore } from '@/stores/group'
+import { useUserStore } from '@/stores/user'
+import { LoginStatus, useWsLoginStore } from '@/stores/ws.ts'
 
 const loginStore = useWsLoginStore()
 const userStore = useUserStore()
@@ -143,10 +143,9 @@ onMounted(() => {
     handleQRCodeLogin()
   })
   useMitt.on(WsResponseMessageType.LOGIN_SUCCESS, async (loginSuccessResType: LoginSuccessResType) => {
-    userStore.isSign = true
     const { token, ...rest } = loginSuccessResType
     // FIXME 可以不需要赋值了，单独请求了接口。
-    userStore.userInfo = { ...userStore.userInfo, ...rest }
+    userStore.userInfo = { ...userStore.userInfo!, ...rest }
     localStorage.setItem('TOKEN', token)
     localStorage.removeItem('wsLogin')
     // 获取用户详情

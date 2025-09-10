@@ -1,24 +1,24 @@
-import { LimitEnum, MittEnum, MsgEnum, MessageStatusEnum, RoomTypeEnum, UploadSceneEnum } from '@/enums'
-import { useUserInfo } from '@/hooks/useCached.ts'
-import apis from '@/services/apis.ts'
-import { useCachedStore, type BaseUserItem } from '@/stores/cached.ts'
+import { Channel, invoke } from '@tauri-apps/api/core'
+import { readImage, readText } from '@tauri-apps/plugin-clipboard-manager'
+import { useDebounceFn } from '@vueuse/core'
+import { storeToRefs } from 'pinia'
+import type { Ref } from 'vue'
+import { LimitEnum, MessageStatusEnum, MittEnum, MsgEnum, TauriCommand, UploadSceneEnum } from '@/enums'
+import { useMitt } from '@/hooks/useMitt.ts'
+import type { AIModel } from '@/services/types.ts'
+import type { BaseUserItem } from '@/stores/cached.ts'
 import { useChatStore } from '@/stores/chat.ts'
 import { useGlobalStore } from '@/stores/global.ts'
+import { useGroupStore } from '@/stores/group.ts'
 import { useSettingStore } from '@/stores/setting.ts'
-import { useMitt } from '@/hooks/useMitt.ts'
-import { type } from '@tauri-apps/plugin-os'
-import { useDebounceFn } from '@vueuse/core'
-import { Ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { SelectionRange, useCommon } from './useCommon.ts'
-import { readText, readImage } from '@tauri-apps/plugin-clipboard-manager'
-import { processClipboardImage } from '@/utils/ImageUtils.ts'
 import { messageStrategyMap } from '@/strategy/MessageStrategy.ts'
-import { useTrigger } from './useTrigger'
-import type { AIModel } from '@/services/types.ts'
-import { UploadProviderEnum, useUpload } from './useUpload.ts'
-import { getReplyContent } from '@/utils/MessageReply.ts'
 import { fixFileMimeType, getMessageTypeByFile } from '@/utils/FileType.ts'
+import { processClipboardImage } from '@/utils/ImageUtils.ts'
+import { getReplyContent } from '@/utils/MessageReply.ts'
+import { isMac, isWindows } from '@/utils/PlatformConstants'
+import { type SelectionRange, useCommon } from './useCommon.ts'
+import { useTrigger } from './useTrigger'
+import { UploadProviderEnum, useUpload } from './useUpload.ts'
 /**
  * 光标管理器
  */
@@ -61,9 +61,9 @@ export function useCursorManager() {
 }
 
 export const useMsgInput = (messageInputDom: Ref) => {
+  const groupStore = useGroupStore()
   const chatStore = useChatStore()
   const globalStore = useGlobalStore()
-  const cachedStore = useCachedStore()
   const { uploadToQiniu } = useUpload()
   const { getCursorSelectionRange, updateSelectionRange, focusOn } = useCursorManager()
   const {
@@ -156,12 +156,10 @@ export const useMsgInput = (messageInputDom: Ref) => {
   /** @ 候选人列表 */
   const personList = computed(() => {
     if (aitKey.value && !isChinese.value) {
-      return cachedStore.currentAtUsersList.filter(
-        (user) => user.name?.startsWith(aitKey.value) && user.uid !== userUid.value
-      )
+      return groupStore.userList.filter((user) => user.name?.startsWith(aitKey.value) && user.uid !== userUid.value)
     } else {
       // 过滤当前登录的用户
-      return cachedStore.currentAtUsersList.filter((user) => user.uid !== userUid.value)
+      return groupStore.userList.filter((user) => user.uid !== userUid.value)
     }
   })
   /** 记录当前选中的提及项 key */
@@ -362,7 +360,7 @@ export const useMsgInput = (messageInputDom: Ref) => {
         msgInput.value = messageInputDom.value.innerHTML.replace(replyDiv.outerHTML, '')
     }
     const msg = await messageStrategy.getMsg(msgInput.value, reply.value)
-    const atUidList = extractAtUserIds(msgInput.value, cachedStore.currentAtUsersList)
+    const atUidList = extractAtUserIds(msgInput.value, groupStore.userList)
     const tempMsgId = Date.now().toString()
 
     // 根据消息类型创建消息体
@@ -375,9 +373,9 @@ export const useMsgInput = (messageInputDom: Ref) => {
     const tempMsg = await messageStrategy.buildMessageType(tempMsgId, messageBody, globalStore, userUid)
     resetInput()
 
+    tempMsg.message.status = MessageStatusEnum.SENDING
     // 先添加到消息列表
     chatStore.pushMsg(tempMsg)
-    useMitt.emit(MittEnum.MESSAGE_ANIMATION, tempMsg)
     console.log('👾临时消息:', tempMsg)
 
     // 设置发送状态的定时器
@@ -463,26 +461,53 @@ export const useMsgInput = (messageInputDom: Ref) => {
         })
         console.log('视频上传完成,更新为服务器URL:', messageBody.url)
       }
-      // 发送消息到服务器
-      const res = await apis.sendMsg({
-        roomId: globalStore.currentSession.roomId,
-        msgType: msg.type,
-        body: messageBody
+      // 发送消息到服务器 - 使用 channel 方式
+      const successChannel = new Channel<any>()
+      const errorChannel = new Channel<string>()
+
+      // 监听成功响应
+      successChannel.onmessage = (message) => {
+        console.log('[跟踪] 收到 send_msg_success 响应:', message)
+        chatStore.updateMsg({
+          msgId: message.oldMsgId,
+          status: MessageStatusEnum.SUCCESS,
+          newMsgId: message.message.id,
+          body: message.message.body
+        })
+      }
+
+      // 监听错误响应
+      errorChannel.onmessage = (msgId) => {
+        console.log('[跟踪] 收到 send_msg_error 响应:', msgId)
+        chatStore.updateMsg({
+          msgId: msgId,
+          status: MessageStatusEnum.FAILED
+        })
+      }
+
+      await invoke(TauriCommand.SEND_MSG, {
+        data: {
+          id: tempMsgId,
+          roomId: globalStore.currentSession!.roomId,
+          msgType: msg.type,
+          body: messageBody
+        },
+        successChannel,
+        errorChannel
       })
 
       // 停止发送状态的定时器
       clearTimeout(statusTimer)
 
       // 更新消息状态为成功,并使用服务器返回的消息体
-      chatStore.updateMsg({
-        msgId: tempMsgId,
-        status: MessageStatusEnum.SUCCESS,
-        newMsgId: res.message.id,
-        body: res.message.body
-      })
+      // chatStore.updateMsg({
+      //   msgId: tempMsgId,
+      //   status: MessageStatusEnum.SUCCESS,
+      //   newMsgId: res,
+      // })
 
       // 更新会话最后活动时间
-      chatStore.updateSessionLastActiveTime(globalStore.currentSession.roomId)
+      chatStore.updateSessionLastActiveTime(globalStore.currentSession!.roomId)
 
       // 消息发送成功后释放预览URL
       if ((msg.type === MsgEnum.IMAGE || msg.type === MsgEnum.EMOJI) && msg.url.startsWith('blob:')) {
@@ -562,16 +587,6 @@ export const useMsgInput = (messageInputDom: Ref) => {
     const cursorPosition = selection.focusOffset
     const text = curNode.textContent
 
-    // 判断是群聊并且有用户列表时才触发@提及
-    if (
-      globalStore.currentSession.type === RoomTypeEnum.GROUP &&
-      cachedStore.currentAtUsersList.length === 0 &&
-      text.includes('@')
-    ) {
-      // 如果当前群聊没有加载用户列表，尝试加载
-      await cachedStore.getGroupAtUserBaseInfo()
-    }
-
     await handleTrigger(text, cursorPosition, { range, selection, keyword: '' })
   }, 0)
 
@@ -591,18 +606,18 @@ export const useMsgInput = (messageInputDom: Ref) => {
     }
 
     // 正在输入拼音，并且是macos系统
-    if (isChinese.value && type() === 'macos') {
+    if (isChinese.value && isMac()) {
       return
     }
-    const isWindows = type() === 'windows'
+    const isWindowsPlatform = isWindows()
     const isEnterKey = e.key === 'Enter'
-    const isCtrlOrMetaKey = isWindows ? e.ctrlKey : e.metaKey
+    const isCtrlOrMetaKey = isWindowsPlatform ? e.ctrlKey : e.metaKey
 
     const sendKeyIsEnter = chat.value.sendKey === 'Enter'
-    const sendKeyIsCtrlEnter = chat.value.sendKey === `${isWindows ? 'Ctrl' : '⌘'}+Enter`
+    const sendKeyIsCtrlEnter = chat.value.sendKey === `${isWindowsPlatform ? 'Ctrl' : '⌘'}+Enter`
 
     // 如果当前的系统是mac，我需要判断当前的chat.value.sendKey是否是Enter，再判断当前是否是按下⌘+Enter
-    if (!isWindows && chat.value.sendKey === 'Enter' && e.metaKey && e.key === 'Enter') {
+    if (!isWindowsPlatform && chat.value.sendKey === 'Enter' && e.metaKey && e.key === 'Enter') {
       // 就进行换行操作
       e.preventDefault()
       insertNode(MsgEnum.TEXT, '\n', {} as HTMLElement)
@@ -612,13 +627,17 @@ export const useMsgInput = (messageInputDom: Ref) => {
       e?.preventDefault()
       return
     }
-    if (!isWindows && e.ctrlKey && isEnterKey && sendKeyIsEnter) {
+    if (!isWindowsPlatform && e.ctrlKey && isEnterKey && sendKeyIsEnter) {
       e?.preventDefault()
       return
     }
     if ((sendKeyIsEnter && isEnterKey && !isCtrlOrMetaKey) || (sendKeyIsCtrlEnter && isCtrlOrMetaKey && isEnterKey)) {
       e?.preventDefault()
-      await send()
+      // 触发form提交而不是直接调用send
+      const form = document.getElementById('message-form') as HTMLFormElement
+      if (form) {
+        form.requestSubmit()
+      }
       resetAllStates()
     }
   }
@@ -742,8 +761,9 @@ export const useMsgInput = (messageInputDom: Ref) => {
       if (!messageInputDom.value) return
 
       try {
-        const accountName = useUserInfo(event.fromUser.uid).value.name!
-        const avatar = useUserInfo(event.fromUser.uid).value.avatar!
+        const userInfo = groupStore.getUserInfo(event.fromUser.uid)!
+        const accountName = userInfo.name
+        const avatar = userInfo.avatar
 
         // 步骤1: 确保输入框先获得焦点
         focusOn(messageInputDom.value)
@@ -839,7 +859,6 @@ export const useMsgInput = (messageInputDom: Ref) => {
           tempMsg.message.status = MessageStatusEnum.SENDING
 
           chatStore.pushMsg(tempMsg)
-          useMitt.emit(MittEnum.MESSAGE_ANIMATION, tempMsg)
 
           // 异步处理上传
           const videoPath = await saveCacheFile(processedFile, 'video/')
@@ -933,32 +952,50 @@ export const useMsgInput = (messageInputDom: Ref) => {
           const finalThumbnailUrl =
             thumbnailUploadResponse?.downloadUrl || `${qiniuConfig.domain}/${thumbnailUploadResponse?.key}`
 
-          // 发送消息到服务器保存
-          const serverResponse = await apis.sendMsg({
-            roomId: globalStore.currentSession.roomId,
-            msgType: MsgEnum.VIDEO,
-            body: {
-              url: finalVideoUrl,
-              size: processedFile.size,
-              fileName: processedFile.name,
-              thumbUrl: finalThumbnailUrl,
-              thumbWidth: 300,
-              thumbHeight: 150,
-              thumbSize: thumbnailFile.size,
-              localPath: videoPath, // 保存本地缓存路径
-              senderUid: userUid.value // 保存发送者UID
-            }
-          })
+          // 发送消息到服务器保存 - 使用 channel 方式
+          const videoSuccessChannel = new Channel<any>()
+          const videoErrorChannel = new Channel<string>()
 
-          // 使用服务器返回的数据更新消息状态为SUCCESS，清除进度信息
-          chatStore.updateMsg({
-            msgId: tempMsgId,
-            status: MessageStatusEnum.SUCCESS,
-            newMsgId: serverResponse.message.id, // 使用服务器返回的消息ID
-            body: serverResponse.message.body, // 使用服务器返回的消息体
-            uploadProgress: undefined // 清除进度信息
-          })
+          // 监听成功响应
+          videoSuccessChannel.onmessage = (message) => {
+            console.log('[视频] 收到 send_msg_success 响应:', message)
+            chatStore.updateMsg({
+              msgId: message.oldMsgId,
+              status: MessageStatusEnum.SUCCESS,
+              newMsgId: message.message.id,
+              body: message.message.body
+            })
+          }
 
+          // 监听错误响应
+          videoErrorChannel.onmessage = (msgId) => {
+            console.log('[视频] 收到 send_msg_error 响应:', msgId)
+            chatStore.updateMsg({
+              msgId: msgId,
+              status: MessageStatusEnum.FAILED
+            })
+          }
+
+          await invoke(TauriCommand.SEND_MSG, {
+            data: {
+              id: tempMsgId,
+              roomId: globalStore.currentSession!.roomId,
+              msgType: MsgEnum.VIDEO,
+              body: {
+                url: finalVideoUrl,
+                size: processedFile.size,
+                fileName: processedFile.name,
+                thumbUrl: finalThumbnailUrl,
+                thumbWidth: 300,
+                thumbHeight: 150,
+                thumbSize: thumbnailFile.size,
+                localPath: videoPath, // 保存本地缓存路径
+                senderUid: userUid.value // 保存发送者UID
+              }
+            },
+            successChannel: videoSuccessChannel,
+            errorChannel: videoErrorChannel
+          })
           // 清理本地URL
           URL.revokeObjectURL(tempMsg.message.body.url)
           URL.revokeObjectURL(localThumbUrl)
@@ -974,8 +1011,6 @@ export const useMsgInput = (messageInputDom: Ref) => {
 
           // 添加到消息列表
           chatStore.pushMsg(tempMsg)
-          useMitt.emit(MittEnum.MESSAGE_ANIMATION, tempMsg)
-
           console.log('🖼️ 开始处理图片上传:', processedFile.name)
 
           // 上传图片
@@ -1001,23 +1036,43 @@ export const useMsgInput = (messageInputDom: Ref) => {
 
           console.log('🖼️ 图片上传完成，更新为服务器URL:', messageBody.url)
 
-          // 发送消息到服务器
-          const serverResponse = await apis.sendMsg({
-            roomId: globalStore.currentSession.roomId,
-            msgType: MsgEnum.IMAGE,
-            body: messageBody
-          })
+          // 发送消息到服务器 - 使用 channel 方式
+          const imageSuccessChannel = new Channel<any>()
+          const imageErrorChannel = new Channel<string>()
 
-          // 更新消息状态为成功，并使用服务器返回的消息体
-          chatStore.updateMsg({
-            msgId: tempMsgId,
-            status: MessageStatusEnum.SUCCESS,
-            newMsgId: serverResponse.message.id,
-            body: serverResponse.message.body
+          // 监听成功响应
+          imageSuccessChannel.onmessage = (message) => {
+            console.log('[图片] 收到 send_msg_success 响应:', message)
+            chatStore.updateMsg({
+              msgId: message.oldMsgId,
+              status: MessageStatusEnum.SUCCESS,
+              newMsgId: message.message.id,
+              body: message.message.body
+            })
+          }
+
+          // 监听错误响应
+          imageErrorChannel.onmessage = (msgId) => {
+            console.log('[图片] 收到 send_msg_error 响应:', msgId)
+            chatStore.updateMsg({
+              msgId: msgId,
+              status: MessageStatusEnum.FAILED
+            })
+          }
+
+          await invoke(TauriCommand.SEND_MSG, {
+            data: {
+              id: tempMsgId,
+              roomId: globalStore.currentSession!.roomId,
+              msgType: MsgEnum.IMAGE,
+              body: messageBody
+            },
+            successChannel: imageSuccessChannel,
+            errorChannel: imageErrorChannel
           })
 
           // 更新会话最后活动时间
-          chatStore.updateSessionLastActiveTime(globalStore.currentSession.roomId)
+          chatStore.updateSessionLastActiveTime(globalStore.currentSession!.roomId)
 
           // 释放本地预览URL
           URL.revokeObjectURL(msg.url)
@@ -1040,7 +1095,6 @@ export const useMsgInput = (messageInputDom: Ref) => {
 
           // 添加到消息列表
           chatStore.pushMsg(tempMsg)
-          useMitt.emit(MittEnum.MESSAGE_ANIMATION, tempMsg)
 
           // 获取上传进度监听
           const { progress, onChange } = (messageStrategy as any).getUploadProgress()
@@ -1093,25 +1147,45 @@ export const useMsgInput = (messageInputDom: Ref) => {
 
           console.log('📎 文件上传完成，更新为服务器URL:', messageBody.url)
 
-          // 发送消息到服务器
-          const serverResponse = await apis.sendMsg({
-            roomId: globalStore.currentSession.roomId,
-            msgType: MsgEnum.FILE,
-            body: messageBody
-          })
+          // 发送消息到服务器 - 使用 channel 方式
+          const fileSuccessChannel = new Channel<any>()
+          const fileErrorChannel = new Channel<string>()
 
-          // 更新消息状态为成功，并使用服务器返回的消息体
-          chatStore.updateMsg({
-            msgId: tempMsgId,
-            status: MessageStatusEnum.SUCCESS,
-            newMsgId: serverResponse.message.id,
-            body: serverResponse.message.body
+          // 监听成功响应
+          fileSuccessChannel.onmessage = (message) => {
+            console.log('[文件] 收到 send_msg_success 响应:', message)
+            chatStore.updateMsg({
+              msgId: message.oldMsgId,
+              status: MessageStatusEnum.SUCCESS,
+              newMsgId: message.message.id,
+              body: message.message.body
+            })
+          }
+
+          // 监听错误响应
+          fileErrorChannel.onmessage = (msgId) => {
+            console.log('[文件] 收到 send_msg_error 响应:', msgId)
+            chatStore.updateMsg({
+              msgId: msgId,
+              status: MessageStatusEnum.FAILED
+            })
+          }
+
+          await invoke(TauriCommand.SEND_MSG, {
+            data: {
+              id: tempMsgId,
+              roomId: globalStore.currentSession!.roomId,
+              msgType: MsgEnum.FILE,
+              body: messageBody
+            },
+            successChannel: fileSuccessChannel,
+            errorChannel: fileErrorChannel
           })
 
           // 更新会话最后活动时间
-          chatStore.updateSessionLastActiveTime(globalStore.currentSession.roomId)
+          chatStore.updateSessionLastActiveTime(globalStore.currentSession!.roomId)
 
-          console.log('📎 文件消息发送成功:', serverResponse.message.id)
+          // console.log('📎 文件消息发送成功:', serverResponse.message.id)
 
           // 清理进度监听器
           if (progressUnsubscribe) {
@@ -1169,7 +1243,7 @@ export const useMsgInput = (messageInputDom: Ref) => {
       }
 
       // 创建临时消息对象
-      const userInfo = useUserInfo(userUid.value)?.value
+      const userInfo = groupStore.getUserInfo(userUid.value)
       const tempMsg = {
         fromUser: {
           uid: String(userUid.value || 0),
@@ -1179,7 +1253,7 @@ export const useMsgInput = (messageInputDom: Ref) => {
         },
         message: {
           id: tempMsgId,
-          roomId: globalStore.currentSession.roomId,
+          roomId: globalStore.currentSession!.roomId,
           sendTime: Date.now(),
           status: MessageStatusEnum.PENDING,
           type: MsgEnum.VOICE,
@@ -1192,7 +1266,6 @@ export const useMsgInput = (messageInputDom: Ref) => {
 
       // 添加到消息列表（显示本地预览）
       chatStore.pushMsg(tempMsg)
-      useMitt.emit(MittEnum.MESSAGE_ANIMATION, tempMsg)
 
       // 设置发送状态的定时器
       const statusTimer = setTimeout(() => {
@@ -1227,25 +1300,47 @@ export const useMsgInput = (messageInputDom: Ref) => {
         })
 
         const sendData = {
-          roomId: globalStore.currentSession.roomId,
+          id: tempMsgId,
+          roomId: globalStore.currentSession!.roomId,
           msgType: MsgEnum.VOICE,
           body: messageBody
         }
 
         try {
-          const res = await apis.sendMsg(sendData)
+          // 发送消息到服务器 - 使用 channel 方式
+          const voiceSuccessChannel = new Channel<any>()
+          const voiceErrorChannel = new Channel<string>()
+
+          // 监听成功响应
+          voiceSuccessChannel.onmessage = (message) => {
+            console.log('[语音] 收到 send_msg_success 响应:', message)
+            chatStore.updateMsg({
+              msgId: message.oldMsgId,
+              status: MessageStatusEnum.SUCCESS,
+              newMsgId: message.message.id,
+              body: message.message.body
+            })
+          }
+
+          // 监听错误响应
+          voiceErrorChannel.onmessage = (msgId) => {
+            console.log('[语音] 收到 send_msg_error 响应:', msgId)
+            chatStore.updateMsg({
+              msgId: msgId,
+              status: MessageStatusEnum.FAILED
+            })
+          }
+
+          await invoke(TauriCommand.SEND_MSG, {
+            data: sendData,
+            successChannel: voiceSuccessChannel,
+            errorChannel: voiceErrorChannel
+          })
           // 停止发送状态的定时器
           clearTimeout(statusTimer)
-          // 更新消息状态为成功,并使用服务器返回的消息体
-          chatStore.updateMsg({
-            msgId: tempMsgId,
-            status: MessageStatusEnum.SUCCESS,
-            newMsgId: res.message.id,
-            body: res.message.body
-          })
 
           // 更新会话最后活动时间
-          chatStore.updateSessionLastActiveTime(globalStore.currentSession.roomId)
+          chatStore.updateSessionLastActiveTime(globalStore.currentSession!.roomId)
 
           // 释放本地预览URL
           if (msg.url.startsWith('asset://')) {

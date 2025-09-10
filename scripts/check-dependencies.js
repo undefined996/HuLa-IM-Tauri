@@ -1,7 +1,7 @@
-import { execSync } from 'child_process'
 import chalk from 'chalk'
-import { platform } from 'os'
+import { execSync } from 'child_process'
 import { existsSync } from 'fs'
+import { platform } from 'os'
 
 // 环境安装指南
 const INSTALL_GUIDES = {
@@ -103,8 +103,8 @@ const compareVersions = (version1, version2) => {
   const v2 = version2.replace(/[^0-9.]/g, '').split('.')
 
   for (let i = 0; i < Math.max(v1.length, v2.length); i++) {
-    const num1 = parseInt(v1[i] || '0')
-    const num2 = parseInt(v2[i] || '0')
+    const num1 = parseInt(v1[i] || '0', 10)
+    const num2 = parseInt(v2[i] || '0', 10)
     if (num1 > num2) return 1
     if (num1 < num2) return -1
   }
@@ -118,7 +118,7 @@ function checkDependency(check) {
     const isVersionValid = compareVersions(version, check.minVersion) >= 0
 
     if (isVersionValid) {
-      console.log(chalk.green(`✓ ${check.name} 版本 ${output} 已安装\n`))
+      console.log(chalk.green(`✅ ${check.name} 版本 ${output} 已安装\n`))
       return true
     } else {
       console.log(chalk.yellow(`⚠️ ${check.name} 版本过低`))
@@ -135,7 +135,7 @@ function checkDependency(check) {
     }
   } catch (error) {
     const errorMessage = getFriendlyErrorMessage(error)
-    console.log(chalk.red(`✗ ${check.name} 未安装`))
+    console.log(chalk.red(`❌ ${check.name} 未安装`))
     console.log(chalk.red(`  原因: ${errorMessage}`))
     console.log(chalk.gray(`  👉 安装指南: ${INSTALL_GUIDES[check.name]}`))
     return false
@@ -151,16 +151,16 @@ function checkWindowsDependency(check) {
   try {
     const isInstalled = check.checkInstalled()
     if (isInstalled) {
-      console.log(chalk.green(`✓ ${check.name} 已安装`))
+      console.log(chalk.green(`✅ ${check.name} 已安装`))
       return true
     } else {
-      console.log(chalk.red(`✗ ${check.name} 未安装`))
+      console.log(chalk.red(`❌ ${check.name} 未安装`))
       console.log(chalk.gray(`  👉 安装指南: ${INSTALL_GUIDES[check.name]}`))
       return false
     }
   } catch (error) {
     const errorMessage = getFriendlyErrorMessage(error)
-    console.log(chalk.red(`✗ ${check.name} 检查失败`))
+    console.log(chalk.red(`❌ ${check.name} 检查失败`))
     console.log(chalk.red(`  原因: ${errorMessage}`))
     return false
   }
@@ -180,10 +180,10 @@ function main() {
   }
 
   if (results.every(Boolean)) {
-    console.log(chalk.green('\n✓ 所有环境检查通过！'))
+    console.log(chalk.green('\n✅ 所有环境检查通过！'))
     process.exit(0)
   } else {
-    console.log(chalk.red('\n✗ 环境依赖检查失败，请按照上述提示安装或更新依赖。'))
+    console.log(chalk.red('\n❌ 环境依赖检查失败，请按照上述提示安装或更新依赖。'))
     process.exit(1)
   }
 }

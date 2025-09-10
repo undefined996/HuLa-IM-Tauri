@@ -1,5 +1,5 @@
 #![allow(unexpected_cfgs)]
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use lazy_static::lazy_static;
 use mime_guess::from_path;
 use screenshots::Screen;
@@ -13,12 +13,29 @@ use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, ResourceId, Runtime, Webview};
 
 #[cfg(target_os = "macos")]
-#[allow(deprecated)]
-use cocoa::appkit::NSWindow;
+use objc2::rc::Retained;
+#[cfg(target_os = "macos")]
+use objc2_app_kit::NSWindow;
+#[cfg(target_os = "macos")]
+use tauri::WebviewWindow;
+
+/// Windows文本缩放信息结构体
+#[cfg(target_os = "windows")]
+#[derive(Serialize)]
+pub struct WindowsScaleInfo {
+    /// 系统DPI
+    pub system_dpi: u32,
+    /// 系统缩放比例
+    pub system_scale: f64,
+    /// 文本缩放比例
+    pub text_scale: f64,
+    /// 是否检测到文本缩放
+    pub has_text_scaling: bool,
+}
 
 use crate::desktops::window_payload::{
-    get_window_payload as _get_window_payload, push_window_payload as _push_window_payload,
-    WindowPayload,
+    WindowPayload, get_window_payload as _get_window_payload,
+    push_window_payload as _push_window_payload,
 };
 
 // 定义用户信息结构体
@@ -31,33 +48,30 @@ pub struct UserInfo {
     is_sign: bool,
 }
 
-impl UserInfo {
-    pub fn new(
-        user_id: i64,
-        username: String,
-        token: String,
-        portrait: String,
-        is_sign: bool,
-    ) -> Self {
+impl Default for UserInfo {
+    fn default() -> Self {
         UserInfo {
-            user_id,
-            username,
-            token,
-            portrait,
-            is_sign,
+            user_id: -1,
+            username: String::new(),
+            token: String::new(),
+            portrait: String::new(),
+            is_sign: false,
         }
     }
 }
 
+#[derive(Serialize)]
+pub struct FileMeta {
+    name: String,
+    path: String,
+    file_type: String,
+    mime_type: String,
+    exists: bool,
+}
+
 // 全局变量
 lazy_static! {
-    static ref USER_INFO: Arc<RwLock<UserInfo>> = Arc::new(RwLock::new(UserInfo::new(
-        -1,
-        String::new(),
-        String::new(),
-        String::new(),
-        false
-    )));
+    static ref USER_INFO: Arc<RwLock<UserInfo>> = Arc::new(RwLock::new(UserInfo::default()));
 }
 
 #[tauri::command]
@@ -72,69 +86,142 @@ pub fn default_window_icon<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn screenshot(x: &str, y: &str, width: &str, height: &str) -> String {
-    let screen = Screen::from_point(100, 100).unwrap();
+pub fn screenshot(x: &str, y: &str, width: &str, height: &str) -> Result<String, String> {
+    let screen = Screen::from_point(100, 100).map_err(|e| format!("获取屏幕信息失败: {}", e))?;
+
+    let x = x
+        .parse::<i32>()
+        .map_err(|_| "无效的 x 坐标参数".to_string())?;
+    let y = y
+        .parse::<i32>()
+        .map_err(|_| "无效的 y 坐标参数".to_string())?;
+    let width = width
+        .parse::<u32>()
+        .map_err(|_| "无效的宽度参数".to_string())?;
+    let height = height
+        .parse::<u32>()
+        .map_err(|_| "无效的高度参数".to_string())?;
+
     let image = screen
-        .capture_area(
-            x.parse::<i32>().unwrap(),
-            y.parse::<i32>().unwrap(),
-            width.parse::<u32>().unwrap(),
-            height.parse::<u32>().unwrap(),
-        )
-        .unwrap();
-    let buffer = image.buffer();
+        .capture_area(x, y, width, height)
+        .map_err(|e| format!("截图失败: {}", e))?;
+
+    let buffer = image.as_raw();
     let base64_str = general_purpose::STANDARD_NO_PAD.encode(buffer);
-    base64_str
+    Ok(base64_str)
 }
 
 #[tauri::command]
-pub fn audio(filename: &str, handle: AppHandle) {
+pub fn audio(filename: &str, handle: AppHandle) -> Result<(), String> {
+    let path = "audio/".to_string() + filename;
+    let handle_clone = handle.clone();
+
+    thread::spawn(move || {
+        if let Err(e) = play_audio_internal(&path, &handle_clone) {
+            tracing::error!("Audio playback failed: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
+fn play_audio_internal(path: &str, handle: &AppHandle) -> Result<(), String> {
     use rodio::{Decoder, Source};
     use std::fs::File;
     use std::io::BufReader;
-    let path = "audio/".to_string() + filename;
-    thread::spawn(move || {
-        let audio_path = handle
-            .path()
-            .resolve(path, BaseDirectory::Resource)
-            .unwrap();
-        let audio = File::open(audio_path).unwrap();
-        let file = BufReader::new(audio);
-        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-        let source = Decoder::new(file).unwrap();
-        stream_handle.play_raw(source.convert_samples()).unwrap();
-        thread::sleep(Duration::from_millis(3000));
-    });
+
+    let audio_path = handle
+        .path()
+        .resolve(path, BaseDirectory::Resource)
+        .map_err(|e| format!("解析音频路径失败: {}", e))?;
+
+    let audio = File::open(audio_path).map_err(|e| format!("打开音频文件失败: {}", e))?;
+
+    let file = BufReader::new(audio);
+    let (_stream, stream_handle) =
+        rodio::OutputStream::try_default().map_err(|e| format!("创建音频输出流失败: {}", e))?;
+
+    let source = Decoder::new(file).map_err(|e| format!("解码音频文件失败: {}", e))?;
+
+    stream_handle
+        .play_raw(source.convert_samples())
+        .map_err(|e| format!("播放音频失败: {}", e))?;
+
+    thread::sleep(Duration::from_millis(3000));
+    Ok(())
 }
 
 #[tauri::command]
-pub fn set_height(height: u32, handle: AppHandle) {
-    let home_window = handle.get_webview_window("home").unwrap();
-    let sf = home_window.scale_factor().unwrap();
-    let out_size = home_window.inner_size().unwrap();
+pub fn set_height(height: u32, handle: AppHandle) -> Result<(), String> {
+    let home_window = handle
+        .get_webview_window("home")
+        .ok_or("未找到 home 窗口")?;
+
+    let sf = home_window
+        .scale_factor()
+        .map_err(|e| format!("获取窗口缩放因子失败: {}", e))?;
+
+    let out_size = home_window
+        .inner_size()
+        .map_err(|e| format!("获取窗口尺寸失败: {}", e))?;
+
     home_window
         .set_size(LogicalSize::new(
             out_size.to_logical(sf).width,
             cmp::max(out_size.to_logical(sf).height, height),
         ))
-        .unwrap();
+        .map_err(|e| format!("设置窗口高度失败: {}", e))?;
+
+    Ok(())
 }
 
-#[tauri::command]
-pub fn set_badge_count(count: Option<i64>, handle: AppHandle) -> Result<(), String> {
-    match handle.get_webview_window("home") {
-        Some(window) => {
-            window.set_badge_count(count).map_err(|e| e.to_string())?;
-            Ok(())
-        }
-        None => {
-            // 如果找不到 home 窗口，直接返回成功，不抛出错误
-            Ok(())
-        }
+/// 设置 macOS 交通灯按钮的可见性
+#[cfg(target_os = "macos")]
+fn set_traffic_lights_hidden(
+    ns_window: &NSWindow,
+    hidden: bool,
+    btn: objc2_app_kit::NSWindowButton,
+) {
+    if let Some(button) = ns_window.standardWindowButton(btn) {
+        button.setHidden(hidden);
     }
 }
 
 /// 隐藏Mac窗口的标题栏按钮（红绿灯按钮）和标题
+///
+/// # 参数
+/// * `window_label` - 窗口的标签名称
+/// * `hide_close_button` - 可选参数，是否隐藏关闭按钮，默认为false（不隐藏）
+/// * `handle` - Tauri应用句柄
+///
+/// # 返回
+/// * `Result<(), String>` - 成功返回Ok(()), 失败返回错误信息
+#[tauri::command]
+#[cfg(target_os = "macos")]
+pub fn hide_title_bar_buttons(
+    window_label: &str,
+    hide_close_button: Option<bool>,
+    handle: AppHandle,
+) -> Result<(), String> {
+    use objc2_app_kit::NSWindowButton;
+
+    let webview_window = get_webview_window(&handle, window_label)?;
+    let ns_window = get_nswindow_from_webview_window(&webview_window)?;
+
+    // 隐藏标题栏按钮的辅助函数
+    set_traffic_lights_hidden(&ns_window, true, NSWindowButton::MiniaturizeButton);
+    set_traffic_lights_hidden(&ns_window, true, NSWindowButton::ZoomButton);
+    // 根据参数决定是否隐藏关闭按钮
+    if hide_close_button.unwrap_or(false) {
+        set_traffic_lights_hidden(&ns_window, true, NSWindowButton::CloseButton);
+    }
+
+    // 设置窗口不可拖动
+    ns_window.setMovable(false);
+    Ok(())
+}
+
+/// 恢复Mac窗口的标题栏按钮显示
 ///
 /// # 参数
 /// * `window_label` - 窗口的标签名称
@@ -144,38 +231,18 @@ pub fn set_badge_count(count: Option<i64>, handle: AppHandle) -> Result<(), Stri
 /// * `Result<(), String>` - 成功返回Ok(()), 失败返回错误信息
 #[tauri::command]
 #[cfg(target_os = "macos")]
-pub fn hide_title_bar_buttons(window_label: &str, handle: AppHandle) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    #[allow(deprecated)]
-    {
-        use cocoa::appkit::NSWindowButton;
-        use cocoa::base::{id, NO, YES};
-        use objc::{msg_send, sel, sel_impl};
+pub fn show_title_bar_buttons(window_label: &str, handle: AppHandle) -> Result<(), String> {
+    use objc2_app_kit::NSWindowButton;
 
-        let ns_window = handle
-            .get_webview_window(window_label)
-            .unwrap()
-            .ns_window()
-            .unwrap() as id;
+    let webview_window = get_webview_window(&handle, window_label)?;
+    let ns_window = get_nswindow_from_webview_window(&webview_window)?;
 
-        unsafe {
-            // 隐藏标题栏按钮的辅助函数
-            let hide_button = |window: id, button_type: NSWindowButton| {
-                let btn = window.standardWindowButton_(button_type);
-                if !btn.is_null() {
-                    let _: () = msg_send![btn, setHidden: YES];
-                }
-            };
-
-            // 隐藏各种标题栏按钮
-            hide_button(ns_window, NSWindowButton::NSWindowFullScreenButton);
-            hide_button(ns_window, NSWindowButton::NSWindowMiniaturizeButton);
-            hide_button(ns_window, NSWindowButton::NSWindowZoomButton);
-
-            // 设置窗口不可拖动
-            let _: () = msg_send![ns_window, setMovable: NO];
-        }
-    }
+    // 显示所有标题栏按钮
+    set_traffic_lights_hidden(&ns_window, false, NSWindowButton::CloseButton);
+    set_traffic_lights_hidden(&ns_window, false, NSWindowButton::MiniaturizeButton);
+    set_traffic_lights_hidden(&ns_window, false, NSWindowButton::ZoomButton);
+    // 恢复窗口可拖动
+    ns_window.setMovable(false);
     Ok(())
 }
 
@@ -186,53 +253,29 @@ pub async fn push_window_payload(
     handle: AppHandle,
 ) -> Result<(), String> {
     let payload_entity = WindowPayload::new(payload);
-
-    let option_window = handle.get_webview_window(&label);
-
-    if let Some(window) = option_window {
-        // 找到了对应label的window说明已经打开了，就只需要提醒刷新就行了
-        let res = window.emit(&format!("{}:update", label), payload_entity);
-
-        if let Err(e) = res {
-            return Err(e.to_string());
-        }
-
-        return Ok(());
+    if let Some(window) = handle.get_webview_window(&label) {
+        window
+            // 找到了对应label的window说明已经打开了，就只需要提醒刷新就行了
+            .emit(&format!("{}:update", label), payload_entity)
+            .map_err(|e| e.to_string())
     } else {
-        let result = _push_window_payload(label, payload_entity).await;
-
-        // 这里是存在值的时候才算失败，不存在值则是插入成功
-        if let Some(_) = result {
-            Err("none".to_string())
-        } else {
-            Ok(())
-        }
+        _push_window_payload(label, payload_entity)
+            .await
+            // 这里是存在值的时候才算失败，不存在值则是插入成功
+            .map_or_else(|| Ok(()), |_| Err("none".to_string()))
     }
 }
 
 #[tauri::command]
 pub async fn get_window_payload(label: String) -> Result<serde_json::Value, ()> {
-    let result = _get_window_payload(label).await;
-    if let Some(payload_entity) = result {
-        Ok(payload_entity.payload)
-    } else {
-        Err(())
-    }
+    _get_window_payload(label)
+        .await
+        .map(|payload_entity| payload_entity.payload)
+        .ok_or(())
 }
-
-#[derive(Serialize)]
-pub struct FileMeta {
-    name: String,
-    path: String,
-    file_type: String,
-    mime_type: String,
-    exists: bool,
-}
-
-type FilePath = String;
 
 #[tauri::command]
-pub async fn get_files_meta(files_path: Vec<FilePath>) -> Result<Vec<FileMeta>, String> {
+pub async fn get_files_meta(files_path: Vec<String>) -> Result<Vec<FileMeta>, String> {
     let mut files_meta: Vec<FileMeta> = Vec::new();
 
     for path in files_path {
@@ -272,4 +315,126 @@ pub async fn get_files_meta(files_path: Vec<FilePath>) -> Result<Vec<FileMeta>, 
     }
 
     Ok(files_meta)
+}
+
+#[tauri::command]
+pub fn set_badge_count(count: Option<i64>, handle: AppHandle) -> Result<(), String> {
+    // 如果找不到 home 窗口，直接返回成功，不抛出错误
+    if let Some(window) = handle.get_webview_window("home") {
+        window.set_badge_count(count).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// 设置 macOS 窗口级别为屏幕保护程序级别，以覆盖菜单栏
+#[tauri::command]
+#[cfg(target_os = "macos")]
+pub fn set_window_level_above_menubar(window_label: &str, handle: AppHandle) -> Result<(), String> {
+    let webview_window = get_webview_window(&handle, window_label)?;
+    let ns_window = get_nswindow_from_webview_window(&webview_window)?;
+
+    // 设置窗口级别为屏幕保护程序级别 (1000)，高于菜单栏
+    ns_window.setLevel(objc2_app_kit::NSScreenSaverWindowLevel);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn get_webview_window(handle: &AppHandle, window_label: &str) -> Result<WebviewWindow, String> {
+    handle
+        .get_webview_window(window_label)
+        .ok_or_else(|| format!("Window '{}' not found", window_label))
+}
+
+#[cfg(target_os = "macos")]
+fn get_nswindow_from_webview_window(
+    webview_window: &WebviewWindow,
+) -> Result<Retained<NSWindow>, String> {
+    webview_window
+        .ns_window()
+        .map_err(|e| format!("Failed to get NSWindow: {}", e))
+        .map(|ptr| unsafe { Retained::retain(ptr as *mut NSWindow) })?
+        .ok_or_else(|| "Failed to retain NSWindow".to_string())
+}
+
+/// 获取Windows系统和文本缩放信息
+#[tauri::command]
+#[cfg(target_os = "windows")]
+pub fn get_windows_scale_info() -> Result<WindowsScaleInfo, String> {
+    use windows::Win32::UI::HiDpi::GetDpiForSystem;
+
+    unsafe {
+        // 获取系统DPI
+        let system_dpi = GetDpiForSystem();
+        let standard_dpi = 96.0; // Windows标准DPI
+        let system_scale = system_dpi as f64 / standard_dpi;
+
+        // 从注册表读取文本缩放设置
+        let text_scale = get_text_scale_from_registry().unwrap_or(1.0);
+
+        // 检测是否存在文本缩放 (容差为1%)
+        let has_text_scaling = (text_scale - 1.0).abs() > 0.01;
+
+        Ok(WindowsScaleInfo {
+            system_dpi,
+            system_scale,
+            text_scale,
+            has_text_scaling,
+        })
+    }
+}
+
+/// 从Windows注册表读取文本缩放设置
+#[cfg(target_os = "windows")]
+unsafe fn get_text_scale_from_registry() -> Result<f64, String> {
+    use windows::Win32::System::Registry::{RegOpenKeyExW, RegQueryValueExW, RegCloseKey, HKEY_CURRENT_USER, KEY_READ, REG_DWORD, HKEY};
+    use windows::core::w;
+
+    // 尝试多个可能的注册表位置
+    let registry_paths = [
+        w!("Control Panel\\Desktop\\WindowMetrics"),
+        w!("Software\\Microsoft\\Accessibility"),
+        w!("Control Panel\\Desktop"),
+    ];
+
+    let value_names = [
+        w!("TextScaleFactor"),
+        w!("TextScaleFactor"),
+        w!("LogPixels"),
+    ];
+
+    for (i, &subkey) in registry_paths.iter().enumerate() {
+        let mut hkey: HKEY = HKEY::default();
+        let result = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, subkey, 0, KEY_READ, &mut hkey) };
+
+        if result.is_ok() {
+            let value_name = value_names[i];
+            let mut data: u32 = 0;
+            let mut data_size = std::mem::size_of::<u32>() as u32;
+            let mut value_type = REG_DWORD;
+
+            let result = unsafe {
+                RegQueryValueExW(
+                    hkey,
+                    value_name,
+                    None,
+                    Some(&mut value_type),
+                    Some(&mut data as *mut u32 as *mut u8),
+                    Some(&mut data_size),
+                )
+            };
+
+            let _ = unsafe { RegCloseKey(hkey) };
+
+            if result.is_ok() && value_type == REG_DWORD && data > 0 {
+
+                if i == 2 { // LogPixels 是DPI值，需要特殊处理
+                    return Ok(1.0); // LogPixels不是文本缩放，返回默认值
+                } else {
+                    // TextScaleFactor 是百分比值 (100 = 100%, 150 = 150%)
+                    return Ok(data as f64 / 100.0);
+                }
+            }
+        }
+    }
+    Ok(1.0)
 }

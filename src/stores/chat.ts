@@ -1,23 +1,25 @@
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { info } from '@tauri-apps/plugin-log'
+import { sendNotification } from '@tauri-apps/plugin-notification'
 import { defineStore } from 'pinia'
 import { useRoute } from 'vue-router'
-import apis from '@/services/apis'
+import { ErrorType } from '@/common/exception'
+import { type MessageStatusEnum, MsgEnum, NotificationTypeEnum, RoomTypeEnum, StoresEnum, TauriCommand } from '@/enums'
 import type { MarkItemType, MessageType, RevokedMsgType, SessionItem } from '@/services/types'
-import { MessageStatusEnum, MsgEnum, NotificationTypeEnum, RoomTypeEnum, StoresEnum } from '@/enums'
-import { computedTimeBlock } from '@/utils/ComputedTime.ts'
-import { useCachedStore } from '@/stores/cached.ts'
+import { useContactStore } from '@/stores/contacts.ts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useGroupStore } from '@/stores/group.ts'
-import { useContactStore } from '@/stores/contacts.ts'
-import { cloneDeep } from 'lodash-es'
 import { useUserStore } from '@/stores/user.ts'
+import { getSessionDetail } from '@/utils/ImRequestUtils'
+import { isMac } from '@/utils/PlatformConstants'
 import { renderReplyContent } from '@/utils/RenderReplyContent.ts'
-import { sendNotification } from '@tauri-apps/plugin-notification'
-import { invoke } from '@tauri-apps/api/core'
+import { invokeWithErrorHandler } from '@/utils/TauriInvokeHandler'
 
 type RecalledMessage = {
   messageId: string
   content: string
   recallTime: number
+  originalType: MsgEnum
 }
 
 // 定义每页加载的消息数量
@@ -45,7 +47,7 @@ export const useChatStore = defineStore(
   StoresEnum.CHAT,
   () => {
     const route = useRoute()
-    const cachedStore = useCachedStore()
+    // const router = useRouter()
     const userStore = useUserStore()
     const globalStore = useGlobalStore()
     const groupStore = useGroupStore()
@@ -56,19 +58,13 @@ export const useChatStore = defineStore(
     // 会话列表的加载状态
     const sessionOptions = reactive({ isLast: false, isLoading: false, cursor: '' })
 
-    // 当前房间ID和类型的计算属性
-    const currentRoomId = computed(() => globalStore.currentSession?.roomId)
-    const currentRoomType = computed(() => globalStore.currentSession?.type)
-
     // 存储所有消息的Map
-    const messageMap = reactive<Map<string, Map<string, MessageType>>>(new Map([[currentRoomId.value, new Map()]]))
+    const messageMap = reactive<Map<string, Map<string, MessageType>>>(new Map())
     // 消息加载状态
-    const messageOptions = reactive<Map<string, { isLast: boolean; isLoading: boolean; cursor: string }>>(
-      new Map([[currentRoomId.value, { isLast: false, isLoading: false, cursor: '' }]])
-    )
+    const messageOptions = reactive<Map<string, { isLast: boolean; isLoading: boolean; cursor: string }>>(new Map())
 
     // 回复消息的映射关系
-    const replyMapping = reactive<Map<string, Map<string, string[]>>>(new Map([[currentRoomId.value, new Map()]]))
+    const replyMapping = reactive<Map<string, Map<string, string[]>>>(new Map())
     // 存储撤回的消息内容和时间
     const recalledMessages = reactive<Map<string, RecalledMessage>>(new Map())
     // 存储每条撤回消息的过期定时器
@@ -77,254 +73,236 @@ export const useChatStore = defineStore(
     // 当前聊天室的消息Map计算属性
     const currentMessageMap = computed({
       get: () => {
-        const current = messageMap.get(currentRoomId.value)
+        const current = messageMap.get(globalStore.currentSession!.roomId)
         if (current === undefined) {
-          messageMap.set(currentRoomId.value, new Map())
+          messageMap.set(globalStore.currentSession!.roomId, new Map())
         }
-        return messageMap.get(currentRoomId.value)
+        return messageMap.get(globalStore.currentSession!.roomId)
       },
       set: (val) => {
-        messageMap.set(currentRoomId.value, val as Map<string, MessageType>)
+        messageMap.set(globalStore.currentSession!.roomId, val as Map<string, MessageType>)
       }
     })
 
     // 当前聊天室的消息加载状态计算属性
     const currentMessageOptions = computed({
       get: () => {
-        const current = messageOptions.get(currentRoomId.value)
+        const current = messageOptions.get(globalStore.currentSession!.roomId)
         if (current === undefined) {
-          messageOptions.set(currentRoomId.value, { isLast: false, isLoading: true, cursor: '' })
+          messageOptions.set(globalStore.currentSession!.roomId, { isLast: false, isLoading: true, cursor: '' })
         }
-        return messageOptions.get(currentRoomId.value)
+        return messageOptions.get(globalStore.currentSession!.roomId)
       },
       set: (val) => {
-        messageOptions.set(currentRoomId.value, val as { isLast: boolean; isLoading: boolean; cursor: string })
+        messageOptions.set(
+          globalStore.currentSession!.roomId,
+          val as { isLast: boolean; isLoading: boolean; cursor: string }
+        )
       }
     })
 
     // 当前聊天室的回复消息映射计算属性
     const currentReplyMap = computed({
       get: () => {
-        const current = replyMapping.get(currentRoomId.value)
+        const current = replyMapping.get(globalStore.currentSession!.roomId)
         if (current === undefined) {
-          replyMapping.set(currentRoomId.value, new Map())
+          replyMapping.set(globalStore.currentSession!.roomId, new Map())
         }
-        return replyMapping.get(currentRoomId.value)
+        return replyMapping.get(globalStore.currentSession!.roomId)
       },
       set: (val) => {
-        replyMapping.set(currentRoomId.value, val as Map<string, string[]>)
+        replyMapping.set(globalStore.currentSession!.roomId, val as Map<string, string[]>)
       }
     })
 
     // 判断当前是否为群聊
-    const isGroup = computed(() => currentRoomType.value === RoomTypeEnum.GROUP)
+    const isGroup = computed(() => globalStore.currentSession?.type === RoomTypeEnum.GROUP)
 
     // 获取当前会话信息的计算属性
     const currentSessionInfo = computed(() =>
-      sessionList.value.find((session) => session.roomId === globalStore.currentSession.roomId)
+      sessionList.value.find((session) => session.roomId === globalStore.currentSession?.roomId)
     )
 
     // 新消息计数相关的响应式数据
-    const newMsgCount = reactive<Map<string, { count: number; isStart: boolean }>>(
-      new Map([
-        [
-          currentRoomId.value,
-          {
-            count: 0,
-            isStart: false
-          }
-        ]
-      ])
-    )
+    const newMsgCount = reactive<Map<string, { count: number; isStart: boolean }>>(new Map())
 
     // 当前聊天室的新消息计数计算属性
     const currentNewMsgCount = computed({
       get: () => {
-        const current = newMsgCount.get(currentRoomId.value)
+        const current = newMsgCount.get(globalStore.currentSession!.roomId)
         if (current === undefined) {
-          newMsgCount.set(currentRoomId.value, { count: 0, isStart: false })
+          newMsgCount.set(globalStore.currentSession!.roomId, { count: 0, isStart: false })
         }
-        return newMsgCount.get(currentRoomId.value)
+        return newMsgCount.get(globalStore.currentSession!.roomId)
       },
       set: (val) => {
-        newMsgCount.set(currentRoomId.value, val as { count: number; isStart: boolean })
+        newMsgCount.set(globalStore.currentSession!.roomId, val as { count: number; isStart: boolean })
       }
     })
 
-    // 监听当前房间ID的变化
-    watch(currentRoomId, (val, oldVal) => {
-      if (oldVal !== undefined && val !== oldVal) {
-        // 1. 立即清空当前消息列表
-        if (currentMessageMap.value) {
-          currentMessageMap.value.clear()
-        }
+    const changeRoom = async () => {
+      const currentWindowLabel = WebviewWindow.getCurrent()
+      if (currentWindowLabel.label !== 'home' && currentWindowLabel.label !== 'mobile-home') {
+        return
+      }
 
-        // 2. 重置消息加载状态
+      currentMessageOptions.value = {
+        isLast: false,
+        isLoading: true,
+        cursor: ''
+      }
+
+      // 3. 清空回复映射
+      if (currentReplyMap.value) {
+        currentReplyMap.value.clear()
+      }
+
+      try {
+        // 从服务器加载消息
+        await getMsgList(pageSize)
+      } catch (error) {
+        console.error('无法加载消息:', error)
         currentMessageOptions.value = {
           isLast: false,
-          isLoading: true,
+          isLoading: false,
           cursor: ''
         }
+      }
 
-        // 3. 清空回复映射
-        if (currentReplyMap.value) {
-          currentReplyMap.value.clear()
-        }
-
-        // 4. 尝试从服务器加载新房间的消息
-        nextTick(async () => {
-          try {
-            // 从服务器加载消息
-            await getMsgList()
-          } catch (error) {
-            console.error('无法加载消息:', error)
-            currentMessageOptions.value = {
-              isLast: false,
-              isLoading: false,
-              cursor: ''
-            }
-          }
-        })
-
-        // 群组的时候去请求
-        if (currentRoomType.value === RoomTypeEnum.GROUP) {
-          // 放到和公告一起加载
-          // groupStore.getGroupUserList(true)
-          cachedStore.getGroupAtUserBaseInfo()
-        }
-
-        // 标记当前会话已读
-        if (val) {
-          const session = sessionList.value.find((s) => s.roomId === val)
-          if (session?.unreadCount) {
-            markSessionRead(val)
-            updateTotalUnreadCount()
-          }
-        }
+      // 标记当前会话已读
+      const session = sessionList.value.find((s) => s.roomId === globalStore.currentSession!.roomId)
+      if (session?.unreadCount) {
+        markSessionRead(globalStore.currentSession!.roomId)
+        updateTotalUnreadCount()
       }
 
       // 重置当前回复的消息
       currentMsgReply.value = {}
-    })
+    }
 
     // 当前消息回复
     const currentMsgReply = ref<Partial<MessageType>>({})
 
     // 将消息列表转换为数组
-    const chatMessageList = computed(() => [...(currentMessageMap.value?.values() || [])])
+    const chatMessageList = computed(() => {
+      return currentMessageMap.value
+        ? [...currentMessageMap.value.values()].sort((a, b) => Number(a.message.id) - Number(b.message.id))
+        : []
+    })
+
+    const chatMessageListByRoomId = computed(() => (roomId: string) => {
+      return messageMap.get(roomId)
+        ? [...messageMap.get(roomId)!.values()].sort((a, b) => Number(a.message.id) - Number(b.message.id))
+        : []
+    })
+
+    // 登录之后，加载一次所有会话的消息
+    const setAllSessionMsgList = async (size = pageSize) => {
+      await info('初始设置所有会话消息列表')
+      for (const session of sessionList.value) {
+        getPageMsg(size, session.roomId, '')
+      }
+    }
 
     // 获取消息列表
     const getMsgList = async (size = pageSize) => {
+      await info('获取消息列表')
       // 获取当前房间ID，用于后续比较
-      const requestRoomId = currentRoomId.value
+      const requestRoomId = globalStore.currentSession!.roomId
 
       currentMessageOptions.value && (currentMessageOptions.value.isLoading = true)
-      const data = await apis
-        .getMsgList({
-          pageSize: size,
-          cursor: currentMessageOptions.value?.cursor,
-          roomId: requestRoomId
-        })
-        .finally(() => {
-          // 只有当当前房间ID仍然是请求时的房间ID时，才更新加载状态
-          if (requestRoomId === currentRoomId.value && currentMessageOptions.value) {
-            currentMessageOptions.value.isLoading = false
+      await getPageMsg(size, requestRoomId, currentMessageOptions.value?.cursor)
+    }
+
+    const getPageMsg = async (pageSize: number, roomId: string, cursor: string = '') => {
+      // 查询本地存储，获取消息数据
+      const data: any = await invokeWithErrorHandler(
+        TauriCommand.PAGE_MSG,
+        {
+          param: {
+            pageSize: pageSize,
+            cursor: cursor,
+            roomId: roomId
           }
-        })
-
-      // 如果没有数据或者房间ID已经变化，则不处理响应
-      if (!data || requestRoomId !== currentRoomId.value) return
-
-      const computedList = computedTimeBlock(data.list)
-
-      /** 收集需要请求用户详情的 uid */
-      const uidCollectYet: Set<string> = new Set() // 去重用
-      for (const msg of computedList) {
-        const replyItem = msg.message.body?.reply
-        if (replyItem?.id) {
-          const messageIds = currentReplyMap.value?.get(replyItem.id) || []
-          messageIds.push(msg.message.id)
-          currentReplyMap.value?.set(replyItem.id, messageIds)
-
-          // 查询被回复用户的信息，被回复的用户信息里暂时无 uid
-          // collectUidItem(replyItem.uid)
+        },
+        {
+          customErrorMessage: '获取消息列表失败',
+          errorType: ErrorType.Network
         }
-        // 查询消息发送者的信息
-        uidCollectYet.add(msg.fromUser.uid)
-      }
-      // 获取用户信息缓存
-      await cachedStore.getBatchUserInfo([...uidCollectYet])
+      )
 
-      // 再次检查房间ID是否变化，防止在获取用户信息期间切换了房间
-      if (requestRoomId !== currentRoomId.value) return
+      // 更新 messageOptions
+      messageOptions.set(roomId, {
+        isLast: data.isLast,
+        isLoading: false,
+        cursor: data.cursor
+      })
 
-      // 为保证获取的历史消息在前面
-      const newList = [...computedList, ...chatMessageList.value]
-      currentMessageMap.value?.clear() // 清空Map
-      for (const msg of newList) {
-        currentMessageMap.value?.set(msg.message.id, msg)
+      let map = messageMap.get(roomId)
+      if (!map) {
+        map = new Map<string, MessageType>()
       }
-
-      if (currentMessageOptions.value) {
-        currentMessageOptions.value.cursor = data.cursor
-        currentMessageOptions.value.isLast = data.isLast
-        currentMessageOptions.value.isLoading = false
+      for (const msg of data.list) {
+        map.set(msg.message.id, msg)
       }
+      // 设置消息
+      messageMap.set(roomId, map)
     }
 
     // 获取会话列表
     const getSessionList = async (isFresh = false) => {
-      if (!isFresh && (sessionOptions.isLast || sessionOptions.isLoading)) return
-      sessionOptions.isLoading = true
-      // TODO: 这里先请求100条会话列表，后续优化
-      const response = await apis
-        .getSessionList({
-          pageSize: sessionList.value.length > 100 ? sessionList.value.length : 100,
-          cursor: isFresh || !sessionOptions.cursor ? '' : sessionOptions.cursor
-        })
-        .catch(() => {
+      try {
+        if (sessionOptions.isLoading) return
+        sessionOptions.isLoading = true
+        console.log('获取会话列表')
+        const response: any = await invokeWithErrorHandler(TauriCommand.LIST_CONTACTS, undefined, {
+          customErrorMessage: '获取会话列表失败',
+          errorType: ErrorType.Network
+        }).catch(() => {
           sessionOptions.isLoading = false
+          return null
         })
-      if (!response) return
-      const data = response
-      if (!data) {
-        return
-      }
-
-      // 保存当前选中的会话ID
-      const currentSelectedRoomId = globalStore.currentSession.roomId
-
-      sessionList.value = []
-      sessionList.value.push(...data.list)
-
-      sessionOptions.cursor = data.cursor
-      sessionOptions.isLast = data.isLast
-      sessionOptions.isLoading = false
-
-      sortAndUniqueSessionList()
-
-      // sessionList[0].unreadCount = 0
-      if (!isFirstInit || isFresh) {
-        isFirstInit = true
-        // 只有在没有当前选中会话时，才设置第一个会话为当前会话
-        if (!currentSelectedRoomId || currentSelectedRoomId === '1') {
-          globalStore.currentSession.roomId = data.list[0].roomId
-          globalStore.currentSession.type = data.list[0].type
+        if (!response) return
+        const data = response
+        if (!data) {
+          return
         }
 
-        // 用会话列表第一个去请求消息列表
-        await getMsgList()
-        // 请求第一个群成员列表
-        currentRoomType.value === RoomTypeEnum.GROUP && (await groupStore.getGroupUserList(true))
-        // 初始化所有用户基本信息
-        userStore.isSign && (await cachedStore.initAllUserBaseInfo())
-        // 联系人列表
-        await contactStore.getContactList(true)
+        sessionList.value = []
+        sessionList.value.push(...data)
+        sessionOptions.isLoading = false
 
-        // 确保在会话列表加载完成后更新总未读数
-        await nextTick(() => {
-          updateTotalUnreadCount()
-        })
+        sortAndUniqueSessionList()
+
+        // 保存当前选中的会话ID
+        const currentSelectedRoomId = globalStore.currentSession?.roomId
+
+        // sessionList[0].unreadCount = 0
+        if (!isFirstInit || isFresh) {
+          isFirstInit = true
+          // 只有在没有当前选中会话时，才设置第一个会话为当前会话
+          if (!currentSelectedRoomId || currentSelectedRoomId === '1') {
+            globalStore.updateCurrentSessionRoomId(data[0].roomId)
+          }
+
+          // 用会话列表第一个去请求消息列表
+          await getMsgList()
+          // 请求第一个群成员列表
+          globalStore.currentSession?.type === RoomTypeEnum.GROUP &&
+            (await groupStore.getGroupUserList(globalStore.currentSession!.roomId))
+          // 联系人列表
+          await contactStore.getContactList(true)
+
+          // 确保在会话列表加载完成后更新总未读数
+          await nextTick(() => {
+            updateTotalUnreadCount()
+          })
+        }
+      } catch (e) {
+        console.error('获取会话列表失败11:', e)
+        sessionOptions.isLoading = false
+      } finally {
+        sessionOptions.isLoading = false
       }
     }
 
@@ -351,16 +329,20 @@ export const useChatStore = defineStore(
       }
     }
 
-    // 更新会话最后活跃时间
-    const updateSessionLastActiveTime = (roomId: string, room?: SessionItem) => {
+    // 更新会话最后活跃时间, 只要更新的过程中会话不存在，那么将会话刷新出来
+    const updateSessionLastActiveTime = (roomId: string) => {
       const session = sessionList.value.find((item) => item.roomId === roomId)
       if (session) {
         Object.assign(session, { activeTime: Date.now() })
-      } else if (room) {
-        const newItem = cloneDeep(room)
-        newItem.activeTime = Date.now()
-        sessionList.value.unshift(newItem)
+      } else {
+        addSession(roomId)
       }
+      return session
+    }
+
+    const addSession = async (roomId: string) => {
+      const resp = await getSessionDetail({ id: roomId })
+      sessionList.value.unshift(resp)
       sortAndUniqueSessionList()
     }
 
@@ -386,24 +368,17 @@ export const useChatStore = defineStore(
 
       // 获取用户信息缓存
       const uid = msg.fromUser.uid
-      const cacheUser = cachedStore.userCachedList[uid]
-      await cachedStore.getBatchUserInfo([uid])
-
-      // 发完消息就要刷新会话列表
-      let detailResponse = undefined
-      if (!current) {
-        detailResponse = await apis.sessionDetail({ id: msg.message.roomId })
-      }
+      const cacheUser = groupStore.getUserInfo(uid)
 
       // 更新会话的文本属性和未读数
-      const session = sessionList.value.find((item) => item.roomId === msg.message.roomId)
+      const session = updateSessionLastActiveTime(msg.message.roomId)
       if (session) {
-        const lastMsgUserName = cachedStore.userCachedList[uid]?.name
+        const lastMsgUserName = cacheUser?.name
         const formattedText =
           msg.message.type === MsgEnum.RECALL
             ? session.type === RoomTypeEnum.GROUP
               ? `${lastMsgUserName}:撤回了一条消息`
-              : msg.fromUser.uid === userStore.userInfo.uid
+              : msg.fromUser.uid === userStore.userInfo!.uid
                 ? '你撤回了一条消息'
                 : '对方撤回了一条消息'
             : renderReplyContent(
@@ -414,8 +389,11 @@ export const useChatStore = defineStore(
               )
         session.text = formattedText!
         // 更新未读数
-        if (msg.fromUser.uid !== userStore.userInfo.uid) {
-          if (route?.path !== '/message' || msg.message.roomId !== currentRoomId.value) {
+        if (msg.fromUser.uid !== userStore.userInfo!.uid) {
+          if (
+            (route?.path !== '/message' && route?.path !== '/mobile/message') ||
+            msg.message.roomId !== globalStore.currentSession!.roomId
+          ) {
             session.unreadCount = (session.unreadCount || 0) + 1
             await nextTick(() => {
               updateTotalUnreadCount()
@@ -424,21 +402,14 @@ export const useChatStore = defineStore(
         }
       }
 
-      updateSessionLastActiveTime(msg.message.roomId, detailResponse)
-
       // 如果收到的消息里面是艾特自己的就发送系统通知
-      if (msg.message.body.atUidList?.includes(userStore.userInfo.uid) && cacheUser) {
+      if (msg.message.body.atUidList?.includes(userStore.userInfo!.uid) && cacheUser) {
         sendNotification({
           title: cacheUser.name as string,
           body: msg.message.body.content,
           icon: cacheUser.avatar as string
         })
       }
-
-      // if (currentNewMsgCount.value) {
-      //   currentNewMsgCount.value.count++
-      //   return
-      // }
     }
 
     // 过滤掉拉黑用户的发言
@@ -467,13 +438,31 @@ export const useChatStore = defineStore(
     const getMsgIndex = (msgId: string) => {
       if (!msgId) return -1
       const keys = currentMessageMap.value ? Array.from(currentMessageMap.value.keys()) : []
-      return keys.findIndex((key) => key === msgId)
+      return keys.indexOf(msgId)
     }
 
     // 更新所有标记类型的数量
-    const updateMarkCount = (markList: MarkItemType[]) => {
+    const updateMarkCount = async (markList: MarkItemType[]) => {
+      info('保存消息标记到本地数据库')
       for (const mark of markList) {
         const { msgId, markType, markCount, actType, uid } = mark
+
+        await invokeWithErrorHandler(
+          TauriCommand.SAVE_MESSAGE_MARK,
+          {
+            data: {
+              msgId: msgId.toString(),
+              markType,
+              markCount,
+              actType,
+              uid: uid.toString()
+            }
+          },
+          {
+            customErrorMessage: '保存消息标记',
+            errorType: ErrorType.Client
+          }
+        )
 
         const msgItem = currentMessageMap.value?.get(String(msgId))
         if (msgItem && msgItem.message.messageMarks) {
@@ -488,7 +477,7 @@ export const useChatStore = defineStore(
           if (actType === 1) {
             // 添加标记
             // 如果是当前用户的操作，设置userMarked为true
-            if (String(uid) === userStore.userInfo.uid) {
+            if (uid === userStore.userInfo!.uid) {
               currentMarkStat.userMarked = true
             }
             // 更新计数
@@ -496,7 +485,7 @@ export const useChatStore = defineStore(
           } else if (actType === 2) {
             // 取消标记
             // 如果是当前用户的操作，设置userMarked为false
-            if (String(uid) === userStore.userInfo.uid) {
+            if (uid === userStore.userInfo!.uid) {
               currentMarkStat.userMarked = false
             }
             // 更新计数
@@ -509,41 +498,69 @@ export const useChatStore = defineStore(
       }
     }
 
-    // 更新消息撤回状态 TODO: 撤回消息消息计数没有改变
-    const updateRecallStatus = (data: RevokedMsgType) => {
-      const { msgId } = data
-      const message = currentMessageMap.value?.get(msgId)
-      if (message && typeof data.recallUid === 'string') {
-        // 存储撤回的消息内容和时间
-        const recallTime = Date.now()
-        recalledMessages.set(msgId, {
-          messageId: msgId,
-          content: message.message.body.content,
-          recallTime
+    const recordRecallMsg = (data: { recallUid: string; msg: MessageType }) => {
+      // 存储撤回的消息内容和时间
+      const recallTime = Date.now()
+      recalledMessages.set(data.msg.message.id, {
+        messageId: data.msg.message.id,
+        content: data.msg.message.body.content,
+        recallTime,
+        originalType: data.msg.message.type
+      })
+
+      if (data.recallUid === userStore.userInfo!.uid) {
+        // 使用 Worker 来处理定时器
+        timerWorker.postMessage({
+          type: 'startTimer',
+          msgId: data.msg.message.id,
+          duration: RECALL_EXPIRATION_TIME
         })
+      }
 
-        if (message.fromUser.uid === userStore.userInfo.uid) {
-          // 使用 Worker 来处理定时器
-          timerWorker.postMessage({
-            type: 'startTimer',
-            msgId,
-            duration: RECALL_EXPIRATION_TIME
-          })
-        }
+      // 记录这个消息ID已经有了定时器
+      expirationTimers.set(data.msg.message.id, true)
+    }
 
-        // 记录这个消息ID已经有了定时器
-        expirationTimers.set(msgId, true)
+    // 更新消息撤回状态
+    const updateRecallMsg = async (data: RevokedMsgType) => {
+      const { msgId } = data
+      const message = currentMessageMap.value!.get(msgId)
+      if (message && typeof data.recallUid === 'string') {
+        const cacheUser = groupStore.getUserInfo(data.recallUid)!
+        let recallMessageBody: string
 
-        message.message.type = MsgEnum.RECALL
-        const cacheUser = cachedStore.userCachedList[data.recallUid]
         // 如果撤回者的 id 不等于消息发送人的 id, 或者你本人就是管理员，那么显示管理员撤回的。
-        if (data.recallUid !== message.fromUser.uid) {
-          message.message.body = `管理员"${cacheUser.name}"撤回了一条消息` // 后期根据本地用户数据修改
+        if (data.recallUid !== userStore.userInfo!.uid) {
+          recallMessageBody = `管理员"${cacheUser.name}"撤回了一条消息` // 后期根据本地用户数据修改
         } else {
           // 如果被撤回的消息是消息发送者撤回，正常显示
-          message.message.body = `"${cacheUser.name}"撤回了一条消息` // 后期根据本地用户数据修改
+          recallMessageBody = `"${cacheUser.name}"撤回了一条消息` // 后期根据本地用户数据修改
+        }
+
+        // 更新前端缓存
+        message.message.type = MsgEnum.RECALL
+        message.message.body = recallMessageBody
+
+        // 同步更新 SQLite 数据库
+        try {
+          await invokeWithErrorHandler(
+            TauriCommand.UPDATE_MESSAGE_RECALL_STATUS,
+            {
+              messageId: message.message.id,
+              messageType: MsgEnum.RECALL,
+              messageBody: recallMessageBody
+            },
+            {
+              customErrorMessage: '更新撤回消息状态失败',
+              errorType: ErrorType.Client
+            }
+          )
+          info(`✅ [RECALL] Successfully updated message recall status in database, message_id: ${msgId}`)
+        } catch (error) {
+          console.error(`❌ [RECALL] Failed to update message recall status in database:`, error)
         }
       }
+
       // 更新与这条撤回消息有关的消息
       const messageList = currentReplyMap.value?.get(msgId)
       if (messageList) {
@@ -603,7 +620,7 @@ export const useChatStore = defineStore(
           const updatedMsg = { ...msg, uploadProgress }
           currentMessageMap.value?.set(msg.message.id, updatedMsg)
           // 强制触发响应式更新
-          messageMap.set(currentRoomId.value, new Map(currentMessageMap.value))
+          messageMap.set(globalStore.currentSession!.roomId, new Map(currentMessageMap.value))
         } else {
           currentMessageMap.value?.set(msg.message.id, msg)
         }
@@ -631,7 +648,7 @@ export const useChatStore = defineStore(
     }
 
     // 删除会话
-    const removeContact = (roomId: string) => {
+    const removeSession = (roomId: string) => {
       const index = sessionList.value.findIndex((session) => session.roomId === roomId)
       if (index !== -1) {
         sessionList.value.splice(index, 1)
@@ -676,7 +693,12 @@ export const useChatStore = defineStore(
     }
 
     // 更新未读消息计数
-    const updateTotalUnreadCount = () => {
+    const updateTotalUnreadCount = async () => {
+      const webviewWindowLabel = WebviewWindow.getCurrent()
+      if (webviewWindowLabel.label !== 'home' && webviewWindowLabel.label !== 'mobile-home') {
+        return
+      }
+      info('[chat]更新全局未读消息计数')
       // 使用 Array.from 确保遍历的是最新的 sessionList
       const totalUnread = Array.from(sessionList.value).reduce((total, session) => {
         // 免打扰的会话不计入全局未读数
@@ -691,7 +713,10 @@ export const useChatStore = defineStore(
       // 更新全局 store 中的未读计数
       globalStore.unReadMark.newMsgUnreadCount = totalUnread
       // 更新系统托盘图标上的未读数
-      invoke('set_badge_count', { count: totalUnread > 0 ? totalUnread : null })
+      if (isMac()) {
+        const count = totalUnread > 0 ? totalUnread : undefined
+        await invokeWithErrorHandler('set_badge_count', { count })
+      }
     }
 
     // 清空所有会话的未读数
@@ -705,10 +730,10 @@ export const useChatStore = defineStore(
 
     // 重置当前聊天室的消息并刷新最新消息
     const resetAndRefreshCurrentRoomMessages = async () => {
-      if (!currentRoomId.value) return
+      if (!globalStore.currentSession!.roomId) return
 
       // 保存当前房间ID，用于后续比较
-      const requestRoomId = currentRoomId.value
+      const requestRoomId = globalStore.currentSession!.roomId
 
       try {
         // 1. 清空当前消息列表
@@ -737,7 +762,7 @@ export const useChatStore = defineStore(
       } catch (error) {
         console.error('[Network] 重置并刷新消息列表失败:', error)
         // 如果获取失败，确保重置加载状态
-        if (currentRoomId.value === requestRoomId && currentMessageOptions.value) {
+        if (globalStore.currentSession!.roomId === requestRoomId && currentMessageOptions.value) {
           currentMessageOptions.value = {
             isLast: false,
             isLoading: false,
@@ -747,6 +772,11 @@ export const useChatStore = defineStore(
       }
     }
 
+    // 获取所有群组类型的会话
+    const getGroupSessions = () => {
+      return sessionList.value.filter((session) => session.type === RoomTypeEnum.GROUP)
+    }
+
     return {
       getMsgIndex,
       chatMessageList,
@@ -754,7 +784,8 @@ export const useChatStore = defineStore(
       deleteMsg,
       clearNewMsgCount,
       updateMarkCount,
-      updateRecallStatus,
+      updateRecallMsg,
+      recordRecallMsg,
       updateMsg,
       newMsgCount,
       messageMap,
@@ -775,13 +806,18 @@ export const useChatStore = defineStore(
       isGroup,
       currentSessionInfo,
       getMessage,
-      removeContact,
       getRecalledMessage,
       recalledMessages,
       clearAllExpirationTimers,
       updateTotalUnreadCount,
       clearUnreadCount,
-      resetAndRefreshCurrentRoomMessages
+      resetAndRefreshCurrentRoomMessages,
+      getGroupSessions,
+      removeSession,
+      changeRoom,
+      addSession,
+      setAllSessionMsgList,
+      chatMessageListByRoomId
     }
   },
   {

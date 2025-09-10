@@ -51,8 +51,8 @@
             round
             style="border: 2px solid #f1f1f1"
             :size="120"
-            :src="AvatarUtils.getAvatarUrl(userStore.userInfo.avatar!)" />
-          <p class="text-(24px #f1f1f1) font-500">{{ userStore.userInfo.name }}</p>
+            :src="AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar!)" />
+          <p class="text-(24px #f1f1f1) font-500">{{ userStore.userInfo!.name }}</p>
 
           <!-- 密码输入框 -->
           <n-config-provider :theme="lightTheme">
@@ -119,14 +119,14 @@
 </template>
 <script setup lang="ts">
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useSettingStore } from '@/stores/setting.ts'
-import { useLogin } from '@/hooks/useLogin.ts'
 import { onKeyStroke } from '@vueuse/core'
-import { InputInst, lightTheme } from 'naive-ui'
-import { getWeekday } from '@/utils/Day.ts'
 import dayjs from 'dayjs'
+import { type InputInst, lightTheme } from 'naive-ui'
+import { useLogin } from '@/hooks/useLogin.ts'
+import { useSettingStore } from '@/stores/setting.ts'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
+import { getWeekday } from '@/utils/Day.ts'
 
 const appWindow = WebviewWindow.getCurrent()
 const settingStore = useSettingStore()

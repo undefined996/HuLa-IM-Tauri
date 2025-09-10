@@ -5,12 +5,13 @@
     <ActionBar :max-w="false" :shrink="false" proxy />
 
     <!--  手动登录样式  -->
-    <n-flex vertical :size="25" v-if="!login.autoLogin || !TOKEN || !isAutoLogin">
+    <n-flex vertical :size="25" v-if="!login.autoLogin">
       <!-- 头像 -->
       <n-flex justify="center" class="w-full pt-35px" data-tauri-drag-region>
         <n-avatar
-          class="size-80px rounded-50% bg-#90909090 border-(2px solid #fff)"
-          :src="AvatarUtils.getAvatarUrl(info.avatar || '/logo.png')" />
+          class="welcome size-80px rounded-50% border-(2px solid #fff)"
+          :src="AvatarUtils.getAvatarUrl(info.avatar || '/logoD.png')"
+          color="#fff" />
       </n-flex>
 
       <!-- 登录菜单 -->
@@ -33,7 +34,9 @@
               <svg v-if="!arrowStatus" class="down w-18px h-18px color-#505050 cursor-pointer">
                 <use href="#down"></use>
               </svg>
-              <svg v-else class="down w-18px h-18px color-#505050 cursor-pointer"><use href="#up"></use></svg>
+              <svg v-else class="down w-18px h-18px color-#505050 cursor-pointer">
+                <use href="#up"></use>
+              </svg>
             </n-flex>
           </template>
         </n-input>
@@ -51,7 +54,10 @@
               @click="giveAccount(item)"
               class="p-8px cursor-pointer hover:bg-#f3f3f3 hover:rounded-6px">
               <div class="flex-between-center">
-                <n-avatar :src="AvatarUtils.getAvatarUrl(item.avatar)" class="size-28px bg-#ccc rounded-50%" />
+                <n-avatar
+                  :src="AvatarUtils.getAvatarUrl(item.avatar || '/logoD.png')"
+                  color="#fff"
+                  class="size-28px rounded-50%" />
                 <p class="text-14px color-#505050">{{ item.account }}</p>
                 <svg @click.stop="delAccount(item)" class="w-12px h-12px">
                   <use href="#close"></use>
@@ -79,22 +85,23 @@
           clearable />
 
         <!-- 协议 -->
-        <n-flex justify="center" :size="6">
+        <n-flex align="center" justify="center" :size="6">
           <n-checkbox v-model:checked="protocol" />
-          <div class="text-12px color-#909090 cursor-default lh-14px">
+          <div class="text-12px color-#909090 cursor-default lh-14px agreement">
             <span>已阅读并同意</span>
-            <span class="color-#13987f cursor-pointer">服务协议</span>
+            <span class="color-#13987f cursor-pointer" @click.stop="openServiceAgreement">服务协议</span>
             <span>和</span>
-            <span class="color-#13987f cursor-pointer">HuLa隐私保护指引</span>
+            <span class="color-#13987f cursor-pointer" @click.stop="openPrivacyAgreement">HuLa隐私保护指引</span>
           </div>
         </n-flex>
 
         <n-button
           :loading="loading"
           :disabled="loginDisabled"
-          class="w-full mt-8px mb-50px"
-          @click="normalLogin()"
-          color="#13987f">
+          tertiary
+          style="color: #fff"
+          class="gradient-button w-full mt-8px mb-50px"
+          @click="normalLogin()">
           <span>{{ loginText }}</span>
         </n-button>
       </n-flex>
@@ -111,13 +118,13 @@
           <n-avatar
             round
             :size="110"
-            :color="'#fff'"
+            color="#fff"
             class="border-(2px solid #fff)"
-            :src="AvatarUtils.getAvatarUrl(userStore.userInfo.avatar || '/logo.png')" />
+            :src="AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar || '/logoD.png')" />
         </n-flex>
 
         <n-flex justify="center">
-          <n-ellipsis style="max-width: 200px" class="text-18px">{{ userStore.userInfo.name }}</n-ellipsis>
+          <n-ellipsis style="max-width: 200px" class="text-18px">{{ userStore.userInfo!.name }}</n-ellipsis>
         </n-flex>
       </n-flex>
 
@@ -125,10 +132,11 @@
         <n-button
           :loading="loading"
           :disabled="loginDisabled"
-          class="w-200px mt-12px mb-40px"
-          @click="normalLogin(true)"
-          color="#13987f">
-          {{ loginText }}
+          tertiary
+          style="color: #fff"
+          class="gradient-button w-200px mt-12px mb-40px"
+          @click="normalLogin(true)">
+          <span>{{ loginText }}</span>
         </n-button>
       </n-flex>
     </n-flex>
@@ -137,7 +145,7 @@
     <n-flex justify="center" class="text-14px" id="bottomBar">
       <div class="color-#13987f cursor-pointer" @click="router.push('/qrCode')">扫码登录</div>
       <div class="w-1px h-14px bg-#ccc"></div>
-      <div v-if="login.autoLogin && TOKEN" class="color-#13987f cursor-pointer" @click="removeToken">移除账号</div>
+      <div v-if="login.autoLogin" class="color-#13987f cursor-pointer" @click="removeToken">移除账号</div>
       <n-popover
         v-else
         trigger="click"
@@ -150,7 +158,7 @@
         </template>
         <n-flex vertical :size="2">
           <div
-            class="text-14px cursor-pointer hover:bg-#f3f3f3 hover:rounded-6px p-8px"
+            class="register text-14px cursor-pointer hover:bg-#f3f3f3 hover:rounded-6px p-8px"
             @click="createWebviewWindow('注册', 'register', 600, 600)">
             注册账号
           </div>
@@ -160,8 +168,9 @@
             忘记密码
           </div>
           <div
-            v-if="!isCompatibility"
+            v-if="!isCompatibility()"
             @click="router.push('/network')"
+            :class="{ network: isMac() }"
             class="text-14px cursor-pointer hover:bg-#f3f3f3 hover:rounded-6px p-8px">
             网络设置
           </div>
@@ -171,40 +180,91 @@
   </n-config-provider>
 </template>
 <script setup lang="ts">
-import router from '@/router'
-import { useWindow } from '@/hooks/useWindow.ts'
-import { lightTheme } from 'naive-ui'
-import { useLogin } from '@/hooks/useLogin.ts'
+import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useLoginHistoriesStore } from '@/stores/loginHistory.ts'
-import apis from '@/services/apis.ts'
-import { useUserStore } from '@/stores/user.ts'
-import { UserInfoType } from '@/services/types.ts'
-import { useSettingStore } from '@/stores/setting.ts'
-import { AvatarUtils } from '@/utils/AvatarUtils'
-import { useMitt } from '@/hooks/useMitt'
-import { WsResponseMessageType } from '@/services/wsType'
 import { useNetwork } from '@vueuse/core'
-import { useUserStatusStore } from '@/stores/userStatus'
-import { clearListener } from '@/utils/ReadCountQueue'
-import { useGlobalStore } from '@/stores/global'
-import { type } from '@tauri-apps/plugin-os'
+import { lightTheme } from 'naive-ui'
+import { ErrorType } from '@/common/exception'
+import { TauriCommand } from '@/enums'
 import { useCheckUpdate } from '@/hooks/useCheckUpdate'
+import { type DriverStepConfig, useDriver } from '@/hooks/useDriver'
+import { useLogin } from '@/hooks/useLogin.ts'
+import { useMitt } from '@/hooks/useMitt'
+import { useWindow } from '@/hooks/useWindow.ts'
+import router from '@/router'
+import { getEnhancedFingerprint } from '@/services/fingerprint'
+import type { UserInfoType } from '@/services/types.ts'
+import rustWebSocketClient from '@/services/webSocketRust'
+import { WsResponseMessageType } from '@/services/wsType'
+import { useGlobalStore } from '@/stores/global'
+import { useGuideStore } from '@/stores/guide'
+import { useLoginHistoriesStore } from '@/stores/loginHistory.ts'
+import { useSettingStore } from '@/stores/setting.ts'
+import { useUserStore } from '@/stores/user.ts'
+import { useUserStatusStore } from '@/stores/userStatus'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { getAllUserState, getUserDetail } from '@/utils/ImRequestUtils'
+import { isCompatibility, isMac } from '@/utils/PlatformConstants'
+import { clearListener } from '@/utils/ReadCountQueue'
+import { invokeWithErrorHandler } from '@/utils/TauriInvokeHandler'
 
-const isCompatibility = computed(() => type() === 'windows' || type() === 'linux')
+// 定义引导步骤配置
+const driverSteps: DriverStepConfig[] = [
+  {
+    element: '.welcome',
+    popover: {
+      title: '🎉 欢迎使用HuLa',
+      description: 'HuLa是一款基于Tauri的聊天软件，支持Windows、macOS、Linux、IOS、Android',
+      side: 'bottom',
+      align: 'center'
+    }
+  },
+  {
+    element: '.agreement',
+    popover: {
+      title: '🤔 关于 隐私条款 和 服务协议',
+      description: '或许您需要查看 HuLa 的隐私条款和服务协议',
+      onNextClick: () => {
+        if (isMac()) {
+          moreShow.value = true
+        }
+      }
+    }
+  },
+  {
+    element: '.network',
+    popover: {
+      title: '⚙️ 关于网络设置',
+      description: 'HuLa 支持自定义服务设置，您可以替换官方的服务地址',
+      onNextClick: () => {
+        moreShow.value = true
+      }
+    }
+  },
+  {
+    element: '.register',
+    popover: {
+      title: '🤓 如何登录HuLa',
+      description: '在使用HuLa之前您需要注册一个帐号'
+    }
+  }
+]
+
 const settingStore = useSettingStore()
 const userStore = useUserStore()
 const userStatusStore = useUserStatusStore()
 const globalStore = useGlobalStore()
+const guideStore = useGuideStore()
 const { isTrayMenuShow } = storeToRefs(globalStore)
+const { isGuideCompleted } = storeToRefs(guideStore)
+const { startTour } = useDriver(driverSteps)
 const { stateId } = storeToRefs(userStatusStore)
 /** 网络连接是否正常 */
 const { isOnline } = useNetwork()
 const loginHistoriesStore = useLoginHistoriesStore()
 const { loginHistories } = loginHistoriesStore
 const { login } = storeToRefs(settingStore)
-const TOKEN = ref(localStorage.getItem('TOKEN'))
-const REFRESH_TOKEN = ref(localStorage.getItem('REFRESH_TOKEN'))
 /** 账号信息 */
 const info = ref({
   account: '',
@@ -219,15 +279,14 @@ const loginDisabled = ref(!isOnline.value)
 const loading = ref(false)
 const arrowStatus = ref(false)
 const moreShow = ref(false)
-const isAutoLogin = ref(login.value.autoLogin && TOKEN.value && REFRESH_TOKEN.value)
 const { setLoginState } = useLogin()
-const { createWebviewWindow } = useWindow()
+const { createWebviewWindow, createModalWindow } = useWindow()
 const { checkUpdate, CHECK_UPDATE_LOGIN_TIME } = useCheckUpdate()
 
 const accountPH = ref('邮箱/HuLa账号')
 const passwordPH = ref('输入HuLa密码')
 /** 登录按钮的文本内容 */
-const loginText = ref(isOnline.value ? (isAutoLogin.value ? '登录' : '登录') : '网络异常')
+const loginText = ref(isOnline.value ? '登录' : '网络异常')
 /** 是否直接跳转 */
 const isJumpDirectly = ref(false)
 
@@ -253,7 +312,7 @@ watchEffect(() => {
 
 watch(isOnline, (v) => {
   loginDisabled.value = !v
-  loginText.value = v ? (isAutoLogin.value ? '登录' : '登录') : '网络异常'
+  loginText.value = v ? '登录' : '网络异常'
 })
 
 // 监听账号输入
@@ -261,7 +320,7 @@ watch(
   () => info.value.account,
   (newAccount) => {
     if (!newAccount) {
-      info.value.avatar = '/logo.png'
+      info.value.avatar = '/logoD.png'
       return
     }
 
@@ -272,7 +331,7 @@ watch(
     if (matchedAccount) {
       info.value.avatar = matchedAccount.avatar
     } else {
-      info.value.avatar = '/logo.png'
+      info.value.avatar = '/logoD.png'
     }
   }
 )
@@ -288,7 +347,7 @@ const delAccount = (item: UserInfoType) => {
   }
   info.value.account = ''
   info.value.password = ''
-  info.value.avatar = '/logo.png'
+  info.value.avatar = '/logoD.png'
 }
 
 /**
@@ -314,86 +373,33 @@ const normalLogin = async (auto = false) => {
   const loginInfo = auto ? (userStore.userInfo as UserInfoType) : info.value
   const { account } = loginInfo
 
-  // 自动登录
-  if (auto) {
-    // 添加2秒延迟
-    await new Promise((resolve) => setTimeout(resolve, 1200))
+  // 存储此次登陆设备指纹
+  const clientId = await getEnhancedFingerprint()
+  localStorage.setItem('clientId', clientId)
 
-    try {
-      // 直接获取用户详情，如果token过期会自动续签，如果续签失败就回到登录页面
-      const userDetail = await apis.getUserDetail()
-      // 设置用户状态id
-      stateId.value = userDetail.userStateId
-      const account = {
-        ...userDetail
-      }
-      userStore.userInfo = account
-      loginHistoriesStore.addLoginHistory(account)
-
-      loginText.value = '登录成功正在跳转...'
-      await setLoginState()
-      await openHomeWindow()
-      loading.value = false
-    } catch (error) {
-      console.error('自动登录失败', error)
-      // 如果是网络异常，不删除token
-      if (!isOnline.value) {
-        loginDisabled.value = true
-        loginText.value = '网络异常'
-        loading.value = false
-      } else {
-        // 其他错误才清除token并重置状态
-        localStorage.removeItem('TOKEN')
-        isAutoLogin.value = false
-        loginDisabled.value = true
-        loginText.value = '登录'
-        loading.value = false
-      }
+  invoke('login_command', {
+    data: {
+      account: account,
+      password: info.value.password,
+      deviceType: 'PC',
+      systemType: '2',
+      clientId: clientId,
+      grantType: 'PASSWORD',
+      isAutoLogin: auto,
+      uid: auto ? userStore.userInfo!.uid : null
     }
-    return
-  }
-
-  apis
-    .login({ account: account, password: info.value.password, source: 'pc' })
-    .then(async (res) => {
+  })
+    .then(async (res: any) => {
       loginDisabled.value = true
-      loginText.value = '登录成功, 正在跳转'
-      userStore.isSign = true
-      // 存储双token
-      localStorage.setItem('TOKEN', res.token)
-      localStorage.setItem('REFRESH_TOKEN', res.refreshToken)
-      // 需要删除二维码，因为用户可能先跳转到二维码界面再回到登录界面，会导致二维码一直保持在内存中
-      if (localStorage.getItem('wsLogin')) {
-        localStorage.removeItem('wsLogin')
-      }
-      // 获取用户状态列表
-      if (userStatusStore.stateList.length === 0) {
-        try {
-          userStatusStore.stateList = await apis.getAllUserState()
-        } catch (error) {
-          console.error('获取用户状态列表失败', error)
-        }
-      }
-      // 获取用户详情
-      const userDetail = await apis.getUserDetail()
 
-      // 设置用户状态id
-      stateId.value = userDetail.userStateId
-      // TODO 先不获取 emoji 列表，当我点击 emoji 按钮的时候再获取
-      // await emojiStore.getEmojiList()
-      const account = {
-        ...userDetail,
-        token: res.token,
-        client: res.client
-      }
-      userStore.userInfo = account
-      loginHistoriesStore.addLoginHistory(account)
-
-      await setLoginState()
-      await openHomeWindow()
-      loading.value = false
+      // 开启 ws 连接
+      await rustWebSocketClient.initConnect()
+      // 登录处理
+      await loginProcess(res.token, res.refreshToken, res.client)
     })
-    .catch(() => {
+    .catch((e: any) => {
+      console.error('登录异常：', e)
+      window.$message.error(e)
       loading.value = false
       loginDisabled.value = false
       loginText.value = '登录'
@@ -405,15 +411,79 @@ const normalLogin = async (auto = false) => {
     })
 }
 
+const loginProcess = async (token: string, refreshToken: string, client: string) => {
+  loading.value = false
+  // 获取用户状态列表
+  if (userStatusStore.stateList.length === 0) {
+    try {
+      userStatusStore.stateList = await getAllUserState()
+    } catch (error) {
+      console.error('获取用户状态列表失败', error)
+    }
+  }
+  // 获取用户详情
+  // const userDetail = await apis.getUserDetail()
+  const userDetail: any = await getUserDetail()
+
+  // 设置用户状态id
+  stateId.value = userDetail.userStateId
+  // const token = localStorage.getItem('TOKEN')
+  // const refreshToken = localStorage.getItem('REFRESH_TOKEN')
+  // TODO 先不获取 emoji 列表，当我点击 emoji 按钮的时候再获取
+  // await emojiStore.getEmojiList()
+  const account = {
+    ...userDetail,
+    token,
+    refreshToken,
+    client
+  }
+  userStore.userInfo = account
+  loginHistoriesStore.addLoginHistory(account)
+  // 在 sqlite 中存储用户信息
+  await invokeWithErrorHandler(
+    TauriCommand.SAVE_USER_INFO,
+    {
+      userInfo: userDetail
+    },
+    {
+      customErrorMessage: '保存用户信息失败',
+      errorType: ErrorType.Client
+    }
+  )
+
+  // 在 rust 部分设置 token
+  await emit('set_user_info', {
+    token,
+    refreshToken,
+    uid: userDetail.uid
+  })
+
+  loginText.value = '登录成功正在跳转...'
+  await setLoginState()
+  await openHomeWindow()
+}
+
 const openHomeWindow = async () => {
   await createWebviewWindow('HuLa', 'home', 960, 720, 'login', true, undefined, 480, undefined, false)
+  // 只有在成功创建home窗口并且已登录的情况下才显示托盘菜单
+  isTrayMenuShow.value = true
 }
 
 /** 移除已登录账号 */
 const removeToken = () => {
   localStorage.removeItem('TOKEN')
   localStorage.removeItem('REFRESH_TOKEN')
-  userStore.userInfo = {}
+  userStore.userInfo = undefined
+}
+
+/** 打开服务协议窗口 */
+const openServiceAgreement = async () => {
+  await createModalWindow('服务协议', 'modal-serviceAgreement', 600, 600, 'login')
+}
+
+/** 打开隐私保护协议窗口 */
+const openPrivacyAgreement = async () => {
+  await createModalWindow('隐私保护指引', 'modal-privacyAgreement', 600, 600, 'login')
 }
 
 const closeMenu = (event: MouseEvent) => {
@@ -436,11 +506,13 @@ onBeforeMount(async () => {
   const token = localStorage.getItem('TOKEN')
   const refreshToken = localStorage.getItem('REFRESH_TOKEN')
 
+  // 始终初始化托盘菜单状态为false
+  isTrayMenuShow.value = false
+
   if (!login.value.autoLogin) {
     localStorage.removeItem('TOKEN')
     localStorage.removeItem('REFRESH_TOKEN')
     clearListener()
-    isTrayMenuShow.value = false
     return
   }
 
@@ -455,13 +527,17 @@ onBeforeMount(async () => {
       // token无效，清除token并重置状态
       localStorage.removeItem('TOKEN')
       localStorage.removeItem('REFRESH_TOKEN')
-      userStore.userInfo = {}
-      userStore.isSign = false
+      userStore.userInfo = undefined
     }
   }
 })
 
 onMounted(async () => {
+  // 检查引导状态，只有未完成时才启动引导
+  if (!isGuideCompleted.value) {
+    startTour()
+  }
+
   // 只有在需要登录的情况下才显示登录窗口
   if (!isJumpDirectly.value) {
     await getCurrentWebviewWindow().show()
@@ -473,7 +549,7 @@ onMounted(async () => {
   })
 
   // 自动登录时直接触发登录
-  if (isAutoLogin.value) {
+  if (login.value.autoLogin) {
     normalLogin(true)
   } else {
     loginHistories.length > 0 && giveAccount(loginHistories[0])

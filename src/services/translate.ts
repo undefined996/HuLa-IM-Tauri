@@ -1,7 +1,7 @@
 import { fetch } from '@tauri-apps/plugin-http'
 import CryptoJS from 'crypto-js'
-import { TranslateProvider } from './types.ts'
 import { AppException } from '@/common/exception.ts'
+import type { TranslateProvider } from './types.ts'
 
 // 有道云翻译接口响应类型
 interface YoudaoResponse {
@@ -55,7 +55,7 @@ const signUtils = {
    */
   getTencentSign(text: string, secretId: string, secretKey: string, timestamp: string): string {
     // 根据时间戳生成UTC日期字符串
-    const date = new Date(parseInt(timestamp) * 1000)
+    const date = new Date(parseInt(timestamp, 10) * 1000)
     const dateStr = date.toISOString().split('T')[0]
     const service = 'tmt' // 服务名称
 

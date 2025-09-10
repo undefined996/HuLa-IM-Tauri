@@ -3,10 +3,10 @@
     <div class="bg-[--bg-edit] w-480px h-fit box-border flex flex-col">
       <n-flex :size="6" vertical>
         <div
-          v-if="type() === 'macos'"
+          v-if="isMac()"
           @click="editInfo.show = false"
           class="mac-close size-13px shadow-inner bg-#ed6a5eff rounded-50% mt-6px select-none absolute left-6px">
-          <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+          <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
             <use href="#close"></use>
           </svg>
         </div>
@@ -14,7 +14,7 @@
         <n-flex class="text-(14px [--text-color]) select-none pt-6px" justify="center">编辑资料</n-flex>
 
         <svg
-          v-if="type() === 'windows'"
+          v-if="isWindows()"
           class="size-14px cursor-pointer pt-6px select-none absolute right-6px"
           @click="editInfo.show = false">
           <use href="#close"></use>
@@ -134,25 +134,25 @@
   <AvatarCropper ref="cropperRef" v-model:show="showCropper" :image-url="localImageUrl" @crop="handleCrop" />
 </template>
 <script setup lang="ts">
-import { IsYesEnum, MittEnum } from '@/enums'
-import { leftHook } from '@/layout/left/hook.ts'
-import { useMitt } from '@/hooks/useMitt.ts'
-import apis from '@/services/apis.ts'
-import { type } from '@tauri-apps/plugin-os'
-import { useCommon } from '@/hooks/useCommon.ts'
-import { useUserStore } from '@/stores/user.ts'
-import { UserInfoType } from '@/services/types'
-import { AvatarUtils } from '@/utils/AvatarUtils'
-import AvatarCropper from '@/components/common/AvatarCropper.vue'
-import { useLoginHistoriesStore } from '@/stores/loginHistory'
-import { formatTimestamp, isDiffNow } from '@/utils/ComputedTime.ts'
-import dayjs from 'dayjs'
-import { useTauriListener } from '@/hooks/useTauriListener'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import dayjs from 'dayjs'
+import AvatarCropper from '@/components/common/AvatarCropper.vue'
+import { IsYesEnum, MittEnum } from '@/enums'
 import { useAvatarUpload } from '@/hooks/useAvatarUpload'
+import { useCommon } from '@/hooks/useCommon.ts'
+import { useMitt } from '@/hooks/useMitt.ts'
+import { useTauriListener } from '@/hooks/useTauriListener'
+import { leftHook } from '@/layout/left/hook.ts'
+import type { UserInfoType } from '@/services/types'
+import { useLoginHistoriesStore } from '@/stores/loginHistory'
+import { useUserStore } from '@/stores/user.ts'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { formatTimestamp, isDiffNow } from '@/utils/ComputedTime.ts'
+import { getBadgeList, uploadAvatar } from '@/utils/ImRequestUtils'
+import { isMac, isWindows } from '@/utils/PlatformConstants'
 
 const appWindow = WebviewWindow.getCurrent()
-let localUserInfo = ref<Partial<UserInfoType>>({})
+const localUserInfo = ref<Partial<UserInfoType>>({})
 const userStore = useUserStore()
 const { addListener } = useTauriListener()
 const loginHistoriesStore = useLoginHistoriesStore()
@@ -169,15 +169,15 @@ const {
 } = useAvatarUpload({
   onSuccess: async (downloadUrl) => {
     // 调用更新头像的API
-    await apis.uploadAvatar({ avatar: downloadUrl })
+    await uploadAvatar({ avatar: downloadUrl })
     // 更新编辑信息
     editInfo.value.content.avatar = downloadUrl
     // 更新用户信息
-    userStore.userInfo.avatar = downloadUrl
+    userStore.userInfo!.avatar = downloadUrl
     // 更新头像更新时间
-    userStore.userInfo.avatarUpdateTime = Date.now()
+    userStore.userInfo!.avatarUpdateTime = Date.now()
     // 更新登录历史记录
-    loginHistoriesStore.loginHistories.filter((item) => item.uid === userStore.userInfo.uid)[0].avatar = downloadUrl
+    loginHistoriesStore.loginHistories.filter((item) => item.uid === userStore.userInfo!.uid)[0].avatar = downloadUrl
     // 更新缓存里面的用户信息
     updateCurrentUserCache('avatar', downloadUrl)
     window.$message.success('头像更新成功')
@@ -193,7 +193,7 @@ const handleCrop = async (cropBlob: Blob) => {
 const noSideSpace = (value: string) => !value.startsWith(' ') && !value.endsWith(' ')
 
 const openAvatarCropper = () => {
-  const lastUpdateTime = userStore.userInfo.avatarUpdateTime
+  const lastUpdateTime = userStore.userInfo!.avatarUpdateTime
   // 计算30天的毫秒数
   if (lastUpdateTime && !isDiffNow({ time: lastUpdateTime, unit: 'day', diff: 30 })) {
     // 计算下次可更新时间
@@ -208,19 +208,20 @@ const openAvatarCropper = () => {
 
 const openEditInfo = () => {
   editInfo.value.show = true
-  editInfo.value.content = userStore.userInfo
-  localUserInfo.value = { ...userStore.userInfo }
+  editInfo.value.content = userStore.userInfo!
+  localUserInfo.value = { ...userStore.userInfo! }
   /** 获取徽章列表 */
-  apis.getBadgeList().then((res) => {
-    editInfo.value.badgeList = res as any
+  getBadgeList().then((res: any) => {
+    editInfo.value.badgeList = res
   })
 }
 
-onMounted(() => {
-  addListener(
+onMounted(async () => {
+  await addListener(
     appWindow.listen('open_edit_info', async () => {
       openEditInfo()
-    })
+    }),
+    'open_edit_info'
   )
   useMitt.on(MittEnum.OPEN_EDIT_INFO, () => {
     useMitt.emit(MittEnum.CLOSE_INFO_SHOW)

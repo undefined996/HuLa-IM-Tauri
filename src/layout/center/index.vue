@@ -4,9 +4,9 @@
     id="center"
     :class="{ 'rounded-r-8px': shrinkStatus }"
     class="resizable select-none flex flex-col border-r-(1px solid [--right-chat-footer-line-color])"
-    :style="{ width: `${initWidth}px` }">
+    :style="{ width: shrinkStatus ? '100%' : `${initWidth}px` }">
     <!-- 分隔条 -->
-    <div v-if="!shrinkStatus" class="resize-handle transition-all duration-600 ease-in-out" @mousedown="initDrag">
+    <div v-show="!shrinkStatus" class="resize-handle transition-all duration-600 ease-in-out" @mousedown="initDrag">
       <div :class="{ 'opacity-100': isDragging }" class="transition-all duration-600 ease-in-out opacity-0 drag-icon">
         <div style="border-radius: 8px 0 0 8px" class="bg-#c8c8c833 h-60px w-14px absolute top-40% right-0 drag-icon">
           <svg class="size-16px absolute top-1/2 right--2px transform -translate-y-1/2 color-#909090">
@@ -18,14 +18,13 @@
 
     <ActionBar
       class="absolute right-0 w-full"
-      v-if="shrinkStatus"
+      v-show="shrinkStatus"
       :shrink-status="!shrinkStatus"
       :max-w="false"
       :current-label="appWindow.label" />
 
     <!-- 顶部搜索栏 -->
-    <header
-      class="mt-30px w-full h-40px flex flex-col items-center border-b-(1px solid [--right-chat-footer-line-color])">
+    <header class="mt-30px pb-10px flex-1 flex-col-x-center border-b-(1px solid [--right-chat-footer-line-color])">
       <div class="flex-center gap-5px w-full pr-16px pl-16px box-border">
         <n-input
           id="search"
@@ -90,10 +89,10 @@
       <div class="bg-[--bg-edit] w-540px h-fit box-border flex flex-col">
         <n-flex :size="6" vertical>
           <div
-            v-if="type() === 'macos'"
-            @click="createGroupModal = false"
+            v-if="isMac()"
+            @click="resetCreateGroupState"
             class="mac-close size-13px shadow-inner bg-#ed6a5eff rounded-50% mt-6px select-none absolute left-6px">
-            <svg class="hidden size-7px color-#000 font-bold select-none absolute top-3px left-3px">
+            <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
               <use href="#close"></use>
             </svg>
           </div>
@@ -101,18 +100,20 @@
           <n-flex class="text-(14px [--text-color]) select-none pt-6px" justify="center">创建群聊</n-flex>
 
           <svg
-            v-if="type() === 'windows'"
+            v-if="isWindows()"
             class="size-14px cursor-pointer pt-6px select-none absolute right-6px"
-            @click="createGroupModal = false">
+            @click="resetCreateGroupState">
             <use href="#close"></use>
           </svg>
 
           <n-transfer
+            :key="`${isFromChatbox}-${preSelectedFriendId}`"
             source-filterable
             target-filterable
             v-model:value="selectedValue"
             :options="options"
-            :render-source-list="renderSourceList()"
+            :render-source-list="renderSourceList(isFromChatbox ? preSelectedFriendId : '', isFromChatbox)"
+            :render-target-list="renderTargetList(isFromChatbox ? preSelectedFriendId : '', isFromChatbox)"
             :render-target-label="renderLabel" />
 
           <n-flex align="center" justify="center" class="p-16px">
@@ -125,16 +126,16 @@
 </template>
 
 <script setup lang="ts">
-import { useMitt } from '@/hooks/useMitt.ts'
-import router from '@/router'
-import { MittEnum } from '@/enums'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useWindowSize } from '@vueuse/core'
-import { useSettingStore } from '@/stores/setting.ts'
-import { type } from '@tauri-apps/plugin-os'
-import { renderLabel, renderSourceList, options, createGroup } from './model.tsx'
+import { MittEnum } from '@/enums'
+import { useMitt } from '@/hooks/useMitt.ts'
 import { useWindow } from '@/hooks/useWindow'
+import router from '@/router'
 import { useGlobalStore } from '@/stores/global.ts'
+import { useSettingStore } from '@/stores/setting.ts'
+import { isMac, isWindows } from '@/utils/PlatformConstants'
+import { createGroup, options, renderLabel, renderSourceList, renderTargetList } from './model.tsx'
 
 const { createWebviewWindow } = useWindow()
 
@@ -142,8 +143,10 @@ const settingStore = useSettingStore()
 const globalStore = useGlobalStore()
 const { page } = storeToRefs(settingStore)
 const appWindow = WebviewWindow.getCurrent()
-const selectedValue = ref([])
+const selectedValue = ref<string[]>([])
 const createGroupModal = ref(false)
+const preSelectedFriendId = ref('')
+const isFromChatbox = ref(false) // 标记是否来自聊天框
 /** 设置最小宽度 */
 const minWidth = 160
 /** 设置最大宽度 */
@@ -154,8 +157,6 @@ const initWidth = ref(250)
 const { width, height } = useWindowSize()
 /** 是否拖拽 */
 const isDrag = ref(true)
-/** 当前消息 */
-const currentMsg = ref()
 /** 搜索框文字 */
 const searchText = ref('搜索')
 /** 是否处于搜索模式 */
@@ -168,6 +169,9 @@ const addPanels = ref({
       label: '发起群聊',
       icon: 'launch',
       click: () => {
+        isFromChatbox.value = false
+        preSelectedFriendId.value = ''
+        selectedValue.value = []
         createGroupModal.value = true
       }
     },
@@ -187,18 +191,22 @@ const shrinkStatus = ref(false)
 const isDragging = ref(false)
 
 watchEffect(() => {
-  if (width.value >= 310 && width.value < 800) {
+  // 获取页面缩放因子来计算调整后的断点
+  // 由于使用了 useFixedScale 来抵消系统缩放，需要相应调整窗口布局断点
+  const pageScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-scale') || '1')
+  const SHRINK_MIN_WIDTH = 310 * pageScale // 根据缩放因子调整断点
+  const SHRINK_MAX_WIDTH = 800 * pageScale // 根据缩放因子调整断点
+
+  const shouldShrink = width.value >= SHRINK_MIN_WIDTH && width.value < SHRINK_MAX_WIDTH
+  const shouldExpand = width.value >= SHRINK_MAX_WIDTH
+
+  if (shouldShrink) {
     useMitt.emit(MittEnum.SHRINK_WINDOW, true)
     const center = document.querySelector('#center')
     center?.classList.add('flex-1')
     isDrag.value = false
-  }
-  if (width.value >= 800) {
+  } else if (shouldExpand) {
     useMitt.emit(MittEnum.SHRINK_WINDOW, false)
-    // TODO: 因为拖动后要重新加载所以这里会监听两次，后续优化
-    // if (currentMsg.value) {
-    //   useMitt.emit(MittEnum.MSG_BOX_SHOW, { msgBoxShow: true, ...currentMsg.value })
-    // }
     const center = document.querySelector('#center')
     center?.classList.remove('flex-1')
     isDrag.value = true
@@ -206,12 +214,29 @@ watchEffect(() => {
   globalStore.setHomeWindowState({ width: width.value, height: height.value })
 })
 
+// 监听选中值的变化，确保必选项不会被清除
+watch(selectedValue, (newValue) => {
+  if (isFromChatbox.value && preSelectedFriendId.value && newValue) {
+    // 如果是从聊天框触发且有预选中好友，确保该好友始终在选中列表中
+    if (!newValue.includes(preSelectedFriendId.value)) {
+      // 如果预选中好友被移除了，重新加回去
+      selectedValue.value = [...newValue, preSelectedFriendId.value]
+    }
+  }
+})
+
+const resetCreateGroupState = () => {
+  selectedValue.value = []
+  preSelectedFriendId.value = ''
+  isFromChatbox.value = false
+  createGroupModal.value = false
+}
+
 const handleCreateGroup = async () => {
   if (selectedValue.value.length < 2) return
   try {
     await createGroup(selectedValue.value)
-    createGroupModal.value = false
-    selectedValue.value = []
+    resetCreateGroupState()
     window.$message.success('创建群聊成功')
   } catch (error) {
     window.$message.error('创建群聊失败')
@@ -255,9 +280,6 @@ const doDrag = (e: MouseEvent) => {
     const newWidth = startWidth.value + e.clientX - startX.value
     // 如果新宽度不等于最大宽度，则更新宽度值
     if (newWidth !== maxWidth) {
-      // 给聊天框添加 select-none 样式，防止在拖动改变布局时选中文本
-      const chatMain = document.querySelector('#image-chat-main')
-      chatMain?.classList.add('select-none')
       initWidth.value = clamp(newWidth, minWidth, maxWidth) // 使用 clamp 函数限制宽度值在最小值和最大值之间
     }
   })
@@ -275,12 +297,14 @@ const initDrag = (e: MouseEvent) => {
   isDragging.value = true
   document.addEventListener('mousemove', doDrag, false)
   document.addEventListener('mouseup', stopDrag, false)
+  // 防止拖拽时选中文本
+  document.body.style.userSelect = 'none'
+  e.preventDefault()
 }
 
 const stopDrag = () => {
-  // 松开鼠标后，移除聊天框的 select-none 样式
-  const chatMain = document.querySelector('#image-chat-main')
-  chatMain?.classList.remove('select-none')
+  // 恢复文本选择功能
+  document.body.style.userSelect = ''
   document.removeEventListener('mousemove', doDrag, false)
   document.removeEventListener('mouseup', stopDrag, false)
   isDragging.value = false
@@ -296,19 +320,25 @@ onMounted(async () => {
     shrinkStatus.value = event
   })
   useMitt.on(MittEnum.CREATE_GROUP, (event: { id: string }) => {
+    isFromChatbox.value = true
+    preSelectedFriendId.value = event.id
     createGroupModal.value = true
-    console.log(event)
-    // TODO: 选用并且禁用当前 event.id 对应的uid的用户
-  })
-  useMitt.on(MittEnum.MSG_BOX_SHOW, (event: any) => {
-    if (!event) return
-    currentMsg.value = event
+    nextTick(() => {
+      selectedValue.value = [event.id]
+    })
   })
   window.addEventListener('click', closeMenu, true)
 })
 
 onUnmounted(() => {
   window.removeEventListener('click', closeMenu, true)
+  // 清理拖拽相关的事件监听器和样式
+  if (isDragging.value) {
+    document.removeEventListener('mousemove', doDrag, false)
+    document.removeEventListener('mouseup', stopDrag, false)
+    document.body.style.userSelect = ''
+    isDragging.value = false
+  }
 })
 </script>
 

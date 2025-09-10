@@ -120,7 +120,7 @@
         <div v-if="isEditingRemark" class="flex items-center">
           <n-input
             ref="remarkInputRef"
-            v-model:value="remarkValue"
+            v-model:value="item.remark"
             size="tiny"
             class="border-(1px solid #90909080)"
             placeholder="请输入群聊备注"
@@ -180,7 +180,7 @@
     <!-- 群成员 -->
     <n-flex vertical :size="10" class="px-30px box-border">
       <n-flex align="center" justify="space-between" class="text-(14px [--chat-text-color])">
-        <span>群成员 ({{ item.memberNum }}人)</span>
+        <span>({{ item.memberNum }}人)</span>
         <span class="flex items-center">在线 {{ item.onlineNum }}人</span>
       </n-flex>
 
@@ -196,13 +196,15 @@
 </template>
 <script setup lang="ts">
 import { RoomTypeEnum } from '@/enums'
-import { useBadgeInfo, useUserInfo } from '@/hooks/useCached.ts'
+import { useBadgeInfo } from '@/hooks/useCached.ts'
 import { useCommon } from '@/hooks/useCommon.ts'
-import { AvatarUtils } from '@/utils/AvatarUtils'
-import apis from '@/services/apis.ts'
 import { useWindow } from '@/hooks/useWindow'
-import { useImageViewer } from '@/stores/imageViewer'
 import type { UserItem } from '@/services/types'
+import { useCachedStore } from '@/stores/cached'
+import { useGroupStore } from '@/stores/group'
+import { useImageViewer } from '@/stores/imageViewer'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { getGroupDetail } from '@/utils/ImRequestUtils'
 
 const { openMsgSession } = useCommon()
 const { createWebviewWindow } = useWindow()
@@ -216,36 +218,35 @@ const options = ref<Array<{ name: string; src: string }>>([])
 
 // 编辑群备注相关状态
 const isEditingRemark = ref(false)
-const remarkValue = ref('')
 const remarkInputRef = useTemplateRef('remarkInputRef')
 
 // 编辑本群昵称相关状态
 const isEditingNickname = ref(false)
 const nicknameValue = ref('')
 const nicknameInputRef = useTemplateRef('nicknameInputRef')
+const cacheStore = useCachedStore()
+const groupStore = useGroupStore()
 
-watchEffect(() => {
+watchEffect(async () => {
   if (content.type === RoomTypeEnum.SINGLE) {
-    item.value = useUserInfo(content.uid).value
+    item.value = groupStore.getUserInfo(content.uid)!
   } else {
-    apis.groupDetail({ id: content.uid }).then((response) => {
-      item.value = response
-
-      // 初始化备注和昵称值
-      remarkValue.value = response.remark || ''
-      nicknameValue.value = response.myName || ''
-
-      // 获取群成员列表
-      if (item.value && item.value.roomId) {
-        fetchGroupMembers(item.value.roomId)
-      }
-    })
+    await getGroupDetail(content.uid)
+      .then((response: any) => {
+        item.value = response
+        nicknameValue.value = response.myName || ''
+        if (item.value && item.value.roomId) {
+          fetchGroupMembers(item.value.roomId)
+        }
+      })
+      .catch((e) => {
+        console.error('获取群组详情失败:', e)
+      })
   }
 })
 
 // 开始编辑群备注
 const startEditRemark = () => {
-  remarkValue.value = item.value.remark || ''
   isEditingRemark.value = true
   nextTick(() => {
     remarkInputRef.value?.focus()
@@ -254,15 +255,12 @@ const startEditRemark = () => {
 
 // 处理群备注更新
 const handleRemarkUpdate = async () => {
-  if (remarkValue.value !== item.value.remark) {
-    await apis.updateMyRoomInfo({
-      id: item.value.roomId,
-      remark: remarkValue.value,
-      myName: item.value.myName || ''
-    })
-    item.value.remark = remarkValue.value
-    window.$message.success('群备注更新成功')
-  }
+  await cacheStore.updateMyRoomInfo({
+    id: item.value.roomId,
+    remark: item.value.remark,
+    myName: item.value.myName || ''
+  })
+  window.$message.success('群备注更新成功')
   isEditingRemark.value = false
 }
 
@@ -278,10 +276,10 @@ const startEditNickname = () => {
 // 处理本群昵称更新
 const handleNicknameUpdate = async () => {
   if (nicknameValue.value !== item.value.myName) {
-    await apis.updateMyRoomInfo({
+    await cacheStore.updateMyRoomInfo({
       id: item.value.roomId,
-      myName: nicknameValue.value,
-      remark: item.value.remark || ''
+      remark: item.value.remark,
+      myName: item.value.myName || ''
     })
     item.value.myName = nicknameValue.value
     window.$message.success('本群昵称更新成功')
@@ -300,24 +298,17 @@ const handleCopy = (account: string) => {
 // 获取群组详情和成员信息
 const fetchGroupMembers = async (roomId: string) => {
   try {
-    const params = {
-      roomId: roomId,
-      current: 1,
-      size: 10 // 获取前10个成员
-    }
-    const response = await apis.getGroupList(params)
-    if (response && response.list) {
-      // 使用每个成员的uid获取详细信息
-      const memberDetails = response.list.map((member: UserItem) => {
-        const userInfo = useUserInfo(member.uid).value
-        return {
-          name: userInfo.name || member.name || member.uid,
-          src: userInfo.avatar || member.avatar
-        }
-      })
+    // 使用每个成员的uid获取详细信息
+    const userList = groupStore.getUserListByRoomId(roomId)
+    const memberDetails = userList.map((member: UserItem) => {
+      const userInfo = groupStore.getUserInfo(member.uid)!
+      return {
+        name: userInfo.name || member.name || member.uid,
+        src: userInfo.avatar || member.avatar
+      }
+    })
 
-      options.value = memberDetails
-    }
+    options.value = memberDetails
   } catch (error) {
     console.error('获取群成员失败:', error)
   }

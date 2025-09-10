@@ -1,8 +1,8 @@
-import type { MessageType } from '@/services/types'
 import { computed } from 'vue'
-import { useGlobalStore } from '@/stores/global'
 import { MessageStatusEnum } from '@/enums'
-import { useUserInfo } from '@/hooks/useCached.ts'
+import type { MessageType } from '@/services/types'
+import { useGlobalStore } from '@/stores/global'
+import { useGroupStore } from '@/stores/group'
 
 /**
  * Mock 消息 Hook
@@ -11,7 +11,6 @@ export const useMockMessage = () => {
   const globalStore = useGlobalStore()
   // 获取本地存储的用户信息
   const userInfo = computed(() => JSON.parse(localStorage.getItem('user') || '{}'))
-  const currentRoomId = computed(() => globalStore.currentSession.roomId)
 
   /**
    * 模拟消息生成
@@ -26,17 +25,18 @@ export const useMockMessage = () => {
     // 唯一id 后五位时间戳+随机数
     const uniqueId: string = String(currentTimeStamp + random).slice(-7)
     const { uid = 0, name: username = '', avatar = '' } = userInfo.value || {}
+    const groupStore = useGroupStore()
 
     return {
       fromUser: {
         username,
         uid,
         avatar,
-        locPlace: useUserInfo(uid)?.value?.locPlace || 'xx'
+        locPlace: groupStore.getUserInfo(uid)?.locPlace || 'xx'
       },
       message: {
         id: uniqueId,
-        roomId: currentRoomId.value,
+        roomId: globalStore.currentSession!.roomId,
         sendTime: Number(currentTimeStamp),
         type: type,
         body,

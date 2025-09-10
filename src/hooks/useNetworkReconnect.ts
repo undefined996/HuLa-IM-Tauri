@@ -1,11 +1,11 @@
-import { useNetwork, useEventListener, useTimeoutFn } from '@vueuse/core'
+import { useEventListener, useNetwork, useTimeoutFn } from '@vueuse/core'
+import { RoomTypeEnum } from '@/enums'
+import webSocket from '@/services/webSocketAdapter'
 import { useChatStore } from '@/stores/chat'
+import { useContactStore } from '@/stores/contacts'
 import { useGlobalStore } from '@/stores/global'
 import { useGroupStore } from '@/stores/group'
-import { useCachedStore } from '@/stores/cached'
-import { useContactStore } from '@/stores/contacts'
-import { type } from '@tauri-apps/plugin-os'
-import webSocket from '@/services/webSocket'
+import { isMobile } from '@/utils/PlatformConstants'
 
 /**
  * 网络重连Hook，监测网络恢复并自动刷新数据
@@ -24,7 +24,7 @@ export const useNetworkReconnect = () => {
   let lastActivityTimestamp = Date.now()
 
   // 判断是否是移动设备
-  const isMobile = computed(() => type() === 'android' || type() === 'ios')
+  const _isMobileDevice = isMobile()
 
   // 最长空闲时间，超过这个时间会检查连接（15分钟）
   const MAX_IDLE_TIME = 15 * 60 * 1000
@@ -66,7 +66,7 @@ export const useNetworkReconnect = () => {
    * 在挂起/恢复时可能会改变网络状态
    * 对所有平台处理可见性变化和潜在的连接问题
    */
-  useEventListener(window, 'visibilitychange', () => {
+  useEventListener(window, 'visibilitychange', async () => {
     const currentTime = Date.now()
     const idleTime = currentTime - lastActivityTimestamp
 
@@ -75,8 +75,17 @@ export const useNetworkReconnect = () => {
       console.log(`[Network] 应用从后台恢复，已离线 ${idleTime / 1000} 秒`)
       lastActivityTimestamp = currentTime
 
+      // 通知WebSocket应用恢复到前台
+      try {
+        if (typeof webSocket.setAppBackgroundState === 'function') {
+          await webSocket.setAppBackgroundState(false)
+        }
+      } catch (error) {
+        console.warn('[Network] 通知WebSocket前台状态失败:', error)
+      }
+
       // 在移动设备上的恢复逻辑
-      if (isMobile.value && isOnline.value) {
+      if (_isMobileDevice && isOnline.value) {
         // 如果离线超过30秒，则刷新数据
         if (lastOfflineTimestamp > 0 && currentTime - lastOfflineTimestamp > 30000) {
           console.log('[Network] 移动端应用从后台恢复，刷新数据')
@@ -93,6 +102,15 @@ export const useNetworkReconnect = () => {
     } else {
       // 页面变为不可见时，记录时间戳
       lastActivityTimestamp = currentTime
+
+      // 通知WebSocket应用进入后台
+      try {
+        if (typeof webSocket.setAppBackgroundState === 'function') {
+          await webSocket.setAppBackgroundState(true)
+        }
+      } catch (error) {
+        console.warn('[Network] 通知WebSocket后台状态失败:', error)
+      }
     }
   })
 
@@ -136,7 +154,6 @@ export const useNetworkReconnect = () => {
     const chatStore = useChatStore()
     const globalStore = useGlobalStore()
     const groupStore = useGroupStore()
-    const cachedStore = useCachedStore()
     const contactStore = useContactStore()
 
     // 刷新会话列表
@@ -147,15 +164,13 @@ export const useNetworkReconnect = () => {
       await chatStore.resetAndRefreshCurrentRoomMessages()
     }
     // 如果当前是群聊，刷新群组信息
-    if (globalStore.currentSession?.type === 2) {
-      await groupStore.getGroupUserList(true)
-      await groupStore.getCountStatistic()
-      await cachedStore.getGroupAtUserBaseInfo()
+    if (globalStore.currentSession?.type === RoomTypeEnum.GROUP) {
+      await groupStore.getGroupUserList(globalStore.currentSession.roomId)
     }
     // 刷新联系人列表
     await contactStore.getContactList(true)
     // 更新未读消息计数
-    globalStore.updateGlobalUnreadCount()
+    await globalStore.updateGlobalUnreadCount()
     // 刷新在线用户列表
     await groupStore.refreshGroupMembers()
 

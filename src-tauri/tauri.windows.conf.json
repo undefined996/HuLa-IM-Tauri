@@ -11,7 +11,8 @@
   },
   "bundle": {
     "resources": [
-      "tray"
+      "tray",
+      "configuration"
     ],
     "active": true,
     "targets": [
@@ -95,12 +96,13 @@
       {
         "label": "capture",
         "url": "/capture",
-        "fullscreen": false,
+        "fullscreen": true,
         "transparent": true,
         "resizable": false,
-        "skipTaskbar": false,
+        "skipTaskbar": true,
         "decorations": false,
-        "visible": false
+        "visible": false,
+        "hiddenTitle": true
       },
       {
         "label": "checkupdate",

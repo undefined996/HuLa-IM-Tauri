@@ -1,35 +1,36 @@
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { info } from '@tauri-apps/plugin-log'
+import { delay } from 'lodash-es'
+import { EventEnum, IsYesEnum, MittEnum, ThemeEnum } from '@/enums'
+import { useMitt } from '@/hooks/useMitt.ts'
+import { useTauriListener } from '@/hooks/useTauriListener'
 import { useWindow } from '@/hooks/useWindow.ts'
+import router from '@/router'
+import type { BadgeType, UserInfoType } from '@/services/types.ts'
+import { useGroupStore } from '@/stores/group'
+import { useLoginHistoriesStore } from '@/stores/loginHistory.ts'
+import { useMenuTopStore } from '@/stores/menuTop.ts'
 import { useSettingStore } from '@/stores/setting.ts'
 import { useUserStore } from '@/stores/user.ts'
-import { useCachedStore } from '@/stores/cached.ts'
 import { useUserStatusStore } from '@/stores/userStatus.ts'
-import { EventEnum, IsYesEnum, MittEnum, ThemeEnum } from '@/enums'
-import { BadgeType, UserInfoType } from '@/services/types.ts'
-import { useMitt } from '@/hooks/useMitt.ts'
-import apis from '@/services/apis.ts'
-import { delay } from 'lodash-es'
-import router from '@/router'
-import { useMenuTopStore } from '@/stores/menuTop.ts'
-import { useLoginHistoriesStore } from '@/stores/loginHistory.ts'
-import { useTauriListener } from '@/hooks/useTauriListener'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { modifyUserName, setUserBadge } from '@/utils/ImRequestUtils'
 
 export const leftHook = () => {
   const appWindow = WebviewWindow.getCurrent()
-  const { pushListeners } = useTauriListener()
+  const { addListener } = useTauriListener()
   const prefers = matchMedia('(prefers-color-scheme: dark)')
   const { createWebviewWindow } = useWindow()
   const settingStore = useSettingStore()
   const { menuTop } = useMenuTopStore()
   const loginHistoriesStore = useLoginHistoriesStore()
   const userStore = useUserStore()
-  const cachedStore = useCachedStore()
   const { themes } = settingStore
   const userStatusStore = useUserStatusStore()
   const { currentState } = storeToRefs(userStatusStore)
   const activeUrl = ref<string>(menuTop[0].url)
   const settingShow = ref(false)
   const shrinkStatus = ref(false)
+  const groupStore = useGroupStore()
   /** 是否展示个人信息浮窗 */
   const infoShow = ref(false)
   /** 是否显示上半部分操作栏中的提示 */
@@ -71,7 +72,7 @@ export const leftHook = () => {
 
   /** 更新缓存里面的用户信息 */
   const updateCurrentUserCache = (key: 'name' | 'wearingItemId' | 'avatar', value: any) => {
-    const currentUser = userStore.userInfo.uid && cachedStore.userCachedList[userStore.userInfo.uid]
+    const currentUser = userStore.userInfo!.uid && groupStore.getUserInfo(userStore.userInfo!.uid)
     if (currentUser) {
       currentUser[key] = value // 更新缓存里面的用户信息
     }
@@ -87,9 +88,9 @@ export const leftHook = () => {
       window.$message.error('改名次数不足')
       return
     }
-    apis.modifyUserName(localUserInfo.name).then(() => {
+    modifyUserName({ name: localUserInfo.name }).then(() => {
       // 更新本地缓存的用户信息
-      userStore.userInfo.name = localUserInfo.name!
+      userStore.userInfo!.name = localUserInfo.name!
       loginHistoriesStore.updateLoginHistory(<UserInfoType>userStore.userInfo) // 更新登录历史记录
       updateCurrentUserCache('name', localUserInfo.name) // 更新缓存里面的用户信息
       if (!editInfo.value.content.modifyNameChance) return
@@ -102,14 +103,14 @@ export const leftHook = () => {
   const toggleWarningBadge = async (badge: BadgeType) => {
     if (!badge?.id) return
     try {
-      await apis.setUserBadge(badge.id)
+      await setUserBadge({ badgeId: badge.id })
       // 更新本地缓存中的用户徽章信息
-      const currentUser = userStore.userInfo.uid && cachedStore.userCachedList[userStore.userInfo.uid]
+      const currentUser = userStore.userInfo!.uid && groupStore.getUserInfo(userStore.userInfo!.uid)
       if (currentUser) {
         // 更新当前佩戴的徽章ID
         currentUser.wearingItemId = badge.id
         // 更新用户信息中的佩戴徽章ID
-        userStore.userInfo.wearingItemId = badge.id
+        userStore.userInfo!.wearingItemId = badge.id
         // 更新徽章列表中的佩戴状态
         editInfo.value.badgeList = editInfo.value.badgeList.map((item) => ({
           ...item,
@@ -121,7 +122,7 @@ export const leftHook = () => {
       nextTick(() => {
         window.$message.success('佩戴成功')
       })
-    } catch (error) {
+    } catch (_error) {
       window.$message.error('佩戴失败，请稍后重试')
     }
   }
@@ -147,7 +148,8 @@ export const leftHook = () => {
   ) => {
     if (window) {
       delay(async () => {
-        await createWebviewWindow(
+        info(`打开窗口: ${title}`)
+        const webview = await createWebviewWindow(
           title!,
           url,
           <number>size?.width,
@@ -156,6 +158,12 @@ export const leftHook = () => {
           window?.resizable,
           <number>size?.minWidth
         )
+        openWindowsList.value.add(url)
+
+        const unlisten = await webview.onCloseRequested(() => {
+          openWindowsList.value.delete(url)
+          unlisten()
+        })
       }, 300)
     } else {
       activeUrl.value = url
@@ -197,16 +205,20 @@ export const leftHook = () => {
     useMitt.on(MittEnum.TO_SEND_MSG, (event: any) => {
       activeUrl.value = event.url
     })
-    await pushListeners([
+    await addListener(
       appWindow.listen(EventEnum.WIN_SHOW, (e) => {
         // 如果已经存在就不添加
         if (openWindowsList.value.has(e.payload)) return
         openWindowsList.value.add(e.payload)
       }),
+      EventEnum.WIN_SHOW
+    )
+    await addListener(
       appWindow.listen(EventEnum.WIN_CLOSE, (e) => {
         openWindowsList.value.delete(e.payload)
-      })
-    ])
+      }),
+      EventEnum.WIN_CLOSE
+    )
   })
 
   onUnmounted(() => {

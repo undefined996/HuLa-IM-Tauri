@@ -6,7 +6,7 @@
 
     <n-flex vertical justify="center" :size="25" class="pt-70px w-full">
       <n-flex justify="center" align="center">
-        <span class="text-(24px #70938c) font-bold textFont">欢迎注册</span>
+        <span class="text-(24px #70938c) textFont">欢迎注册</span>
         <img class="w-100px h-40px" src="@/assets/logo/hula.png" alt="" />
       </n-flex>
 
@@ -17,22 +17,22 @@
           <div v-if="currentStep === 1">
             <n-form-item path="name">
               <n-input
-                :class="[{ 'pr-20px': info.name }, { 'pr-16px': showNamePrefix && !info.name }]"
+                :class="[{ 'pr-20px': info.nickName }, { 'pr-16px': showNamePrefix && !info.nickName }]"
                 maxlength="8"
                 minlength="1"
                 size="large"
-                v-model:value="info.name"
+                v-model:value="info.nickName"
                 type="text"
                 spellCheck="false"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
                 :allow-input="noSideSpace"
-                :placeholder="showNamePrefix ? '' : placeholders.name"
-                @focus="handleInputState($event, 'name')"
-                @blur="handleInputState($event, 'name')"
+                :placeholder="showNamePrefix ? '' : placeholders.nickName"
+                @focus="handleInputState($event, 'nickName')"
+                @blur="handleInputState($event, 'nickName')"
                 clearable>
-                <template #prefix v-if="showNamePrefix || info.name">
+                <template #prefix v-if="showNamePrefix || info.nickName">
                   <p class="text-12px">昵称</p>
                 </template>
               </n-input>
@@ -91,21 +91,18 @@
               <n-flex vertical :size="4">
                 <Validation :value="info.password" message="最少6位" :validator="validateMinLength" />
                 <Validation :value="info.password" message="由英文和数字构成" :validator="validateAlphaNumeric" />
-                <Validation
-                  :value="info.password"
-                  message="必须有一个特殊字符!@#¥%.&*"
-                  :validator="validateSpecialChar" />
+                <Validation :value="info.password" message="必须有一个特殊字符" :validator="validateSpecialChar" />
               </n-flex>
             </n-flex>
 
             <!-- 协议 -->
-            <n-flex justify="center" :size="6" class="mt-10px">
+            <n-flex align="center" justify="center" :size="6" class="mt-10px">
               <n-checkbox v-model:checked="protocol" />
               <div class="text-12px color-#909090 cursor-default lh-14px">
                 <span>已阅读并同意</span>
-                <span class="color-#13987f cursor-pointer">服务协议</span>
+                <span class="color-#13987f cursor-pointer" @click.stop="openServiceAgreement">服务协议</span>
                 <span>和</span>
-                <span class="color-#13987f cursor-pointer">HuLa隐私保护指引</span>
+                <span class="color-#13987f cursor-pointer" @click.stop="openPrivacyAgreement">HuLa隐私保护指引</span>
               </div>
             </n-flex>
           </div>
@@ -122,7 +119,10 @@
                 :append="true"
                 clearable
                 type="text"
-                autocomplete="off"
+                spellCheck="false"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
                 @focus="handleInputState($event, 'email')"
                 @blur="handleInputState($event, 'email')">
                 <template #prefix v-if="showemailPrefix || info.email">
@@ -144,8 +144,7 @@
                 :placeholder="showCodePrefix ? '' : placeholders.code"
                 @focus="handleInputState($event, 'code')"
                 @blur="handleInputState($event, 'code')"
-                clearable>
-              </n-input>
+                clearable></n-input>
 
               <n-image
                 width="120"
@@ -165,9 +164,10 @@
         <n-button
           :loading="loading"
           :disabled="btnEnable"
-          class="w-full mt-8px mb-50px"
-          @click="handleStepAction"
-          color="#13987f">
+          tertiary
+          style="color: #fff"
+          class="w-full mt-8px mb-50px gradient-button"
+          @click="handleStepAction">
           {{ btnText }}
         </n-button>
       </n-flex>
@@ -184,8 +184,8 @@
         <n-flex vertical class="w-full h-fit">
           <video class="w-full h-240px rounded-t-8px object-cover" src="@/assets/video/star.mp4" autoplay loop />
           <n-flex vertical :size="10" class="p-14px">
-            <p class="text-(16px [--text-color] font-bold)">在 GitHub 为我们点亮星标</p>
-            <p class="text-(12px [--chat-text-color]) leading-5">
+            <p class="text-(16px #303030)">在 GitHub 为我们点亮星标</p>
+            <p class="text-(12px #808080) leading-5">
               如果您喜爱我们的产品，并希望支持我们，可以去 GitHub
               给我们点一颗星吗？这个小小的动作对我们来说意义重大，能激励我们为您持续提供特性体验。
             </p>
@@ -207,11 +207,26 @@
 
     <!-- 邮箱验证码输入弹窗 -->
     <n-modal v-model:show="emailCodeModal" :mask-closable="false" class="rounded-8px" transform-origin="center">
-      <div class="bg-[--bg-edit] w-380px h-fit box-border flex flex-col">
+      <div class="bg-#f0f0f0 w-380px h-fit box-border flex flex-col">
+        <div
+          v-if="isMac()"
+          @click="emailCodeModal = false"
+          class="mac-close z-999 size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none absolute top-3px left-4px">
+          <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
+            <use href="#close"></use>
+          </svg>
+        </div>
+
+        <svg
+          v-if="isWindows()"
+          @click="emailCodeModal = false"
+          class="w-12px h-12px ml-a mr-4px mt-4px cursor-pointer select-none">
+          <use href="#close"></use>
+        </svg>
         <n-flex vertical class="w-full h-fit">
-          <n-flex vertical :size="10" class="p-20px">
-            <p class="text-(16px [--text-color] font-bold) mb-10px">请输入邮箱验证码</p>
-            <p class="text-(12px [--chat-text-color]) leading-5 mb-10px">
+          <n-flex vertical :size="10" class="p-24px">
+            <p class="text-(16px #303030) mb-10px">请输入邮箱验证码</p>
+            <p class="text-(12px #808080) leading-5 mb-10px">
               验证码已发送至 {{ info.email }}，请查收并输入验证码完成注册
             </p>
 
@@ -223,9 +238,10 @@
             <n-button
               :loading="registerLoading"
               :disabled="!isEmailCodeComplete"
-              class="w-full"
-              @click="register"
-              color="#13987f">
+              tertiary
+              style="color: #fff"
+              class="w-full gradient-button"
+              @click="register">
               注册
             </n-button>
           </n-flex>
@@ -236,16 +252,18 @@
 </template>
 
 <script setup lang="ts">
-import { lightTheme } from 'naive-ui'
-import apis from '@/services/apis.ts'
 import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import dayjs from 'dayjs'
-import { RegisterUserReq } from '@/services/types.ts'
-import Validation from '@/components/common/Validation.vue'
+import { lightTheme } from 'naive-ui'
 import PinInput from '@/components/common/PinInput.vue'
+import Validation from '@/components/common/Validation.vue'
+import { useWindow } from '@/hooks/useWindow'
+import type { RegisterUserReq } from '@/services/types.ts'
+import * as ImRequestUtils from '@/utils/ImRequestUtils'
+import { isMac, isWindows } from '@/utils/PlatformConstants'
 
 // 输入框类型定义
-type InputType = 'name' | 'email' | 'password' | 'code' | 'confirmPassword'
+type InputType = 'nickName' | 'email' | 'password' | 'code' | 'confirmPassword'
 
 /** 注册信息 */
 const info = unref(
@@ -253,9 +271,12 @@ const info = unref(
     avatar: '',
     email: '',
     password: '',
-    name: '',
+    nickName: '',
     code: '',
-    uuid: ''
+    uuid: '',
+    key: 'REGISTER_EMAIL',
+    confirmPassword: '',
+    systemType: 2
   })
 )
 
@@ -273,7 +294,7 @@ const registerLoading = ref(false)
 
 // 占位符
 const placeholders: Record<InputType, string> = {
-  name: '输入HuLa昵称',
+  nickName: '输入HuLa昵称',
   email: '输入邮箱',
   password: '输入HuLa密码',
   code: '验证码',
@@ -286,7 +307,7 @@ const showemailPrefix = ref(false)
 const showPasswordPrefix = ref(false)
 const showCodePrefix = ref(false)
 const showConfirmPasswordPrefix = ref(false)
-
+const { createModalWindow } = useWindow()
 // 常用邮箱后缀
 const commonEmailDomains = computed(() => {
   return ['gmail.com', '163.com', 'qq.com'].map((suffix) => {
@@ -321,7 +342,7 @@ const isEmailCodeComplete = computed(() => emailCode.value.length === 6)
 
 // 校验规则
 const rules = {
-  name: {
+  nickName: {
     required: true,
     message: '请输入昵称',
     trigger: 'blur'
@@ -361,6 +382,16 @@ const getShow = (value: string) => {
   return false
 }
 
+/** 打开服务协议窗口 */
+const openServiceAgreement = async () => {
+  await createModalWindow('服务协议', 'modal-serviceAgreement', 600, 600, 'login')
+}
+
+/** 打开隐私保护协议窗口 */
+const openPrivacyAgreement = async () => {
+  await createModalWindow('隐私保护指引', 'modal-privacyAgreement', 600, 600, 'login')
+}
+
 /** 不允许输入空格 */
 const noSideSpace = (value: string) => !value.startsWith(' ') && !value.endsWith(' ')
 
@@ -375,7 +406,7 @@ const validateAlphaNumeric = (value: string) => {
 }
 
 /** 检查密码是否包含特殊字符 */
-const validateSpecialChar = (value: string) => /[!@#¥$%.&*]/.test(value)
+const validateSpecialChar = (value: string) => /[!@#¥$%.&*^()_+=-~]/.test(value)
 
 /** 检查密码是否满足所有条件 */
 const isPasswordValid = computed(() => {
@@ -385,7 +416,7 @@ const isPasswordValid = computed(() => {
 
 /** 检查第一步是否可以继续 */
 const isStep1Valid = computed(() => {
-  return info.name && isPasswordValid.value && confirmPassword.value === info.password && protocol.value
+  return info.nickName && isPasswordValid.value && confirmPassword.value === info.password && protocol.value
 })
 
 /** 检查第二步是否可以继续 */
@@ -408,7 +439,7 @@ watchEffect(() => {
  */
 const handleInputState = (event: FocusEvent, type: InputType): void => {
   const prefixMap: Record<InputType, Ref<boolean>> = {
-    name: showNamePrefix,
+    nickName: showNamePrefix,
     email: showemailPrefix,
     password: showPasswordPrefix,
     code: showCodePrefix,
@@ -441,7 +472,7 @@ const getVerifyCode = async () => {
     }
   }, 1000)
 
-  const { img, uuid } = await apis.getCaptcha()
+  const { img, uuid } = await ImRequestUtils.getCaptcha()
   captcha.value = { base64: img, uuid }
 }
 
@@ -456,7 +487,11 @@ const handleStepAction = async () => {
     loading.value = true
     try {
       // 发送邮箱验证码
-      await apis.sendCaptcha({ email: info.email, code: info.code.toString(), uuid: captcha.value.uuid.toString() })
+      await ImRequestUtils.sendCaptcha({
+        email: info.email,
+        uuid: captcha.value.uuid.toString(),
+        templateCode: 'REGISTER_EMAIL'
+      })
       window.$message.success('验证码已发送')
       loading.value = false
       // 显示邮箱验证码输入弹窗
@@ -489,8 +524,10 @@ const register = async () => {
     const avatarId = avatarNum.toString().padStart(3, '0')
     info.avatar = avatarId
 
+    info.confirmPassword = confirmPassword.value
+
     // 注册
-    await apis.register({ ...info })
+    await ImRequestUtils.register({ ...info })
     window.$message.success('注册成功')
 
     // 关闭弹窗并跳转到登录页

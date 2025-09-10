@@ -9,7 +9,7 @@
     <!-- 主体内容区域 -->
     <div ref="contentRef" class="flex-1 overflow-auto">
       <!-- 图片展示区域 -->
-      <div ref="imgContainerRef" class="min-h-[calc(100vh-124px)] flex-center">
+      <div ref="imgContainerRef" style="min-height: calc(100vh / var(--page-scale, 1) - 124px)" class="flex-center">
         <img
           ref="imageRef"
           :src="currentImage"
@@ -107,13 +107,13 @@
 </template>
 
 <script setup lang="ts">
-import { save } from '@tauri-apps/plugin-dialog'
-import { useDownload } from '@/hooks/useDownload'
 import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import ActionBar from '@/components/windows/ActionBar.vue'
+import { save } from '@tauri-apps/plugin-dialog'
 import { NTooltip } from 'naive-ui'
-import { useImageViewer } from '@/stores/imageViewer.ts'
+import ActionBar from '@/components/windows/ActionBar.vue'
+import { useDownload } from '@/hooks/useDownload'
 import { useTauriListener } from '@/hooks/useTauriListener'
+import { useImageViewer } from '@/stores/imageViewer.ts'
 
 const { addListener } = useTauriListener()
 const { downloadFile } = useDownload()

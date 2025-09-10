@@ -52,7 +52,7 @@
 
       <!--暂无数据-->
       <div v-if="!announList || announList.length === 0" class="flex-center">
-        <n-empty style="height: calc(100vh - 100px)" class="flex-center" description="暂无公告">
+        <n-empty style="height: calc(100vh / var(--page-scale, 1) - 100px)" class="flex-center" description="暂无公告">
           <template #icon>
             <n-icon>
               <svg>
@@ -74,10 +74,17 @@
               <div class="size-full flex-between-center">
                 <n-flex align="center" :size="16" class="pl-4px pt-4px">
                   <n-flex align="center" :size="6">
-                    <n-avatar round :size="28" :src="avatarSrc(announcement.uid)" fallback-src="/logo.png" />
+                    <n-avatar
+                      round
+                      :size="28"
+                      :src="avatarSrc(announcement.uid)"
+                      :color="themes.content === ThemeEnum.DARK ? '' : '#fff'"
+                      :fallback-src="themes.content === ThemeEnum.DARK ? '/logoL.png' : '/logoD.png'" />
                     <n-flex vertical :size="4">
-                      <div class="text-(12px [--chat-text-color])">{{ useUserInfo(announcement.uid).value.name }}</div>
-                      <div class="text-(12px [#909090])">{{ announcement?.publishTime }}</div>
+                      <div class="text-(12px [--chat-text-color])">
+                        {{ groupStore.getUserInfo(announcement.uid)?.name }}
+                      </div>
+                      <div class="text-(12px [#909090])">{{ formatTimestamp(announcement?.createTime) }}</div>
                     </n-flex>
                   </n-flex>
                   <div
@@ -103,9 +110,9 @@
                       <n-button
                         size="small"
                         tertiary
-                        @click.stop="announcementStates[announcement.id].showDeleteConfirm = false"
-                        >取消</n-button
-                      >
+                        @click.stop="announcementStates[announcement.id].showDeleteConfirm = false">
+                        取消
+                      </n-button>
                       <n-button
                         size="small"
                         type="error"
@@ -161,16 +168,18 @@
   </main>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import apis from '@/services/apis'
-import { useRoute } from 'vue-router'
-import { useGroupStore } from '@/stores/group.ts'
-import { useCachedStore } from '@/stores/cached'
-import { useUserStore } from '@/stores/user'
-import { useUserInfo } from '@/hooks/useCached.ts'
-import { AvatarUtils } from '@/utils/AvatarUtils'
 import { emitTo } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { info } from '@tauri-apps/plugin-log'
+import { useRoute } from 'vue-router'
+import { ThemeEnum } from '@/enums'
+import { useCachedStore } from '@/stores/cached'
+import { useGroupStore } from '@/stores/group.ts'
+import { useSettingStore } from '@/stores/setting'
+import { useUserStore } from '@/stores/user'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { formatTimestamp } from '@/utils/ComputedTime.ts'
+import { deleteAnnouncement, editAnnouncement, pushAnnouncement } from '@/utils/ImRequestUtils'
 
 // 定义响应式变量
 const title = ref('')
@@ -195,18 +204,20 @@ const announcementStates = ref<Record<string, { showDeleteConfirm: boolean; dele
 const groupStore = useGroupStore()
 const cachedStore = useCachedStore()
 const userStore = useUserStore()
+const settingStore = useSettingStore()
+const { themes } = storeToRefs(settingStore)
 /** 判断当前用户是否拥有id为6的徽章 并且是频道 */
 const hasBadge6 = computed(() => {
   // 只有当 roomId 为 "1" 时才进行徽章判断（频道）
   if (roomId.value !== '1') return false
 
-  const currentUser = useUserInfo(userStore.userInfo?.uid).value
+  const currentUser = groupStore.getUserInfo(userStore.userInfo!.uid)!
   return currentUser?.itemIds?.includes('6')
 })
 const isAdmin = computed(() => {
-  let LordId = groupStore.currentLordId
-  let adminUserTds = groupStore.adminUidList
-  let uid = useUserStore().userInfo?.uid
+  const LordId = groupStore.currentLordId
+  const adminUserTds = groupStore.adminUidList
+  const uid = useUserStore().userInfo?.uid
   // 由于 uid 可能为 undefined，需要进行类型检查，确保其为 string 类型
   if (uid && (uid === LordId || adminUserTds.includes(uid) || hasBadge6.value)) {
     return true
@@ -223,7 +234,7 @@ watch(
   }
 )
 
-const avatarSrc = (uid: string) => AvatarUtils.getAvatarUrl(useUserInfo(uid).value.avatar as string)
+const avatarSrc = (uid: string) => AvatarUtils.getAvatarUrl(groupStore.getUserInfo(uid)!.avatar as string)
 
 // 初始化函数，获取群公告列表
 const handleInit = async () => {
@@ -241,7 +252,8 @@ const handleInit = async () => {
 
         // 处理公告的userName getUserGroupNickname
         announList.value.forEach((item) => {
-          item.userName = cachedStore.getUserGroupNickname(item.uid, roomId.value)
+          const user = groupStore.getUser(roomId.value, item.uid)
+          item.userName = user?.myName || user.name
           // 添加展开/收起状态控制
           item.expanded = false
           announcementStates.value[item.id] = {
@@ -302,7 +314,8 @@ const handleLoadMore = async () => {
             deleteLoading: false
           }
           // 处理公告的userName
-          item.userName = cachedStore.getUserGroupNickname(item.uid, roomId.value)
+          const user = groupStore.getUser(roomId.value, item.uid)
+          item.userName = user?.myName || user.name
         })
 
         // 添加新的非重复数据到列表中
@@ -358,7 +371,7 @@ const handleDel = async (announcement: any) => {
     announcementStates.value[announcement.id].deleteLoading = true
 
     // 同时处理删除请求和最小延迟时间
-    await Promise.all([apis.deleteAnnouncement(announcement.id), new Promise((resolve) => setTimeout(resolve, 600))])
+    await Promise.all([deleteAnnouncement(announcement.id), new Promise((resolve) => setTimeout(resolve, 600))])
 
     // 重置该公告的确认框状态
     announcementStates.value[announcement.id].showDeleteConfirm = false
@@ -376,11 +389,11 @@ const handleDel = async (announcement: any) => {
     // 发送刷新消息通知其他组件
     if (announList.value.length === 0) {
       // 如果没有公告了，发送清空事件
-      emitTo('home', 'announcementClear')
+      await emitTo('home', 'announcementClear')
     }
 
     // 无论如何都要发送更新事件，携带最新状态
-    emitTo('home', 'announcementUpdated', {
+    await emitTo('home', 'announcementUpdated', {
       hasAnnouncements: announList.value.length > 0,
       topAnnouncement: newTopAnnouncement
     })
@@ -422,14 +435,14 @@ const handlePushAnnouncement = async () => {
 
   const apiCall = isEdit.value
     ? () =>
-        apis.editAnnouncement({
+        editAnnouncement({
           id: editAnnoouncement.value.id,
           roomId: roomId.value,
           content: announContent.value,
           top: isTop.value
         })
     : () =>
-        apis.pushAnnouncement({
+        pushAnnouncement({
           roomId: roomId.value,
           content: announContent.value,
           top: isTop.value
@@ -451,8 +464,9 @@ const handlePushAnnouncement = async () => {
       newTopAnnouncement = announList.value.find((item: any) => item.top)
     }
 
+    info(`发送更新事件通知home: `)
     // 发送更新事件通知其他组件
-    emitTo('home', 'announcementUpdated', {
+    await emitTo('home', 'announcementUpdated', {
       hasAnnouncements: announList.value.length > 0,
       topAnnouncement: newTopAnnouncement
     })

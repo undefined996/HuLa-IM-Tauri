@@ -1,14 +1,15 @@
 import { emit } from '@tauri-apps/api/event'
-import { EventEnum, MittEnum, RoomTypeEnum, SessionOperateEnum, NotificationTypeEnum } from '@/enums'
-import { useMitt } from '@/hooks/useMitt.ts'
-import { SessionItem } from '@/services/types.ts'
-import { useSettingStore } from '@/stores/setting.ts'
-import { useGlobalStore } from '@/stores/global.ts'
-import { useChatStore } from '@/stores/chat.ts'
-import { useTauriListener } from './useTauriListener'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import apis from '@/services/apis'
+import { EventEnum, MittEnum, NotificationTypeEnum, RoomTypeEnum, SessionOperateEnum } from '@/enums'
+import { useMitt } from '@/hooks/useMitt.ts'
+import type { SessionItem } from '@/services/types.ts'
+import { useChatStore } from '@/stores/chat.ts'
 import { useContactStore } from '@/stores/contacts.ts'
+import { useGlobalStore } from '@/stores/global.ts'
+import { useSettingStore } from '@/stores/setting.ts'
+import { exitGroup, markMsgRead, notification, setSessionTop, shield } from '@/utils/ImRequestUtils'
+import { invokeWithErrorHandler } from '../utils/TauriInvokeHandler'
+import { useTauriListener } from './useTauriListener'
 
 const msgBoxShow = ref(false)
 /** 独立窗口的集合 */
@@ -17,7 +18,7 @@ const shrinkStatus = ref(false)
 const itemRef = ref<SessionItem>()
 export const useMessage = () => {
   const route = useRoute()
-  const { pushListeners } = useTauriListener()
+  const { addListener } = useTauriListener()
   const globalStore = useGlobalStore()
   const chatStore = useChatStore()
   const settingStore = useSettingStore()
@@ -31,21 +32,18 @@ export const useMessage = () => {
   })
 
   /** 处理点击选中消息 */
-  const handleMsgClick = (item: SessionItem) => {
+  const handleMsgClick = async (item: SessionItem) => {
     msgBoxShow.value = true
     // 更新当前会话信息
-    globalStore.currentSession.roomId = item.roomId
-    globalStore.currentSession.type = item.type
-    const data = { msgBoxShow, item }
-    console.log('handleMsgClick:', item)
-    useMitt.emit(MittEnum.MSG_BOX_SHOW, data)
+    globalStore.updateCurrentSessionRoomId(item.roomId)
+    await chatStore.changeRoom()
 
     // 只有在消息页面且有未读消息时，才标记为已读
-    if (route.path === '/message' && item.unreadCount > 0) {
-      apis.markMsgRead({ roomId: item.roomId || '1' }).then(() => {
+    if ((route.path === '/message' || route.path === '/mobile/message') && item.unreadCount > 0) {
+      markMsgRead(item.roomId || '1').then(async () => {
         chatStore.markSessionRead(item.roomId || '1')
         // 更新全局未读计数
-        globalStore.updateGlobalUnreadCount()
+        await globalStore.updateGlobalUnreadCount()
       })
     }
   }
@@ -59,12 +57,13 @@ export const useMessage = () => {
     const currentIndex = currentSessions.findIndex((session) => session.roomId === roomId)
 
     // 检查是否是当前选中的会话
-    const isCurrentSession = roomId === globalStore.currentSession.roomId
+    const isCurrentSession = roomId === globalStore.currentSession!.roomId
 
-    chatStore.removeContact(roomId)
+    chatStore.removeSession(roomId)
     // TODO: 使用隐藏会话接口
-    const res = await apis.hideSession({ roomId, hide: true })
-    console.log(res, roomId)
+    // const res = await apis.hideSession({ roomId, hide: true })
+    await invokeWithErrorHandler('hide_contact_command', { data: { roomId, hide: true } })
+    // console.log(res, roomId)
 
     // 如果不是当前选中的会话，直接返回
     if (!isCurrentSession) {
@@ -72,12 +71,6 @@ export const useMessage = () => {
     }
 
     const updatedSessions = chatStore.sessionList
-
-    // 如果没有会话就把右侧消息框关闭
-    if (updatedSessions.length === 0) {
-      useMitt.emit(MittEnum.MSG_BOX_SHOW, { item: -1 })
-      return
-    }
 
     // 选择下一个或上一个会话
     const nextIndex = Math.min(currentIndex, updatedSessions.length - 1)
@@ -88,31 +81,14 @@ export const useMessage = () => {
   const handleMsgDblclick = (item: SessionItem) => {
     if (!chat.value.isDouble) return
     console.log(item)
-
-    // delay(async () => {
-    //   await openAloneWin(item)
-    // }, 300)
   }
-
-  /** 打开独立窗口 */
-  // const openAloneWin = async (item: SessionItem) => {
-  //   itemRef.value = { ...item }
-  //   if (globalStore.currentSession.roomId === item.roomId) {
-  //     useMitt.emit(MittEnum.MSG_BOX_SHOW, { item: -1 })
-  //     await listen('aloneWin', () => {
-  //       emit('aloneData', { item: { ...item } })
-  //     })
-  //   }
-  //   await createWebviewWindow(item.name, EventEnum.ALONE + item.roomId, 720, 800, '', true, 580)
-  // }
 
   const menuList = ref<OPT.RightMenu[]>([
     {
       label: (item: SessionItem) => (item.top ? '取消置顶' : '置顶'),
       icon: (item: SessionItem) => (item.top ? 'to-bottom' : 'to-top'),
       click: (item: SessionItem) => {
-        apis
-          .setSessionTop({ roomId: item.roomId, top: !item.top })
+        setSessionTop({ roomId: item.roomId, top: !item.top })
           .then(() => {
             // 更新本地会话状态
             chatStore.updateSession(item.roomId, { top: !item.top })
@@ -159,7 +135,7 @@ export const useMessage = () => {
             click: async () => {
               // 如果当前是屏蔽状态，需要先取消屏蔽
               if (item.shield) {
-                await apis.shield({
+                await shield({
                   roomId: item.roomId,
                   state: false
                 })
@@ -174,7 +150,7 @@ export const useMessage = () => {
             click: async () => {
               // 如果当前是屏蔽状态，需要先取消屏蔽
               if (item.shield) {
-                await apis.shield({
+                await shield({
                   roomId: item.roomId,
                   state: false
                 })
@@ -187,12 +163,7 @@ export const useMessage = () => {
             label: '屏蔽群消息',
             icon: item.shield ? 'check-small' : '',
             click: async () => {
-              // 如果当前是免打扰状态，需要先恢复为允许提醒
-              if (item.muteNotification === NotificationTypeEnum.NOT_DISTURB) {
-                await handleNotificationChange(item, NotificationTypeEnum.RECEPTION)
-              }
-
-              await apis.shield({
+              await shield({
                 roomId: item.roomId,
                 state: !item.shield
               })
@@ -222,6 +193,25 @@ export const useMessage = () => {
 
   const specialMenuList = ref<OPT.RightMenu[]>([
     {
+      label: (item: SessionItem) => (item.shield ? '取消屏蔽消息' : '屏蔽此人消息'),
+      icon: (item: SessionItem) => (item.shield ? 'message-success' : 'people-unknown'),
+      click: async (item: SessionItem) => {
+        await shield({
+          roomId: item.roomId,
+          state: !item.shield
+        })
+
+        // 更新本地会话状态
+        chatStore.updateSession(item.roomId, {
+          shield: !item.shield
+        })
+
+        window.$message.success(item.shield ? '已取消屏蔽' : '已屏蔽消息')
+      },
+      // 只在单聊时显示
+      visible: (item: SessionItem) => item.type === RoomTypeEnum.SINGLE
+    },
+    {
       label: '从消息列表中移除',
       icon: 'delete',
       click: async (item: SessionItem) => {
@@ -236,7 +226,7 @@ export const useMessage = () => {
       },
       icon: (item: SessionItem) => {
         if (item.type === RoomTypeEnum.SINGLE) return 'forbid'
-        if (item.operate === SessionOperateEnum.DISSOLUTION_GROUP) return 'delete'
+        if (item.operate === SessionOperateEnum.DISSOLUTION_GROUP) return 'logout'
         return 'logout'
       },
       click: async (item: SessionItem) => {
@@ -257,7 +247,7 @@ export const useMessage = () => {
         }
 
         // 群聊：解散或退出
-        await apis.exitGroup({ roomId: item.roomId })
+        await exitGroup({ roomId: item.roomId })
         await handleMsgDelete(item.roomId)
         window.$message.success(item.operate === SessionOperateEnum.DISSOLUTION_GROUP ? '已解散群聊' : '已退出群聊')
       },
@@ -273,31 +263,12 @@ export const useMessage = () => {
         // 群聊：始终显示退出选项，如果是群主则显示解散选项
         return true
       }
-    },
-    {
-      label: (item: SessionItem) => (item.shield ? '取消屏蔽消息' : '屏蔽此人消息'),
-      icon: (item: SessionItem) => (item.shield ? 'message-success' : 'people-unknown'),
-      click: async (item: SessionItem) => {
-        await apis.shield({
-          roomId: item.roomId,
-          state: !item.shield
-        })
-
-        // 更新本地会话状态
-        chatStore.updateSession(item.roomId, {
-          shield: !item.shield
-        })
-
-        window.$message.success(item.shield ? '已取消屏蔽' : '已屏蔽消息')
-      },
-      // 只在单聊时显示
-      visible: (item: SessionItem) => item.type === RoomTypeEnum.SINGLE
     }
   ])
 
   // 添加通知设置变更处理函数
   const handleNotificationChange = async (item: SessionItem, newType: NotificationTypeEnum) => {
-    await apis.notification({
+    await notification({
       roomId: item.roomId,
       type: newType
     })
@@ -329,21 +300,23 @@ export const useMessage = () => {
 
   onMounted(async () => {
     const appWindow = WebviewWindow.getCurrent()
-    await pushListeners([
+    await addListener(
       appWindow.listen(EventEnum.ALONE, () => {
         emit(EventEnum.ALONE + itemRef.value?.roomId, itemRef.value)
         if (aloneWin.value.has(EventEnum.ALONE + itemRef.value?.roomId)) return
         aloneWin.value.add(EventEnum.ALONE + itemRef.value?.roomId)
       }),
+      EventEnum.ALONE
+    )
+    addListener(
       appWindow.listen(EventEnum.WIN_CLOSE, (e) => {
         aloneWin.value.delete(e.payload)
-      })
-    ])
+      }),
+      EventEnum.WIN_CLOSE
+    )
   })
 
   onBeforeUnmount(() => {
-    // 取消监听, 避免内存中还存在监听，导致请求次数过多
-    useMitt.off(MittEnum.MSG_BOX_SHOW, () => {})
     useMitt.off(MittEnum.SHRINK_WINDOW, () => {})
   })
 

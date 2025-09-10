@@ -1,14 +1,14 @@
 <template>
-  <!-- 消息列表 // TODO 使用虚拟列表组件就用不了动画和拖动了 (nyh -> 2024-03-28 06:01:00) -->
-  <n-scrollbar ref="msg-scrollbar" style="max-height: calc(100vh - 70px)">
-    <!--  右键菜单组件  -->
+  <n-scrollbar ref="msg-scrollbar" style="max-height: calc(100vh / var(--page-scale, 1) - 70px)">
+    <!--  会话列表  -->
     <div v-if="sessionList.length > 0" class="p-[4px_10px_0px_8px]">
       <ContextMenu
         v-for="item in sessionList"
         :key="item.roomId"
         :class="[
-          { active: currentSession.roomId === item.roomId },
-          { 'bg-[--bg-msg-first-child] rounded-12px relative': item.top }
+          { active: globalStore.currentSession?.roomId === item.roomId },
+          { 'bg-[--bg-msg-first-child] rounded-12px relative': item.top },
+          { 'context-menu-active': activeContextMenuRoomId === item.roomId }
         ]"
         :data-key="item.roomId"
         :menu="menuList"
@@ -17,13 +17,15 @@
         class="msg-box w-full h-75px mb-5px"
         @click="handleMsgClick(item)"
         @dblclick="handleMsgDblclick(item)"
-        @select="$event.click(item)">
+        @select="$event.click(item)"
+        @menu-show="handleMenuShow(item.roomId, $event)">
         <n-flex :size="10" align="center" class="h-75px pl-6px pr-8px flex-1">
           <n-avatar
             style="border: 1px solid var(--avatar-border-color)"
             :size="44"
+            :color="themes.content === ThemeEnum.DARK ? '' : '#fff'"
+            :fallback-src="themes.content === ThemeEnum.DARK ? '/logoL.png' : '/logoD.png'"
             :src="AvatarUtils.getAvatarUrl(item.avatar)"
-            fallback-src="/logo.png"
             round />
 
           <n-flex class="h-fit flex-1 truncate" justify="space-between" vertical>
@@ -33,7 +35,7 @@
                 <n-popover trigger="hover" v-if="item.hotFlag === IsAllUserEnum.Yes">
                   <template #trigger>
                     <svg
-                      :class="[currentSession.roomId === item.roomId ? 'color-#33ceab' : 'color-#13987f']"
+                      :class="[globalStore.currentSession?.roomId === item.roomId ? 'color-#33ceab' : 'color-#13987f']"
                       class="size-20px select-none outline-none cursor-pointer">
                       <use href="#auth"></use>
                     </svg>
@@ -59,7 +61,7 @@
               <!-- 消息提示 -->
               <template v-if="item.muteNotification === 1 && !item.unreadCount">
                 <svg
-                  :class="[currentSession.roomId === item.roomId ? 'color-#fefefe' : 'color-#909090']"
+                  :class="[globalStore.currentSession?.roomId === item.roomId ? 'color-#fefefe' : 'color-#909090']"
                   class="size-14px">
                   <use href="#close-remind"></use>
                 </svg>
@@ -80,7 +82,7 @@
       v-else-if="chatStore.sessionOptions.isLoading"
       vertical
       :size="18"
-      style="max-height: calc(100vh - 70px)"
+      style="max-height: calc(100vh / var(--page-scale, 1) - 70px)"
       class="relative h-100vh box-border p-20px">
       <n-flex>
         <n-skeleton style="border-radius: 14px" height="60px" width="100%" :sharp="false" />
@@ -108,31 +110,35 @@
   </n-scrollbar>
 </template>
 <script lang="ts" setup name="message">
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import SysNTF from '@/components/common/SystemNotification.tsx'
+import { MittEnum, RoomTypeEnum, ThemeEnum } from '@/enums'
+import { useCommon } from '@/hooks/useCommon.ts'
 import { useMessage } from '@/hooks/useMessage.ts'
-import { MittEnum, RoomTypeEnum } from '@/enums'
-import { IsAllUserEnum, SessionItem } from '@/services/types.ts'
-import { formatTimestamp } from '@/utils/ComputedTime.ts'
+import { useMitt } from '@/hooks/useMitt'
+import { useReplaceMsg } from '@/hooks/useReplaceMsg.ts'
+import { useTauriListener } from '@/hooks/useTauriListener'
+import { IsAllUserEnum, type SessionItem } from '@/services/types.ts'
 import { useChatStore } from '@/stores/chat.ts'
 import { useGlobalStore } from '@/stores/global.ts'
-import { useUserInfo } from '@/hooks/useCached.ts'
-import { useReplaceMsg } from '@/hooks/useReplaceMsg.ts'
-import { useCommon } from '@/hooks/useCommon.ts'
-import SysNTF from '@/components/common/SystemNotification.tsx'
-import { AvatarUtils } from '@/utils/AvatarUtils'
 import { useGroupStore } from '@/stores/group.ts'
-import { useMitt } from '@/hooks/useMitt'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useTauriListener } from '@/hooks/useTauriListener'
+import { useSettingStore } from '@/stores/setting'
+import { AvatarUtils } from '@/utils/AvatarUtils'
+import { formatTimestamp } from '@/utils/ComputedTime.ts'
 
 const appWindow = WebviewWindow.getCurrent()
-const { addListener } = useTauriListener()
 const chatStore = useChatStore()
 const globalStore = useGlobalStore()
 const groupStore = useGroupStore()
+const settingStore = useSettingStore()
+const { addListener } = useTauriListener()
+const { themes } = storeToRefs(settingStore)
 const { openMsgSession } = useCommon()
 const msgScrollbar = useTemplateRef<HTMLElement>('msg-scrollbar')
 const { handleMsgClick, handleMsgDelete, menuList, specialMenuList, handleMsgDblclick } = useMessage()
-const currentSession = computed(() => globalStore.currentSession)
+// 跟踪当前显示右键菜单的会话ID
+const activeContextMenuRoomId = ref<string | null>(null)
+
 // 会话列表 TODO: 需要后端返回对应字段
 const sessionList = computed(() => {
   return (
@@ -141,7 +147,7 @@ const sessionList = computed(() => {
         // 获取最新的头像
         let latestAvatar = item.avatar
         if (item.type === RoomTypeEnum.SINGLE && item.id) {
-          latestAvatar = useUserInfo(item.id).value.avatar || item.avatar
+          latestAvatar = groupStore.getUserInfo(item.id)?.avatar || item.avatar
         }
 
         // 获取群聊备注名称（如果有）
@@ -151,30 +157,27 @@ const sessionList = computed(() => {
           displayName = item.remark
         }
 
+        const { checkRoomAtMe, getMessageSenderName, formatMessageContent } = useReplaceMsg()
         // 获取该会话的所有消息用于检查@我
-        const messages = Array.from(chatStore.messageMap.get(item.roomId)?.values() || [])
-        const { checkRoomAtMe, getAtMeContent, getMessageSenderName, formatMessageContent } = useReplaceMsg()
+        const messages = chatStore.chatMessageListByRoomId(item.roomId)
         // 检查是否有@我的消息
-        const isAtMe = checkRoomAtMe(item.roomId, item.type, currentSession.value.roomId, messages, item.unreadCount)
+        const isAtMe = checkRoomAtMe(
+          item.roomId,
+          item.type,
+          globalStore.currentSession?.roomId!,
+          messages,
+          item.unreadCount
+        )
 
         // 处理显示消息
         let displayMsg = ''
 
-        // 优先使用session.text作为内容来源
-        if (item.text) {
-          // 如果有@我，对text应用[有人@我]的样式
-          displayMsg = isAtMe ? getAtMeContent(true, item.text) : item.text
-        }
-        // 如果没有text，则尝试从消息列表中获取
-        else if (messages.length > 0) {
-          const lastMsg = messages[messages.length - 1]
-          if (lastMsg) {
-            const senderName = getMessageSenderName(lastMsg)
-            displayMsg = formatMessageContent(lastMsg, item.type, senderName, isAtMe)
-          }
+        const lastMsg = messages[messages.length - 1]
+        if (lastMsg) {
+          const senderName = getMessageSenderName(lastMsg, '', item.roomId)
+          displayMsg = formatMessageContent(lastMsg, item.type, senderName, isAtMe)
         }
 
-        // 如果没有最后一条消息，则返回不带@标记的对象，但也包含修改后的名称
         return {
           ...item,
           avatar: latestAvatar,
@@ -200,13 +203,13 @@ watch(
   () => chatStore.currentSessionInfo,
   async (newVal) => {
     if (newVal) {
+      // 避免重复调用：如果新会话与当前会话相同，跳过处理，不然会触发两次
+      if (newVal.roomId === globalStore.currentSession?.roomId) {
+        return
+      }
+
       // 判断是否是群聊
       if (newVal.type === RoomTypeEnum.GROUP) {
-        // 在这里请求是因为这里一开始选中就会触发，而在chat.ts中则需要切换会话才会触发
-        // await groupStore.getCountStatistic()
-        // 同时获取群成员列表，确保首次加载时也能显示群成员
-        // await groupStore.getGroupUserList(true, newVal.roomId)
-        // 将群组详情信息传递给handleMsgClick方法
         const sessionItem = {
           ...newVal,
           memberNum: groupStore.countInfo?.memberNum,
@@ -224,22 +227,29 @@ watch(
   { immediate: true }
 )
 
+// 处理右键菜单显示状态变化
+const handleMenuShow = (roomId: string, isShow: boolean) => {
+  activeContextMenuRoomId.value = isShow ? roomId : null
+}
+
 onBeforeMount(async () => {
   // 请求回话列表
   await chatStore.getSessionList(true)
   // 从联系人页面切换回消息页面的时候自动定位到选中的会话
-  useMitt.emit(MittEnum.LOCATE_SESSION, { roomId: currentSession.value.roomId })
+  useMitt.emit(MittEnum.LOCATE_SESSION, { roomId: globalStore.currentSession?.roomId })
 })
 
-onMounted(() => {
+onMounted(async () => {
   SysNTF
   // 监听其他窗口发来的WebSocket发送请求
   // TODO：频繁切换会话会导致频繁请求，切换的时候也会有点卡顿
-  addListener(
-    appWindow.listen('search_to_msg', (event: { payload: { uid: string; roomType: number } }) => {
-      openMsgSession(event.payload.uid, event.payload.roomType)
-    })
-  )
+  if (appWindow.label === 'home') {
+    await addListener(
+      appWindow.listen('search_to_msg', (event: { payload: { uid: string; roomType: number } }) => {
+        openMsgSession(event.payload.uid, event.payload.roomType)
+      })
+    )
+  }
   useMitt.on(MittEnum.DELETE_SESSION, async (roomId: string) => {
     await handleMsgDelete(roomId)
   })

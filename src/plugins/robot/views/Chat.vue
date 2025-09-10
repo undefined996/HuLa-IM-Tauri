@@ -24,8 +24,7 @@
           autoCorrect="off"
           autoCapitalize="off"
           style="width: 200px"
-          class="leading-7 text-14px rounded-6px">
-        </n-input>
+          class="leading-7 text-14px rounded-6px"></n-input>
         <p class="text-(14px #707070)">共0条对话</p>
       </n-flex>
 
@@ -45,7 +44,7 @@
     <div
       :class="{ 'shadow-inner': page.shadow }"
       class="w-full p-[28px_16px] box-border"
-      style="height: calc(100vh - 300px)">
+      style="height: calc(100vh / var(--page-scale, 1) - 300px)">
       <n-flex :size="6">
         <n-avatar
           class="rounded-8px"
@@ -81,19 +80,24 @@
       </n-flex>
 
       <div class="flex flex-col items-end gap-6px">
-        <MsgInput />
+        <MsgInput ref="MsgInputRef" :height="inputAreaHeight" />
       </div>
     </n-flex>
   </main>
 </template>
 <script setup lang="ts">
+import { type InputInst, NIcon } from 'naive-ui'
+import { TOOLBAR_HEIGHT } from '@/common/constants'
 import MsgInput from '@/components/rightBox/MsgInput.vue'
+import { useChatLayoutGlobal } from '@/hooks/useChatLayout'
 import { useMitt } from '@/hooks/useMitt.ts'
-import { InputInst, NIcon } from 'naive-ui'
 import { useSettingStore } from '@/stores/setting.ts'
 
 const settingStore = useSettingStore()
 const { page } = storeToRefs(settingStore)
+// 使用全局布局状态
+const { footerHeight } = useChatLayoutGlobal()
+const MsgInputRef = ref()
 /** 是否是编辑模式 */
 const isEdit = ref(false)
 const inputInstRef = ref<InputInst | null>(null)
@@ -118,6 +122,11 @@ const features = ref([
     label: '插件'
   }
 ])
+
+// 输入框区域高度计算（总高度减去顶部选项栏高度）
+const inputAreaHeight = computed(() => {
+  return Math.max(footerHeight.value - TOOLBAR_HEIGHT)
+})
 
 const handleBlur = () => {
   isEdit.value = false
