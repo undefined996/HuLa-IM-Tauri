@@ -1,13 +1,20 @@
 <template>
   <div class="flex w-full flex-col h-full">
+    <HeaderBar
+      :isOfficial="false"
+      :hidden-right="true"
+      :enable-default-background="false"
+      :enable-shadow="false"
+      room-name="发起群聊" />
+
     <!-- 顶部搜索框 -->
     <div class="px-16px mt-10px flex gap-3">
       <div class="flex-1 py-5px shrink-0">
         <n-input
           v-model:value="keyword"
-          class="rounded-10px w-full bg-gray-100 relative text-14px"
           placeholder="搜索联系人~"
           clearable
+          round
           spellCheck="false"
           autoComplete="off"
           autoCorrect="off"
@@ -18,7 +25,7 @@
         </n-input>
       </div>
       <div class="flex justify-end items-center">
-        <n-button class="py-5px" @click="doSearch">搜索</n-button>
+        <n-button strong secondary round @click="doSearch">搜索</n-button>
       </div>
     </div>
 
@@ -37,7 +44,9 @@
               class="w-full flex items-center px-5px"
               :class="[
                 'cursor-pointer select-none transition-colors duration-150',
-                selectedList.includes(item.uid) ? 'bg-blue-50 border-blue-300' : 'hover:bg-gray-50'
+                selectedList.includes(item.uid)
+                  ? 'bg-[#f5f5f5] dark:bg-[#404040] border-blue-300'
+                  : 'hover:bg-[#f5f5f5] dark:hover:bg-[#404040] border-gray-200'
               ]">
               <template #default>
                 <!-- ✅ 强制一行展示 -->
@@ -57,11 +66,11 @@
                     <div class="text-12px text-gray-500 flex items-center gap-4px truncate">
                       <template v-if="getUserState(item.uid)">
                         <img class="size-12px rounded-50%" :src="getUserState(item.uid)?.url" alt="" />
-                        {{ getUserState(item.uid)?.title }}
+                        <n-text>{{ getUserState(item.uid)?.title }}</n-text>
                       </template>
                       <template v-else>
                         <n-badge :color="item.activeStatus === OnlineEnum.ONLINE ? '#1ab292' : '#909090'" dot />
-                        {{ item.activeStatus === OnlineEnum.ONLINE ? '在线' : '离线' }}
+                        <n-text>{{ item.activeStatus === OnlineEnum.ONLINE ? '在线' : '离线' }}</n-text>
                       </template>
                     </div>
                   </div>
@@ -83,16 +92,20 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
 import { OnlineEnum } from '@/enums'
 import { useContactStore } from '@/stores/contacts'
 import { useGroupStore } from '@/stores/group'
 import { useUserStatusStore } from '@/stores/userStatus'
 import { AvatarUtils } from '@/utils/AvatarUtils'
+import * as ImRequestUtils from '@/utils/ImRequestUtils'
+import { useChatStore } from '@/stores/chat.ts'
+import { useGlobalStore } from '@/stores/global.ts'
 
 const userStatusStore = useUserStatusStore()
 const { stateList } = storeToRefs(userStatusStore)
 const groupStore = useGroupStore()
+const chatStore = useChatStore()
+const globalStore = useGlobalStore()
 
 /** 获取用户状态 */
 const getUserState = (uid: string) => {
@@ -126,8 +139,16 @@ const doSearch = () => {
 }
 
 const filteredContacts = computed(() => {
-  if (!keyword.value) return contactStore.contactsList
-  return contactStore.contactsList.filter((c) => {
+  const contactsList = contactStore.contactsList.filter((c) => {
+    if (c.uid === '1') {
+      // 排除hula小管家
+      return false
+    }
+    return true
+  })
+
+  if (!keyword.value) return contactsList
+  return contactsList.filter((c) => {
     const name = groupStore.getUserInfo(c.uid)!.name
     if (name) {
       name.includes(keyword.value)
@@ -138,9 +159,47 @@ const filteredContacts = computed(() => {
 })
 
 // 点击发起群聊
-const createGroup = () => {
-  console.log('发起群聊，选择的用户：', selectedList.value)
-  // TODO: 调用接口 / store 创建群聊
+const createGroup = async () => {
+  if (selectedList.value.length < 2) {
+    window.$message.success('两个人无法建群哦')
+    return
+  }
+
+  try {
+    const result: any = await ImRequestUtils.createGroup({ uidList: selectedList.value })
+
+    await chatStore.getSessionList(true)
+
+    const resultRoomId = result?.roomId != null ? String(result.roomId) : undefined
+    const resultId = result?.id != null ? String(result.id) : undefined
+
+    const matchedSession = chatStore.sessionList.find((session) => {
+      const sessionRoomId = String(session.roomId)
+      const sessionDetailId = session.detailId != null ? String(session.detailId) : undefined
+      return (
+        (resultRoomId !== undefined && sessionRoomId === resultRoomId) ||
+        (resultId !== undefined && (sessionDetailId === resultId || sessionRoomId === resultId))
+      )
+    })
+
+    if (matchedSession?.roomId) {
+      globalStore.updateCurrentSessionRoomId(matchedSession.roomId)
+      await Promise.all([
+        groupStore.addGroupDetail(matchedSession.roomId),
+        groupStore.getGroupUserList(matchedSession.roomId, true)
+      ])
+    }
+
+    resetCreateGroupState()
+    window.$message.success('创建群聊成功')
+  } catch (error) {
+    window.$message.error('创建群聊失败')
+  }
+}
+
+const resetCreateGroupState = () => {
+  selectedList.value = []
+  keyword.value = ''
 }
 </script>
 

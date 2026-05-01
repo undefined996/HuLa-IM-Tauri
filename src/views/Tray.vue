@@ -2,29 +2,37 @@
   <n-flex v-if="isTrayMenuShow" vertical :size="6" class="tray">
     <n-flex vertical :size="6">
       <n-flex
-        v-for="(item, index) in stateList.slice(0, 6)"
-        :key="index"
+        v-for="item in stateList.slice(0, 6)"
+        :key="item.id"
+        v-memo="[item.id, item.title, item.url, stateId]"
         align="center"
         :size="10"
         @click="toggleStatus(item)"
         class="p-6px rounded-4px hover:bg-[--tray-hover]">
         <img class="size-14px" :src="item.url" alt="" />
-        <span>{{ item.title }}</span>
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+          {{ translateStateTitle(item.title) }}
+        </span>
       </n-flex>
       <n-flex
-        @click="createWebviewWindow('在线状态', 'onlineStatus', 320, 480)"
+        @click="createWebviewWindow(t('message.tray.online_status_window_title'), 'onlineStatus', 320, 480)"
         align="center"
         :size="10"
-        class="p-6px rounded-4px hover:bg-[--tray-hover]">
+        class="p-6px rounded-4px hover:bg-[--tray-hover]"
+        v-once>
         <svg class="size-14px">
           <use href="#more"></use>
         </svg>
-        <span>更多状态</span>
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ t('message.tray.more_status') }}</span>
       </n-flex>
 
       <component :is="division" />
-      <n-flex align="center" :size="10" class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover]">
-        <span>打开所有声音</span>
+      <n-flex
+        @click="toggleMessageSound"
+        align="center"
+        :size="10"
+        class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover]">
+        <span>{{ messageSound ? t('message.tray.mute_all') : t('message.tray.unmute_all') }}</span>
       </n-flex>
 
       <component :is="division" />
@@ -32,20 +40,31 @@
         @click="checkWinExist('home')"
         align="center"
         :size="10"
-        class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover]">
-        <span>打开主面板</span>
+        class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover]"
+        v-once>
+        <span>{{ t('message.tray.open_main_panel') }}</span>
       </n-flex>
 
       <component :is="division" />
-      <n-flex @click="handleExit" align="center" :size="10" class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover-e]">
-        <span>退出</span>
+      <n-flex
+        @click="handleExit"
+        align="center"
+        :size="10"
+        class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover-e]"
+        v-once>
+        <span>{{ t('message.tray.exit') }}</span>
       </n-flex>
     </n-flex>
   </n-flex>
 
   <n-flex v-else vertical :size="6" class="tray">
-    <n-flex @click="handleExit" align="center" :size="10" class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover-e]">
-      <span>退出</span>
+    <n-flex
+      @click="handleExit"
+      align="center"
+      :size="10"
+      class="p-[8px_6px] rounded-4px hover:bg-[--tray-hover-e]"
+      v-once>
+      <span>{{ t('message.tray.exit') }}</span>
     </n-flex>
   </n-flex>
 </template>
@@ -61,6 +80,7 @@ import { useUserStore } from '@/stores/user'
 import { useUserStatusStore } from '@/stores/userStatus'
 import { changeUserState } from '@/utils/ImRequestUtils'
 import { isWindows } from '@/utils/PlatformConstants'
+import { useI18n } from 'vue-i18n'
 
 const appWindow = WebviewWindow.getCurrent()
 const { checkWinExist, createWebviewWindow, resizeWindow } = useWindow()
@@ -71,12 +91,28 @@ const globalStore = useGlobalStore()
 const { lockScreen } = storeToRefs(settingStore)
 const { stateList, stateId } = storeToRefs(userStatusStore)
 const { tipVisible, isTrayMenuShow } = storeToRefs(globalStore)
+const { t } = useI18n()
 const isFocused = ref(false)
 // 状态栏图标是否显示
 const iconVisible = ref(false)
 
+// 消息提示音状态
+const messageSound = computed({
+  get: () => settingStore.notification.messageSound,
+  set: (value: boolean) => {
+    settingStore.setMessageSoundEnabled(value)
+  }
+})
+
 const division = () => {
   return <div class={'h-1px bg-[--line-color] w-full'}></div>
+}
+
+const translateStateTitle = (title?: string) => {
+  if (!title) return ''
+  const key = `auth.onlineStatus.states.${title}`
+  const translated = t(key)
+  return translated === key ? title : translated
 }
 
 const handleExit = () => {
@@ -101,7 +137,16 @@ const toggleStatus = async (item: UserState) => {
   }
 }
 
+const toggleMessageSound = () => {
+  appWindow.hide()
+  nextTick(() => {
+    messageSound.value = !messageSound.value
+  })
+}
+
 let blinkTask: NodeJS.Timeout | null = null
+let homeFocusUnlisten: (() => void) | null = null
+let homeBlurUnlisten: (() => void) | null = null
 
 const startBlinkTask = () => {
   blinkTask = setInterval(async () => {
@@ -144,17 +189,33 @@ const handleTrayResize = async () => {
   await resizeWindow('tray', 130, islogin ? 356 : 44)
 }
 
-onBeforeMount(() => {
-  globalStore.setTipVisible(false)
-})
-
-onMounted(() => {
+onMounted(async () => {
   // 监听系统缩放变化事件，自动调整托盘窗口尺寸
   window.addEventListener('resize-needed', handleTrayResize)
+
+  if (isWindows()) {
+    homeFocusUnlisten = await appWindow.listen('home_focus', async () => {
+      isFocused.value = true
+      await stopBlinkTask()
+    })
+
+    homeBlurUnlisten = await appWindow.listen('home_blur', () => {
+      isFocused.value = false
+    })
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize-needed', handleTrayResize)
+  if (homeFocusUnlisten) {
+    homeFocusUnlisten()
+    homeFocusUnlisten = null
+  }
+  if (homeBlurUnlisten) {
+    homeBlurUnlisten()
+    homeBlurUnlisten = null
+  }
+  stopBlinkTask()
 })
 </script>
 

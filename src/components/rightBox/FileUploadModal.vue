@@ -16,7 +16,9 @@
           </svg>
         </div>
 
-        <n-flex class="text-(14px [--text-color]) select-none pt-6px" justify="center">发送文件</n-flex>
+        <n-flex class="text-(14px [--text-color]) select-none pt-6px" justify="center">
+          {{ t('message.file_upload.title') }}
+        </n-flex>
 
         <svg
           v-if="isWindows()"
@@ -57,9 +59,9 @@
         </div>
 
         <div class="flex justify-end gap-8px">
-          <n-button quaternary @click="handleCancel">取消</n-button>
+          <n-button quaternary @click="handleCancel">{{ t('message.file_upload.cancel') }}</n-button>
           <n-button secondary type="primary" @click="handleConfirm" :disabled="fileList.length === 0">
-            发送 ({{ fileList.length }})
+            {{ t('message.file_upload.send', { count: fileList.length }) }}
           </n-button>
         </div>
       </div>
@@ -70,11 +72,15 @@
 <script setup lang="ts">
 import { formatBytes } from '@/utils/Formatting'
 import { isMac, isWindows } from '@/utils/PlatformConstants'
+import { useI18n } from 'vue-i18n'
+import type { UploadFile } from '@/utils/FileType'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
     show: boolean
-    files: File[]
+    files: UploadFile[]
   }>(),
   {
     show: false,
@@ -84,7 +90,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
-  (e: 'confirm', files: File[]): void
+  (e: 'confirm', files: UploadFile[]): void
   (e: 'cancel'): void
 }>()
 
@@ -93,7 +99,7 @@ const visible = computed({
   set: (value: boolean) => emit('update:show', value)
 })
 
-const fileList = ref<File[]>([])
+const fileList = ref<UploadFile[]>([])
 
 watch(
   () => props.files,

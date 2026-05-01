@@ -1,4 +1,3 @@
-import { emit } from '@tauri-apps/api/event'
 import {
   type FormInst,
   NAvatar,
@@ -15,46 +14,31 @@ import {
   NTimeline,
   NTimelineItem
 } from 'naive-ui'
+import { emit } from '@tauri-apps/api/event'
 import { EventEnum } from '@/enums'
-import { handRelativeTime } from '@/utils/Day.ts'
+import { handRelativeTime } from '@/utils/ComputedTime'
 import './style.scss'
 import { getVersion } from '@tauri-apps/api/app'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
-import { useLogin } from '@/hooks/useLogin'
 import { useSettingStore } from '@/stores/setting.ts'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
-import * as ImRequestUtils from '@/utils/ImRequestUtils'
 import { isMac } from '@/utils/PlatformConstants'
+import { useI18n } from 'vue-i18n'
 
-const { logout: sysLogout, resetLoginState } = useLogin()
 const formRef = ref<FormInst | null>()
 const formValue = ref({
   lockPassword: ''
 })
 export const modalShow = ref(false)
-export const remotelogin = ref({
-  loading: false,
-  async logout() {
-    remotelogin.value.loading = true
-    const settingStore = useSettingStore()
-    const { login } = storeToRefs(settingStore)
-    // token已在后端清空，只需要返回登录页
-    await ImRequestUtils.logout({ autoLogin: login.value.autoLogin })
-    await resetLoginState()
-    await sysLogout()
-    modalShow.value = false
-    remotelogin.value.loading = false
-  }
-})
 export const lock = ref({
   loading: false,
   rules: {
     lockPassword: {
       required: true,
-      message: '请输入锁屏密码',
+      message: '',
       trigger: ['input']
     }
   },
@@ -82,6 +66,8 @@ export const lock = ref({
 /**  锁屏弹窗 */
 export const LockScreen = defineComponent(() => {
   const userStore = useUserStore()
+  const { t } = useI18n()
+  lock.value.rules.lockPassword.message = t('message.lock_screen.validation_required')
   return () => (
     <NModal v-model:show={modalShow.value} maskClosable={false} class="w-350px border-rd-8px">
       <div class="bg-[--bg-popover] w-360px h-full p-6px box-border flex flex-col">
@@ -100,27 +86,31 @@ export const LockScreen = defineComponent(() => {
         )}
         <div class="flex flex-col gap-10px p-10px select-none">
           <NFlex vertical justify="center" align="center" size={20}>
-            <span class="text-(14px center)">锁定屏幕</span>
+            <span class="text-(14px center)">{t('message.lock_screen.title')}</span>
 
             <NAvatar bordered round size={80} src={AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar!)} />
 
             <p class="text-(14px center [--text-color]) truncate w-200px">{userStore.userInfo!.name}</p>
           </NFlex>
           <NForm ref={formRef} model={formValue.value} rules={lock.value.rules}>
-            <NFormItem label-placement="left" label="锁屏密码" path={'lockPassword'} class="w-full">
+            <NFormItem
+              label-placement="left"
+              label={t('message.lock_screen.password_label')}
+              path={'lockPassword'}
+              class="w-full">
               <NInput
                 show-password-on="click"
                 v-model:value={formValue.value.lockPassword}
                 class="border-(1px solid #ccc)"
                 size="small"
                 type="password"
-                placeholder="请输入锁屏密码"
+                placeholder={t('message.lock_screen.password_placeholder')}
               />
             </NFormItem>
           </NForm>
 
           <NButton loading={lock.value.loading} onClick={lock.value.handleLock} class="w-full" color="#13987f">
-            确定
+            {t('message.lock_screen.confirm_button')}
           </NButton>
         </div>
       </div>
@@ -132,10 +122,12 @@ export const LockScreen = defineComponent(() => {
  * 检查更新弹窗
  */
 export const CheckUpdate = defineComponent(() => {
+  const { t } = useI18n()
   /** 项目提交日志记录 */
   const commitLog = ref<{ message: string; icon: string }[]>([])
   const newCommitLog = ref<{ message: string; icon: string }[]>([])
-  const text = ref('检查更新')
+  type ButtonState = 'check_now' | 'update_now' | 'downloading' | 'update_success'
+  const buttonState = ref<ButtonState>('check_now')
   const currentVersion = ref('')
   const newVersion = ref('')
   const loading = ref(false)
@@ -176,7 +168,7 @@ export const CheckUpdate = defineComponent(() => {
   const getCommitLog = async (url: string, isNew = false) => {
     fetch(url).then((res) => {
       if (!res.ok) {
-        commitLog.value = [{ message: '获取更新日志失败，请配置token后再试', icon: 'cloudError' }]
+        commitLog.value = [{ message: t('message.check_update.fetch_log_failed'), icon: 'cloudError' }]
         loading.value = false
         return
       }
@@ -208,10 +200,10 @@ export const CheckUpdate = defineComponent(() => {
   }
 
   const doUpdate = async () => {
-    if (!(await confirm('确定更新吗'))) {
+    if (!(await confirm(t('message.check_update.confirm_update')))) {
       return
     }
-    text.value = '正在下载...'
+    buttonState.value = 'downloading'
     updating.value = true
     checkLoading.value = true
     await check()
@@ -230,8 +222,8 @@ export const CheckUpdate = defineComponent(() => {
               percentage.value = parseFloat(((downloaded.value / total.value) * 100 + '').substring(0, 4))
               break
             case 'Finished':
-              window.$message.success('安装包下载成功，稍后将自动安装并重启')
-              text.value = '更新成功'
+              window.$message.success(t('message.check_update.download_success_toast'))
+              buttonState.value = 'update_success'
               updating.value = false
               break
           }
@@ -240,11 +232,11 @@ export const CheckUpdate = defineComponent(() => {
           await relaunch()
         } catch (e) {
           console.log(e)
-          window.$message.error('重启失败，请手动重启')
+          window.$message.error(t('message.check_update.restart_failed'))
         }
       })
       .catch(() => {
-        window.$message.error('检查更新错误，请稍后再试')
+        window.$message.error(t('message.check_update.update_error'))
       })
       .finally(() => {
         checkLoading.value = false
@@ -254,6 +246,7 @@ export const CheckUpdate = defineComponent(() => {
 
   const checkUpdate = async () => {
     checkLoading.value = true
+    buttonState.value = 'check_now'
     await check()
       .then((e) => {
         if (!e?.available) {
@@ -264,12 +257,12 @@ export const CheckUpdate = defineComponent(() => {
         // 检查版本之间不同的提交信息和提交日期
         const url = `https://gitee.com/api/v5/repos/HuLaSpark/HuLa/releases/tags/v${newVersion.value}?access_token=${import.meta.env.VITE_GITEE_TOKEN}`
         getCommitLog(url, true)
-        text.value = '立即更新'
+        buttonState.value = 'update_now'
         checkLoading.value = false
       })
       .catch(() => {
         checkLoading.value = false
-        window.$message.error('检查更新错误，请稍后再试')
+        window.$message.error(t('message.check_update.update_error'))
       })
   }
 
@@ -311,7 +304,7 @@ export const CheckUpdate = defineComponent(() => {
             <NFlex justify={'space-between'} align={'center'} size={0}>
               <NFlex align={'center'} size={10}>
                 <NFlex align={'center'} size={10}>
-                  <p>当前版本:</p>
+                  <p>{t('message.check_update.current_version')}:</p>
                   <p class="text-(20px #909090) font-500">{currentVersion.value}</p>
                 </NFlex>
 
@@ -324,7 +317,7 @@ export const CheckUpdate = defineComponent(() => {
                     <p class="relative text-(20px #13987f) font-500">{newVersion.value}</p>
 
                     <span class="absolute top--10px right--44px p-[4px_8px] bg-#f6dfe3ff rounded-6px text-(12px #ce304f)">
-                      new
+                      {t('message.check_update.new_tag')}
                     </span>
                   </NFlex>
                 ) : null}
@@ -332,18 +325,18 @@ export const CheckUpdate = defineComponent(() => {
               <NFlex align={'center'} size={10}>
                 {newVersionTime.value ? (
                   <>
-                    <p class="text-(12px #909090)">新版本发布日期:</p>
+                    <p class="text-(12px #909090)">{t('message.check_update.new_release_date')}</p>
                     <p class="text-(12px #13987f)">{handRelativeTime(newVersionTime.value)}</p>
                   </>
                 ) : (
                   <>
-                    <p class="text-(12px #909090)">版本发布日期:</p>
+                    <p class="text-(12px #909090)">{t('message.check_update.release_date')}</p>
                     <p class="text-(12px #13987f)">{handRelativeTime(versionTime.value)}</p>
                   </>
                 )}
               </NFlex>
             </NFlex>
-            <p class="text-(14px #909090)">版本更新日志</p>
+            <p class="text-(14px #909090)">{t('message.check_update.log_title')}</p>
             <NScrollbar class="max-h-460px p-[0_10px] box-border">
               {newCommitLog.value.length > 0 ? (
                 <>
@@ -399,11 +392,11 @@ export const CheckUpdate = defineComponent(() => {
             <NFlex justify={'end'}>
               <NButton
                 loading={checkLoading.value}
-                onClick={text.value === '立即更新' ? doUpdate : checkUpdate}
+                onClick={buttonState.value === 'update_now' ? doUpdate : checkUpdate}
                 secondary
-                type={text.value === '立即更新' ? 'primary' : 'tertiary'}>
-                {text.value}
-                {text.value === '正在下载...' &&
+                type={buttonState.value === 'update_now' ? 'primary' : 'tertiary'}>
+                {t(`message.check_update.${buttonState.value}`)}
+                {buttonState.value === 'downloading' &&
                   total.value > 0 &&
                   `${parseFloat((total.value / 1024 / 1024).toString()).toFixed(2)}M`}
               </NButton>
@@ -422,69 +415,4 @@ export const CheckUpdate = defineComponent(() => {
       </div>
     </NModal>
   )
-})
-
-/**
- * 异地登录弹窗
- */
-export const RemoteLogin = defineComponent({
-  props: {
-    ip: {
-      type: String,
-      default: '未知IP'
-    }
-  },
-  setup(props) {
-    const userStore = useUserStore()
-    return () => (
-      <NModal
-        v-model:show={modalShow.value}
-        maskClosable={false}
-        class="w-350px border-rd-8px select-none cursor-default">
-        <div class="bg-[--bg-popover] w-360px h-full p-6px box-border flex flex-col">
-          {isMac() ? (
-            <div
-              onClick={remotelogin.value.logout}
-              class="mac-close relative size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none">
-              <svg class="hidden size-7px color-#000  select-none absolute top-3px left-3px">
-                <use href="#close"></use>
-              </svg>
-            </div>
-          ) : (
-            <svg onClick={remotelogin.value.logout} class="w-12px h-12px ml-a cursor-pointer select-none">
-              <use href="#close"></use>
-            </svg>
-          )}
-          <div class="flex flex-col gap-10px p-10px select-none">
-            <NFlex vertical align="center" size={30}>
-              <span class="text-(14px [--text-color])">下线通知</span>
-
-              <div class="relative">
-                <img class="rounded-full size-72px" src={AvatarUtils.getAvatarUrl(userStore.userInfo!.avatar!)} />
-                <div class="absolute inset-0 bg-[--avatar-hover-bg] backdrop-blur-[2px] rounded-full flex items-center justify-center">
-                  <svg class="size-34px text-white animate-pulse">
-                    <use href="#cloudError"></use>
-                  </svg>
-                </div>
-              </div>
-
-              <div class="text-(13px centent [--text-color]) px-12px leading-loose mb-20px">
-                您的账号在其他设备 <span class="text-#13987f">{props.ip}</span>{' '}
-                登录，如非本人登录，请尽快修改密码，建议联系管理员
-              </div>
-            </NFlex>
-            <NButton
-              disabled={remotelogin.value.loading}
-              loading={remotelogin.value.loading}
-              onClick={remotelogin.value.logout}
-              style={{ color: '#fff' }}
-              class="w-full"
-              color="#13987f">
-              重新登录
-            </NButton>
-          </div>
-        </div>
-      </NModal>
-    )
-  }
 })

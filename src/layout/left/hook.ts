@@ -1,9 +1,7 @@
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { info } from '@tauri-apps/plugin-log'
-import { delay } from 'lodash-es'
-import { EventEnum, IsYesEnum, MittEnum, ThemeEnum } from '@/enums'
+import { useTimeoutFn } from '@vueuse/core'
+import { IsYesEnum, MittEnum, ThemeEnum } from '@/enums'
 import { useMitt } from '@/hooks/useMitt.ts'
-import { useTauriListener } from '@/hooks/useTauriListener'
 import { useWindow } from '@/hooks/useWindow.ts'
 import router from '@/router'
 import type { BadgeType, UserInfoType } from '@/services/types.ts'
@@ -13,21 +11,20 @@ import { useMenuTopStore } from '@/stores/menuTop.ts'
 import { useSettingStore } from '@/stores/setting.ts'
 import { useUserStore } from '@/stores/user.ts'
 import { useUserStatusStore } from '@/stores/userStatus.ts'
-import { modifyUserName, setUserBadge } from '@/utils/ImRequestUtils'
+import { ModifyUserInfo, setUserBadge } from '@/utils/ImRequestUtils'
+import { storeToRefs } from 'pinia'
 
 export const leftHook = () => {
-  const appWindow = WebviewWindow.getCurrent()
-  const { addListener } = useTauriListener()
   const prefers = matchMedia('(prefers-color-scheme: dark)')
   const { createWebviewWindow } = useWindow()
   const settingStore = useSettingStore()
-  const { menuTop } = useMenuTopStore()
+  const { menuTop } = storeToRefs(useMenuTopStore())
   const loginHistoriesStore = useLoginHistoriesStore()
   const userStore = useUserStore()
   const { themes } = settingStore
   const userStatusStore = useUserStatusStore()
   const { currentState } = storeToRefs(userStatusStore)
-  const activeUrl = ref<string>(menuTop[0].url)
+  const activeUrl = ref<string>(menuTop.value?.[0]?.url || 'message')
   const settingShow = ref(false)
   const shrinkStatus = ref(false)
   const groupStore = useGroupStore()
@@ -88,7 +85,7 @@ export const leftHook = () => {
       window.$message.error('改名次数不足')
       return
     }
-    modifyUserName({ name: localUserInfo.name }).then(() => {
+    ModifyUserInfo(localUserInfo).then(() => {
       // 更新本地缓存的用户信息
       userStore.userInfo!.name = localUserInfo.name!
       loginHistoriesStore.updateLoginHistory(<UserInfoType>userStore.userInfo) // 更新登录历史记录
@@ -143,11 +140,11 @@ export const leftHook = () => {
   const pageJumps = (
     url: string,
     title?: string,
-    size?: { width: number; height: number; minWidth?: number },
+    size?: { width: number; height: number; minWidth?: number; minHeight?: number },
     window?: { resizable: boolean }
   ) => {
     if (window) {
-      delay(async () => {
+      useTimeoutFn(async () => {
         info(`打开窗口: ${title}`)
         const webview = await createWebviewWindow(
           title!,
@@ -156,13 +153,14 @@ export const leftHook = () => {
           <number>size?.height,
           '',
           window?.resizable,
-          <number>size?.minWidth
+          <number>size?.minWidth,
+          <number>size?.minHeight
         )
         openWindowsList.value.add(url)
 
-        const unlisten = await webview.onCloseRequested(() => {
+        const unlisten = await webview?.onCloseRequested(() => {
           openWindowsList.value.delete(url)
-          unlisten()
+          if (unlisten) unlisten()
         })
       }, 300)
     } else {
@@ -179,7 +177,7 @@ export const leftHook = () => {
    * @param h 窗口的高度
    * */
   const openContent = (title: string, label: string, w = 840, h = 600) => {
-    delay(async () => {
+    useTimeoutFn(async () => {
       await createWebviewWindow(title, label, w, h)
     }, 300)
     infoShow.value = false
@@ -205,20 +203,6 @@ export const leftHook = () => {
     useMitt.on(MittEnum.TO_SEND_MSG, (event: any) => {
       activeUrl.value = event.url
     })
-    await addListener(
-      appWindow.listen(EventEnum.WIN_SHOW, (e) => {
-        // 如果已经存在就不添加
-        if (openWindowsList.value.has(e.payload)) return
-        openWindowsList.value.add(e.payload)
-      }),
-      EventEnum.WIN_SHOW
-    )
-    await addListener(
-      appWindow.listen(EventEnum.WIN_CLOSE, (e) => {
-        openWindowsList.value.delete(e.payload)
-      }),
-      EventEnum.WIN_CLOSE
-    )
   })
 
   onUnmounted(() => {

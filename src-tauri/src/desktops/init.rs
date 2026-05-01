@@ -1,4 +1,6 @@
 use crate::common::init::{CustomInit, init_common_plugins};
+#[cfg(target_os = "macos")]
+use crate::desktops::common_cmd::apply_macos_traffic_lights_spacing_default;
 use tauri::{Manager, Runtime, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -60,6 +62,11 @@ impl<R: Runtime> DesktopCustomInit for tauri::Builder<R> {
     fn init_window_event(self) -> Self {
         self.on_window_event(|window, event: &WindowEvent| match event {
             WindowEvent::Focused(flag) => {
+                #[cfg(target_os = "macos")]
+                if *flag {
+                    let app_handle = window.app_handle();
+                    let _ = apply_macos_traffic_lights_spacing_default(window.label(), &app_handle);
+                }
                 // 自定义系统托盘-实现托盘菜单失去焦点时隐藏
                 #[cfg(not(target_os = "macos"))]
                 if !window.label().eq("tray") && *flag {
@@ -86,20 +93,54 @@ impl<R: Runtime> DesktopCustomInit for tauri::Builder<R> {
                 }
             }
             WindowEvent::CloseRequested { .. } => {
-                // 如果是login窗口被用户关闭，直接退出程序
-                if window.label().eq("login") {
-                    // 检查是否有其他窗口存在，如果有home窗口，说明是登录成功后的正常关闭
-                    let windows = window.app_handle().webview_windows();
-                    let has_home_window = windows.iter().any(|(name, _)| name == "home");
+                let app_handle = window.app_handle();
+                let windows = app_handle.webview_windows();
+                let win_label = window.label();
 
-                    if !has_home_window {
+                // 检查窗口是否是无效窗口(不重要的可退出的)
+                let is_ignored_window =
+                    |name: &str| matches!(name, "checkupdate" | "capture" | "update" | "tray");
+
+                if win_label.eq("update") {
+                    let state: tauri::State<'_, crate::AppData> = window.state();
+                    let user_info = state.user_info.clone();
+
+                    let has_other_active_windows =
+                        windows.iter().any(|(name, _)| !is_ignored_window(name));
+
+                    let app_handle = app_handle.clone();
+
+                    tauri::async_runtime::spawn(async move {
+                        let user_info = user_info.lock().await;
+                        let not_logg_in = user_info.uid.trim().is_empty();
+
+                        //  update 窗口关闭 + 未登录 + 没有其他有效窗口 => 退出程序
+                        if not_logg_in && !has_other_active_windows {
+                            app_handle.exit(0);
+                        }
+                    });
+                }
+                // 如果是login窗口被用户关闭，直接退出程序
+                else if win_label.eq("login") {
+                    // 检查是否有其他窗口存在，如果有home窗口，说明是登录成功后的正常关闭
+                    let has_home_or_update = windows
+                        .iter()
+                        .any(|(name, _)| matches!(name.as_str(), "home" | "update"));
+
+                    if !has_home_or_update {
                         // 没有home窗口，说明是用户直接关闭login窗口，退出程序
                         window.app_handle().exit(0);
                     }
                     // 如果有home窗口，说明是登录成功后的正常关闭，允许关闭
                 }
             }
-            WindowEvent::Resized(_ps) => {}
+            WindowEvent::Resized(_ps) => {
+                #[cfg(target_os = "macos")]
+                {
+                    let app_handle = window.app_handle();
+                    let _ = apply_macos_traffic_lights_spacing_default(window.label(), &app_handle);
+                }
+            }
             _ => (),
         })
     }

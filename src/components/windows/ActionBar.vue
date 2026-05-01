@@ -5,57 +5,98 @@
     :class="isCompatibility() ? 'flex justify-end select-none' : 'h-24px select-none w-full'">
     <!-- win 和 linux 的DOM -->
     <template v-if="isCompatibility()">
-      <!--  登录窗口的代理按钮  -->
-      <div
-        v-if="proxy"
-        @click="router.push('/network')"
-        :class="{ network: isWindows() }"
-        class="w-30px h-24px flex-center">
-        <svg class="size-16px color-#404040 cursor-pointer">
-          <use href="#settings"></use>
-        </svg>
-      </div>
-      <!--  固定在最顶层  -->
-      <div v-if="topWinLabel !== void 0" @click="handleAlwaysOnTop" class="hover-box">
-        <n-popover trigger="hover">
-          <template #trigger>
-            <svg v-if="alwaysOnTopStatus" class="size-14px color-[--action-bar-icon-color] outline-none cursor-pointer">
-              <use href="#onTop"></use>
+      <div class="w-full flex items-center justify-between" data-tauri-drag-region>
+        <!-- 自定义图标：Windows/Linux 放在左侧 -->
+        <div class="h-24px flex items-center gap-10px pl-8px">
+          <slot></slot>
+        </div>
+
+        <div class="flex items-center">
+          <!--  登录窗口的代理按钮  -->
+          <div
+            v-if="proxy"
+            @click="router.push('/network')"
+            :class="{ network: isWindows() }"
+            class="w-30px h-24px flex-center hover-box">
+            <svg
+              :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+              class="size-16px cursor-pointer">
+              <use href="#settings"></use>
             </svg>
-            <svg v-else class="size-16px color-[--action-bar-icon-color] outline-none cursor-pointer">
-              <use href="#notOnTop"></use>
+          </div>
+          <!--  固定在最顶层  -->
+          <div v-if="topWinLabel !== void 0" @click="handleAlwaysOnTop" class="hover-box">
+            <n-popover trigger="hover">
+              <template #trigger>
+                <svg
+                  v-if="alwaysOnTopStatus"
+                  :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+                  class="size-14px outline-none cursor-pointer">
+                  <use href="#onTop"></use>
+                </svg>
+                <svg
+                  v-else
+                  :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+                  class="size-16px outline-none cursor-pointer">
+                  <use href="#notOnTop"></use>
+                </svg>
+              </template>
+              <span v-if="alwaysOnTopStatus">{{ t('components.actionBar.always_on_top.enabled') }}</span>
+              <span v-else>{{ t('components.actionBar.always_on_top.disabled') }}</span>
+            </n-popover>
+          </div>
+          <!-- 收缩页面 -->
+          <div v-if="shrink" @click="shrinkWindow" class="hover-box">
+            <svg
+              :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+              class="size-16px cursor-pointer">
+              <use href="#left-bar"></use>
             </svg>
-          </template>
-          <span v-if="alwaysOnTopStatus">取消置顶</span>
-          <span v-else>置顶</span>
-        </n-popover>
+          </div>
+          <!-- 最小化 -->
+          <div v-if="minW" @click="appWindow.minimize()" class="hover-box">
+            <svg
+              :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+              class="size-24px opacity-66 cursor-pointer">
+              <use href="#maximize"></use>
+            </svg>
+          </div>
+          <!-- 最大化 -->
+          <div v-if="maxW" @click="restoreWindow" class="hover-box">
+            <svg
+              v-show="!windowMaximized"
+              :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+              class="size-18px cursor-pointer">
+              <use href="#rectangle-small"></use>
+            </svg>
+            <svg
+              v-show="windowMaximized"
+              :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+              class="size-16px cursor-pointer">
+              <use href="#internal-reduction"></use>
+            </svg>
+          </div>
+          <!-- 关闭窗口 -->
+          <div
+            v-if="closeW"
+            @click="handleCloseWin"
+            :class="{ windowMaximized: 'rounded-rt-8px' }"
+            class="action-close">
+            <svg
+              :class="[iconColor !== '' ? `color-${iconColor}` : 'color-[--action-bar-icon-color]']"
+              class="size-14px cursor-pointer">
+              <use href="#close"></use>
+            </svg>
+          </div>
+        </div>
       </div>
-      <!-- 收缩页面 -->
-      <div v-if="shrink" @click="shrinkWindow" class="hover-box">
-        <svg class="size-16px color-[--action-bar-icon-color] cursor-pointer">
-          <use href="#left-bar"></use>
-        </svg>
-      </div>
-      <!-- 最小化 -->
-      <div v-if="minW" @click="appWindow.minimize()" class="hover-box">
-        <svg class="size-24px color-[--action-bar-icon-color] opacity-66 cursor-pointer">
-          <use href="#maximize"></use>
-        </svg>
-      </div>
-      <!-- 最大化 -->
-      <div v-if="maxW" @click="restoreWindow" class="hover-box">
-        <svg v-show="!windowMaximized" class="size-18px color-[--action-bar-icon-color] cursor-pointer">
-          <use href="#rectangle-small"></use>
-        </svg>
-        <svg v-show="windowMaximized" class="size-16px color-[--action-bar-icon-color] cursor-pointer">
-          <use href="#internal-reduction"></use>
-        </svg>
-      </div>
-      <!-- 关闭窗口 -->
-      <div v-if="closeW" @click="handleCloseWin" :class="{ windowMaximized: 'rounded-rt-8px' }" class="action-close">
-        <svg class="size-14px color-[--action-bar-icon-color] cursor-pointer">
-          <use href="#close"></use>
-        </svg>
+    </template>
+    <template v-else>
+      <div class="h-24px w-full flex items-center justify-end pr-8px select-none" data-tauri-drag-region>
+        <div class="drag-fill" data-tauri-drag-region></div>
+        <div class="flex items-center gap-10px">
+          <slot></slot>
+        </div>
       </div>
     </template>
     <!-- 是否退到托盘提示框 -->
@@ -65,23 +106,27 @@
           <use href="#close"></use>
         </svg>
         <n-flex vertical :size="20" class="p-[22px_10px_10px_22px] select-none">
-          <span class="text-16px">最小化还是直接退出程序?</span>
+          <span class="text-16px">{{ t('components.actionBar.close_prompt.title') }}</span>
           <label class="text-(14px #707070) flex gap-6px lh-16px items-center">
             <n-radio :checked="tipsRef.type === CloseBxEnum.HIDE" @change="tipsRef.type = CloseBxEnum.HIDE" />
-            <span>最小化到系统托盘</span>
+            <span>{{ t('components.actionBar.close_prompt.hide_to_tray') }}</span>
           </label>
           <label class="text-(14px #707070) flex gap-6px lh-16px items-center">
             <n-radio :checked="tipsRef.type === CloseBxEnum.CLOSE" @change="tipsRef.type = CloseBxEnum.CLOSE" />
-            <span>直接退出程序</span>
+            <span>{{ t('components.actionBar.close_prompt.exit_app') }}</span>
           </label>
           <label class="text-(12px #909090) flex gap-6px justify-end items-center">
             <n-checkbox size="small" v-model:checked="tipsRef.notTips" />
-            <span>下次不出现此提示</span>
+            <span>{{ t('components.actionBar.close_prompt.no_prompt') }}</span>
           </label>
 
           <n-flex justify="end">
-            <n-button @click="handleConfirm" class="w-78px" color="#13987f">确定</n-button>
-            <n-button @click="tipsRef.show = false" class="w-78px" secondary>取消</n-button>
+            <n-button @click="handleConfirm" class="w-78px" color="#13987f">
+              {{ t('components.common.confirm') }}
+            </n-button>
+            <n-button @click="tipsRef.show = false" class="w-78px" secondary>
+              {{ t('components.common.cancel') }}
+            </n-button>
           </n-flex>
         </n-flex>
       </div>
@@ -90,19 +135,20 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { emit } from '@tauri-apps/api/event'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { info } from '@tauri-apps/plugin-log'
 import { exit } from '@tauri-apps/plugin-process'
 import { CloseBxEnum, EventEnum, MittEnum } from '@/enums'
 import { useMitt } from '@/hooks/useMitt.ts'
-import { useTauriListener } from '@/hooks/useTauriListener'
 import { useWindow } from '@/hooks/useWindow.ts'
 import router from '@/router'
 import { useAlwaysOnTopStore } from '@/stores/alwaysOnTop.ts'
 import { useSettingStore } from '@/stores/setting.ts'
 import { isCompatibility, isMac, isWindows } from '@/utils/PlatformConstants'
 
+const { t } = useI18n()
 const appWindow = WebviewWindow.getCurrent()
 const {
   topWinLabel,
@@ -112,7 +158,8 @@ const {
   closeW = true,
   shrink = true,
   shrinkStatus = true,
-  isDrag = true
+  isDrag = true,
+  iconColor = ''
 } = defineProps<{
   minW?: boolean
   maxW?: boolean
@@ -123,9 +170,9 @@ const {
   shrinkStatus?: boolean
   proxy?: boolean
   isDrag?: boolean
+  iconColor?: string
 }>()
 const { getWindowTop, setWindowTop } = useAlwaysOnTopStore()
-const { addListener, cleanup } = useTauriListener()
 const settingStore = useSettingStore()
 const { tips, escClose } = storeToRefs(settingStore)
 const { resizeWindow } = useWindow()
@@ -148,16 +195,24 @@ let unlistenCloseRequested: (() => void) | null = null
 let unlistenResized: (() => void) | null = null
 // 是否是程序内部触发的关闭操作
 let isProgrammaticClose = false
+const handleEscKeyDown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && escClose.value) {
+    handleCloseWin()
+  }
+}
 
-watchEffect(() => {
+watchEffect((onCleanup) => {
   tipsRef.type = tips.value.type
   if (alwaysOnTopStatus.value) {
     appWindow.setAlwaysOnTop(alwaysOnTopStatus.value as boolean)
   }
   if (escClose.value && isWindows()) {
-    window.addEventListener('keydown', (e) => isEsc(e))
+    window.addEventListener('keydown', handleEscKeyDown)
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleEscKeyDown)
+    })
   } else {
-    window.removeEventListener('keydown', (e) => isEsc(e))
+    window.removeEventListener('keydown', handleEscKeyDown)
   }
 })
 
@@ -203,14 +258,6 @@ const handleConfirm = async () => {
     await nextTick(() => {
       appWindow.hide()
     })
-  }
-}
-
-/** 监听是否按下esc */
-const isEsc = (e: KeyboardEvent) => {
-  // 判断按下的是否是esc
-  if (e.key === 'Escape' && escClose.value) {
-    handleCloseWin()
   }
 }
 
@@ -263,13 +310,6 @@ onMounted(async () => {
     updateWindowMaximized()
   })
 
-  await addListener(
-    appWindow.listen(EventEnum.EXIT, async () => {
-      await exit(0)
-    }),
-    EventEnum.EXIT
-  )
-
   // 监听 home 窗口的关闭事件
   if (appWindow.label === 'home') {
     appWindow.onCloseRequested((event) => {
@@ -277,7 +317,6 @@ onMounted(async () => {
       if (isProgrammaticClose) {
         // 清理监听器
         info('[ActionBar]清理[home]窗口的监听器')
-        cleanup()
         exit(0)
       }
       info('[ActionBar]阻止[home]窗口关闭事件')
@@ -288,7 +327,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', (e) => isEsc(e))
+  window.removeEventListener('keydown', handleEscKeyDown)
 
   if (unlistenResized) {
     unlistenResized()

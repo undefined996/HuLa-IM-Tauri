@@ -20,3 +20,24 @@ declare namespace Common {
 
 /** 构建时间 */
 declare const PROJECT_BUILD_TIME: string
+
+declare module 'eruda' {
+  const eruda: { init: (options?: unknown) => void }
+  export default eruda
+}
+
+export type ProxySettings = {
+  apiType: string
+  apiIp: string
+  apiPort: string
+  apiSuffix: string
+  wsType: string
+  wsIp: string
+  wsPort: string
+  wsSuffix: string
+}
+
+export type MsgId = {
+  msgId: string
+  fromUid: string
+}

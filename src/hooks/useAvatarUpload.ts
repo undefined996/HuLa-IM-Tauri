@@ -9,6 +9,7 @@ export interface AvatarUploadOptions {
   // 文件大小限制（KB），默认为150KB
   sizeLimit?: number
 }
+
 /**
  * 上传头像的hook
  * @param options 上传配置
@@ -44,6 +45,11 @@ export const useAvatarUpload = (options: AvatarUploadOptions = {}) => {
       }
       img.src = url
     }
+  }
+
+  // 校验头像更改条件
+  const openAvatarCropper = () => {
+    fileInput.value?.click()
   }
 
   // 处理裁剪
@@ -115,6 +121,7 @@ export const useAvatarUpload = (options: AvatarUploadOptions = {}) => {
     cropperRef,
     openFileSelector,
     handleFileChange,
-    handleCrop
+    handleCrop,
+    openAvatarCropper
   }
 }

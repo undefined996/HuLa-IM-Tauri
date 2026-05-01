@@ -1,7 +1,8 @@
 <template>
-  <div class="grid grid-cols-[32px_32px_32px_32px] px-16px gap-12px z-1 h-32px items-center justify-end mt-10px">
+  <div
+    class="grid grid-cols-[32px_32px_32px_32px] px-16px gap-12px z-1 h-32px items-center justify-end mt-10px dark:invert">
     <div @click="toMyMessages" class="h-32px w-32px flex items-center justify-center">
-      <n-badge value="61">
+      <n-badge :max="99" :value="unreadApplyCount" :show="unreadApplyCount > 0">
         <svg class="iconpark-icon h-24px w-24px block"><use href="#remind"></use></svg>
       </n-badge>
     </div>
@@ -26,15 +27,23 @@
 
 <script setup lang="ts">
 import router from '@/router'
+import { useGlobalStore } from '@/stores/global.ts'
 
 const active = ref(false)
+const globalStore = useGlobalStore()
+
+const unreadApplyCount = computed(() => {
+  return globalStore.unReadMark.newFriendUnreadCount + globalStore.unReadMark.newGroupUnreadCount
+})
 
 // 点击按钮打开底部抽屉
 const activate = () => {
   // active.value = true
 }
 
-const toScanQRCode = () => [router.push('/mobile/mobileMy/scanQRcode')]
+const toScanQRCode = () => {
+  router.push('/mobile/mobileMy/scanQRCode')
+}
 
 const toSettings = () => {
   router.push('/mobile/mobileMy/settings')

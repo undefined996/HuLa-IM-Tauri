@@ -1,22 +1,22 @@
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import weekday from 'dayjs/plugin/weekday'
-import 'dayjs/locale/zh-cn' // 导入中文语言包
 import type { ConfigType, Dayjs, OpUnitType } from 'dayjs'
-import type { MessageType } from '@/services/types'
+import 'dayjs/locale/zh-cn'
+import 'dayjs/locale/en'
+import { useI18nGlobal } from '@/services/i18n'
 
-// 全局使用语言包
-dayjs.locale('zh-cn')
-// 设置一周起始位周一
+export const setDayjsLocale = (lang: string) => {
+  const mapped = lang.toLowerCase().includes('zh') ? 'zh-cn' : 'en'
+  dayjs.locale(mapped)
+}
+
+dayjs.extend(relativeTime)
 dayjs.extend(weekday)
-// 5 分钟 5 * 60 * 1000;
-const intervalTime = 300000
-// 计数上限 20 条，到达 20 重置
-const computedCountMax = 20
-// 计数
-let computedCount = 0
+setDayjsLocale('zh-CN')
 
 // 时间格式化为相对文本，仿微信风格
-const timeToStr = (time: number) => {
+export const timeToStr = (time: number) => {
   const sendTime = dayjs(time)
   // 计算今天和消息的发送时间间隔多少天
   const gapDay = dayjs().endOf('day').diff(sendTime, 'day')
@@ -24,40 +24,10 @@ const timeToStr = (time: number) => {
   const isLastWeek = gapDay >= 7
   // 今天显示时分, 昨天的显示 `昨天 时分`, 今天往前一周内，显示`周几 时分`， 再前面显示日期 `年月日 时分`
   return gapDay < 2
-    ? `${gapDay === 1 ? '昨天 ' : ''}${sendTime.format('HH:mm')}`
+    ? `${gapDay === 1 ? `${useI18nGlobal().t('menu.yesterday')} ` : ''}${sendTime.format('HH:mm')}`
     : isLastWeek
       ? sendTime.format('YYYY-MM-DD HH:mm')
       : dayjs(sendTime).format('dddd HH:mm')
-}
-
-// 超过5分钟，或者超过20条消息，就添加展示时间
-const checkTimeInterval = (cur: MessageType, pre: MessageType) => {
-  // 如果有一个超过 5 分钟了或者计数达到 20 条了
-  if ((pre && cur.message.sendTime - pre.message.sendTime > intervalTime) || computedCount >= computedCountMax) {
-    // 重置计数
-    computedCount = 0
-    // 返回时间标记
-    return { ...cur, timeBlock: timeToStr(cur.message.sendTime) }
-  } else {
-    // 时间间隔很短的就累计计数
-    computedCount += 1
-    return cur
-  }
-}
-
-export const computedTimeBlock = (list: MessageType[], needFirst = true) => {
-  if (!list || list.length === 0) return []
-  // 是否需要保留 传入 list 第一个，如果是接口拉回来的消息列表就要保留，如果接收到新消息，需要拿当前消息列表最后一个拿来做时间间隔计算的话，就不需要保留第一个
-  const temp = needFirst ? [list[0]] : []
-  // 跳过第一个
-  for (let index = 1, len = list.length; index < len; index++) {
-    const item = list[index]
-    // 上个聊天记录
-    const preItem = list[index - 1]
-    // 超过20分钟，或者超过50条评论，展示时间
-    temp.push(checkTimeInterval(item, preItem))
-  }
-  return temp
 }
 
 /**
@@ -67,6 +37,7 @@ export const computedTimeBlock = (list: MessageType[], needFirst = true) => {
  * @returns 格式化后的时间字符串
  */
 export const formatTimestamp = (timestamp: number, isDetail = false): string => {
+  timestamp = Number(timestamp)
   const now: Dayjs = dayjs()
   const date: Dayjs = dayjs(timestamp)
   // 计算今天和消息的发送时间间隔多少天
@@ -84,7 +55,11 @@ export const formatTimestamp = (timestamp: number, isDetail = false): string => 
     return date.format(`${isDetail ? 'HH:mm:ss' : 'HH:mm'}`)
   } else {
     if (isDetail) return date.format('MM-DD HH:mm:ss')
-    return gapDay === 1 ? '昨天' : isLastWeek ? date.format('MM-DD') : dayjs(date).format('dddd')
+    return gapDay === 1
+      ? useI18nGlobal().t('menu.yesterday')
+      : isLastWeek
+        ? date.format('MM-DD')
+        : dayjs(date).format('dddd')
   }
 }
 
@@ -106,4 +81,33 @@ export const isDiffNow = ({ time, unit, diff }: { unit: OpUnitType; time: Config
  */
 export const isDiffNow10Min = (time: ConfigType): boolean => {
   return isDiffNow({ time, unit: 'minute', diff: 10 })
+}
+
+/**
+ * 格式化日期分组标签（用于聊天历史等场景）
+ * @param timestamp 时间戳
+ * @returns 格式化后的日期字符串（今天/昨天/MM-DD）
+ */
+export const formatDateGroupLabel = (timestamp: number): string => {
+  const date = dayjs(timestamp)
+  const now = dayjs()
+  const i18n = useI18nGlobal()
+
+  if (now.isSame(date, 'day')) {
+    return i18n.t('menu.today')
+  } else if (now.subtract(1, 'day').isSame(date, 'day')) {
+    return i18n.t('menu.yesterday')
+  } else {
+    return date.format('MM-DD')
+  }
+}
+
+/** 相对时间(前) */
+export const handRelativeTime = (time: string) => {
+  return dayjs(time).fromNow()
+}
+
+/** 获取指定日期的星期 */
+export const getWeekday = (time: string) => {
+  return dayjs(time).format('ddd')
 }

@@ -1,7 +1,5 @@
-import SwiftRs
+import Foundation
 import Tauri
-import UIKit
-import WebKit
 
 class PingArgs: Decodable {
   let value: String?

@@ -4,24 +4,30 @@
 
     <n-flex vertical align="center" :size="20" class="size-full pt-100px" data-tauri-drag-region>
       <div @mousemove="handleMouseMove" @mouseleave="handleMouseLeave" class="box" data-tauri-drag-region>
-        <div id="computer" class="computer">
+        <div id="computer" class="computer" v-once>
           <img class="w-224px h-158px relative" src="../../assets/img/win.png" alt="" />
           <div
             style="background: rgba(111, 111, 111, 0.1)"
             class="w-170px h-113px absolute top-9% left-51% transform -translate-x-51% -translate-y-9%"></div>
           <img
             class="drop-shadow-md absolute top-30% left-1/2 transform -translate-x-1/2 -translate-y-30% w-140px h-60px"
-            src="../../assets/logo/hula.png"
+            src="/hula.png"
             alt="" />
         </div>
       </div>
 
       <n-flex vertical align="center" :size="20" class="cursor-default" data-tauri-drag-region>
-        <span class="text-(15px #707070)">版本：{{ _pkg.version }}({{ osArch }})</span>
-        <span class="text-(15px #707070)">当前设备：{{ osType }}{{ osVersion }}</span>
+        <span class="text-(15px #707070)">
+          {{ t('home.about.version', { version: _pkg.version, arch: osArch || '' }) }}
+        </span>
+        <span class="text-(15px #707070)">
+          {{ t('home.about.device', { type: osType || '', version: osVersion || '' }) }}
+        </span>
         <n-flex vertical class="text-(12px #909090)" :size="8" align="center">
-          <span>Copyright © {{ currentYear - 1 }}-{{ currentYear }} HuLaSpark</span>
-          <span>All Rights Reserved.</span>
+          <span>
+            {{ t('home.about.copyright', { start: currentYear - 1, end: currentYear }) }}
+          </span>
+          <span>{{ t('home.about.rights') }}</span>
         </n-flex>
       </n-flex>
     </n-flex>
@@ -29,11 +35,14 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { arch, version } from '@tauri-apps/plugin-os'
 import dayjs from 'dayjs'
 import { getOSType, isWindows } from '@/utils/PlatformConstants'
 import pkg from '~/package.json'
+
+const { t } = useI18n()
 
 const _pkg = reactive({
   version: pkg.version
@@ -88,18 +97,6 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 @use '@/styles/scss/global/login-bg';
-:deep(.hover-box) {
-  @apply w-28px h24px flex-center hover:bg-#e7e7e7;
-  svg {
-    color: #404040;
-  }
-}
-:deep(.action-close) {
-  svg {
-    color: #404040;
-  }
-}
-
 .box {
   width: 240px;
   height: 200px;

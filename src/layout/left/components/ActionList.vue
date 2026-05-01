@@ -23,7 +23,7 @@
               </svg>
             </n-badge>
           </template>
-          <p>{{ item.title }} 已打开</p>
+          <p>{{ item.title }} {{ t('home.action.opened') }}</p>
         </n-popover>
         <!-- 该选项有提示时展示 -->
         <n-popover style="padding: 12px" v-else-if="item.tip" trigger="manual" v-model:show="tipShow" placement="right">
@@ -48,14 +48,18 @@
           v-if="item.url === 'message'"
           :max="99"
           :value="unReadMark.newMsgUnreadCount"
-          :show="unReadMark.newMsgUnreadCount > 0">
+          :show="unreadReady && unReadMark.newMsgUnreadCount > 0">
           <svg class="size-22px">
             <use
               :href="`#${activeUrl === item.url || openWindowsList.has(item.url) ? item.iconAction : item.icon}`"></use>
           </svg>
         </n-badge>
         <!-- 好友提示 -->
-        <n-badge v-if="item.url === 'friendsList'" :max="99" :value="unreadApplyCount" :show="unreadApplyCount > 0">
+        <n-badge
+          v-if="item.url === 'friendsList'"
+          :max="99"
+          :value="unreadApplyCount"
+          :show="unreadApplyCount > 0 && unreadReady">
           <svg class="size-22px">
             <use
               :href="`#${activeUrl === item.url || openWindowsList.has(item.url) ? item.iconAction : item.icon}`"></use>
@@ -87,7 +91,7 @@
               </svg>
             </n-badge>
           </template>
-          <p>{{ item.title }} 已打开</p>
+          <p>{{ item.title }} {{ t('home.action.opened') }}</p>
         </n-popover>
         <!-- 该选项有提示时展示 -->
         <n-popover style="padding: 12px" v-else-if="item.tip" trigger="manual" v-model:show="tipShow" placement="right">
@@ -107,7 +111,7 @@
           </n-flex>
         </n-popover>
         <!-- 该选项无提示时展示 -->
-        <n-badge v-else :max="99" :value="item.badge">
+        <n-badge v-else :max="99" :value="item.badge" :show="(item.badge ?? 0) > 0">
           <svg class="size-22px">
             <use
               :href="`#${activeUrl === item.url || openWindowsList.has(item.url) ? item.iconAction : item.icon}`"></use>
@@ -152,10 +156,10 @@
               <use href="#settings"></use>
             </svg>
             <!-- <span class="select-none">插件管理</span> -->
-            插件管理
+            {{ t('home.action.plugin_manage') }}
           </n-flex>
         </n-popover>
-        <p v-if="showMode === ShowModeEnum.TEXT" class="text-(10px center)">插件</p>
+        <p v-if="showMode === ShowModeEnum.TEXT" class="text-(10px center)">{{ t('home.action.plugin') }}</p>
       </div>
     </header>
 
@@ -182,7 +186,7 @@
               </svg>
             </n-badge>
           </template>
-          <p>{{ item.title }} 已打开</p>
+          <p>{{ item.title }} {{ t('home.action.opened') }}</p>
         </n-popover>
         <!-- 该选项有提示时展示 -->
         <n-popover style="padding: 12px" v-else-if="item.tip" trigger="manual" v-model:show="tipShow" placement="right">
@@ -214,7 +218,7 @@
       </div>
 
       <!--  更多选项面板  -->
-      <div title="更多" :class="{ 'bottom-action py-4px': showMode === ShowModeEnum.TEXT }">
+      <div :title="t('home.action.more')" :class="{ 'bottom-action py-4px': showMode === ShowModeEnum.TEXT }">
         <n-popover
           v-model:show="settingShow"
           style="padding: 0; background: transparent; user-select: none"
@@ -244,7 +248,7 @@
             </div>
           </div>
         </n-popover>
-        <p v-if="showMode === ShowModeEnum.TEXT" class="text-(10px center)">更多</p>
+        <p v-if="showMode === ShowModeEnum.TEXT" class="text-(10px center)">{{ t('home.action.more') }}</p>
       </div>
     </footer>
   </div>
@@ -260,22 +264,31 @@ import { useGlobalStore } from '@/stores/global.ts'
 import { useMenuTopStore } from '@/stores/menuTop.ts'
 import { usePluginsStore } from '@/stores/plugins.ts'
 import { useSettingStore } from '@/stores/setting.ts'
-import { itemsBottom, moreList } from '../config.tsx'
+import { useFeedStore } from '@/stores/feed.ts'
+import { useItemsBottom, useMoreList } from '../config.tsx'
 import { leftHook } from '../hook.ts'
 import DefinePlugins from './definePlugins/index.vue'
+import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 
 const appWindow = WebviewWindow.getCurrent()
 const { addListener } = useTauriListener()
 const globalStore = useGlobalStore()
 const pluginsStore = usePluginsStore()
+const feedStore = useFeedStore()
 const { showMode } = storeToRefs(useSettingStore())
-const { menuTop } = useMenuTopStore()
+const { menuTop } = storeToRefs(useMenuTopStore())
+const itemsBottom = useItemsBottom()
 const { plugins } = storeToRefs(pluginsStore)
+const { unreadCount: feedUnreadCount } = storeToRefs(feedStore)
+const { t } = useI18n()
 const unReadMark = computed(() => globalStore.unReadMark)
+const unreadReady = computed(() => globalStore.unreadReady)
 // const headerRef = useTemplateRef('header')
 // const actionListRef = useTemplateRef('actionList')
 //const { } = toRefs(getCurrentInstance) // 所有菜单的外层div
 const menuShow = ref(false)
+const moreList = useMoreList()
 // 显示在菜单的插件
 const activePlugins = computed(() => {
   return plugins.value.filter((i) => i.isAdd)
@@ -314,8 +327,10 @@ const handleResize = async (e: Event) => {
   const staticMenuNum = 2
   const menuNum = Math.floor(
     (windowHeight -
-      (menuTop.length + noMiniShowPlugins.value.length + itemsBottom.length + staticMenuNum) * menuDivHeight -
-      (menuTop.length + noMiniShowPlugins.value.length + itemsBottom.length + staticMenuNum - 1) * spaceHeight -
+      (menuTop.value.length + noMiniShowPlugins.value.length + itemsBottom.value.length + staticMenuNum) *
+        menuDivHeight -
+      (menuTop.value.length + noMiniShowPlugins.value.length + itemsBottom.value.length + staticMenuNum - 1) *
+        spaceHeight -
       headerTopHeight -
       bottomPadding -
       randomHeight) /
@@ -341,6 +356,18 @@ const setHomeHeight = () => {
   invoke('set_height', { height: showMode.value === ShowModeEnum.TEXT ? 505 : 423 })
 }
 
+// 监听朋友圈未读数量变化，同步到 dynamic 插件的 badge
+watch(
+  feedUnreadCount,
+  (newCount) => {
+    const dynamicPlugin = plugins.value.find((p) => p.url === 'dynamic')
+    if (dynamicPlugin) {
+      pluginsStore.updatePlugin({ ...dynamicPlugin, badge: newCount })
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
   // 初始化窗口高度
   setHomeHeight()
@@ -360,7 +387,7 @@ onMounted(async () => {
   )
 
   if (tipShow.value) {
-    menuTop.filter((item) => {
+    menuTop.value.filter((item) => {
       if (item.state !== PluginEnum.BUILTIN) {
         item.dot = true
       }

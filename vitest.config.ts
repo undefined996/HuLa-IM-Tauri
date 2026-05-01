@@ -1,12 +1,17 @@
 /// <reference types="vitest" />
 
+import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import AutoImport from 'unplugin-auto-import/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vitest/config'
-import { getRootPath, getSrcPath } from './build/config/getPath'
+import { getComponentsDirs, getComponentsDtsPath } from './build/config/components'
+
+const testPlatform = process.env.TAURI_ENV_PLATFORM
+const testComponentsDirs = getComponentsDirs(testPlatform)
+const testComponentsDtsPath = getComponentsDtsPath(testPlatform)
 
 export default defineConfig({
   plugins: [
@@ -23,15 +28,16 @@ export default defineConfig({
     }),
     /**自动导入组件，但是不会自动导入jsx和tsx*/
     Components({
-      dirs: ['src/components/**', 'src/mobile/components/**'], // 设置需要扫描的目录
+      dirs: testComponentsDirs, // 根据环境加载对应组件目录
       resolvers: [NaiveUiResolver()],
-      dts: 'src/typings/components.d.ts'
+      dts: testComponentsDtsPath
     })
   ],
   resolve: {
     alias: {
-      '@': getSrcPath(),
-      '~': getRootPath()
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '#': fileURLToPath(new URL('./src/mobile', import.meta.url)),
+      '~': fileURLToPath(new URL('.', import.meta.url))
     }
   },
   test: {

@@ -123,12 +123,6 @@ function getBundleOptions(platform) {
           command: 'tauri build --bundles msi'
         },
         {
-          name: '📁  exe 可执行文件',
-          value: 'exe',
-          description: '生成 .exe 可执行文件',
-          command: 'tauri build --bundles exe'
-        },
-        {
           name: '📦  nsis 安装程序',
           value: 'nsis',
           description: '生成 NSIS 安装程序',
@@ -138,7 +132,7 @@ function getBundleOptions(platform) {
           name: '📦  全部格式',
           value: 'all',
           description: '生成所有支持的格式',
-          command: 'tauri build --target x86_64-pc-windows-msvc'
+          command: 'tauri build'
         },
         {
           name: '🔙  返回上一步',
@@ -172,7 +166,7 @@ function getBundleOptions(platform) {
           name: '📦  全部格式',
           value: 'all',
           description: '生成所有支持的格式',
-          command: 'tauri build --target x86_64-unknown-linux-gnu'
+          command: 'tauri build'
         },
         {
           name: '🔙  返回上一步',
@@ -191,12 +185,6 @@ function getBundleOptions(platform) {
           command: 'tauri android build'
         },
         {
-          name: '📱  aab 应用包',
-          value: 'aab',
-          description: '生成 Android App Bundle (Google Play)',
-          command: 'tauri android build --aab'
-        },
-        {
           name: '🔙  返回上一步',
           value: 'back',
           description: '返回平台选择',
@@ -210,7 +198,7 @@ function getBundleOptions(platform) {
           name: '📱  IOS 应用',
           value: 'ios',
           description: '生成 IOS 应用包',
-          command: 'tauri ios build'
+          command: 'tauri ios build --export-method app-store-connect'
         },
         {
           name: '🔙  返回上一步',
@@ -255,42 +243,16 @@ async function executeBuild(command, isDebug = false) {
   const finalCommand = isDebug ? `${command} --debug` : command
   const [cmd, ...args] = finalCommand.split(' ')
 
-  // 捕获输出以检查特定错误
-  let output = ''
-  let errorOutput = ''
-
   const child = spawn(cmd, args, {
-    stdio: ['inherit', 'pipe', 'pipe'],
+    stdio: 'inherit', // 直接继承父进程的 stdio，保留颜色输出
     shell: true
-  })
-
-  // 捕获标准输出和错误输出
-  child.stdout.on('data', (data) => {
-    const text = data.toString()
-    output += text
-    process.stdout.write(text)
-  })
-
-  child.stderr.on('data', (data) => {
-    const text = data.toString()
-    errorOutput += text
-    process.stderr.write(text)
   })
 
   return new Promise((resolve, reject) => {
     child.on('close', (code) => {
-      // 检查是否包含签名密钥相关的错误
-      const hasSigningKeyError =
-        output.includes('TAURI_SIGNING_PRIVATE_KEY') || errorOutput.includes('TAURI_SIGNING_PRIVATE_KEY')
-
       if (code === 0) {
         console.log('\n🎉 打包完成')
         resolve(code)
-      } else if (hasSigningKeyError) {
-        // 如果是签名密钥错误，视为成功
-        console.log('\n🎉 打包完成')
-        console.log('\n💡 提示：签名密钥错误可以忽略，打包已成功完成')
-        resolve(0) // 返回成功状态码
       } else {
         console.log(`\n❌ 打包失败，退出代码: ${code}`)
         resolve(code)
@@ -392,7 +354,7 @@ async function main() {
       // 第一步：选择平台
       const { selectedPlatform } = await selectPlatform()
 
-      // 第二步：选择包格式
+      // 第二步:选择包格式
       while (true) {
         const bundleResult = await selectBundle(selectedPlatform)
 
@@ -401,22 +363,25 @@ async function main() {
           break
         }
 
-        // 第三步：选择调试模式
-        while (true) {
-          const debugResult = await selectDebugMode()
+        // 移动端平台（iOS 和 Android）直接打包正式版本，不需要选择调试模式
+        const isMobilePlatform = selectedPlatform === 'ios' || selectedPlatform === 'android'
 
-          // 如果返回 'back'，返回包格式选择
-          if (debugResult === 'back') {
-            break
-          }
+        if (isMobilePlatform) {
+          const exitCode = await executeBuild(bundleResult.command, false)
+          process.exit(exitCode)
+        } else {
+          // 桌面端平台需要选择调试模式
+          // 第三步：选择调试模式
+          while (true) {
+            const debugResult = await selectDebugMode()
 
-          // 执行打包命令
-          try {
+            // 如果返回 'back'，返回包格式选择
+            if (debugResult === 'back') {
+              break
+            }
+
             const exitCode = await executeBuild(bundleResult.command, debugResult)
             process.exit(exitCode)
-          } catch (error) {
-            console.error(`\n❌ 执行错误: ${error.message}`)
-            process.exit(1)
           }
         }
       }

@@ -7,6 +7,9 @@
     "tauri-apps.tauri-vscode",
     "1yib.rust-bundle",
     "ms-vscode.vscode-typescript-next",
-    "biomejs.biome"
+    "biomejs.biome",
+    "fill-labs.dependi",
+    "usernamehw.errorlens",
+    "lokalise.i18n-ally"
   ]
 }

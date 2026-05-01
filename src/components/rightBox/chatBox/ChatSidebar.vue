@@ -2,6 +2,7 @@
   <!--! 这里最好不要使用n-flex,滚动高度会有问题  -->
   <main
     style="height: 100%"
+    class="flex-shrink-0"
     :class="[
       isGroup
         ? isCollapsed
@@ -26,13 +27,15 @@
     <div v-if="isGroup && !isCollapsed">
       <!-- 群公告 -->
       <n-flex vertical :size="14" class="px-4px py-10px">
-        <n-flex
-          align="center"
-          justify="space-between"
-          class="cursor-pointer"
-          @click="handleOpenAnnoun(announNum === 0 && isAddAnnoun)">
-          <p class="text-(14px --text-color)">群公告须知</p>
-          <svg class="size-16px rotate-270 color-[--text-color]">
+        <n-flex align="center" justify="space-between" :size="8" class="cursor-pointer">
+          <p
+            class="text-(14px --text-color) truncate flex-1 min-w-0"
+            @click="handleOpenAnnoun(announNum === 0 && isAddAnnoun)">
+            {{ t('home.chat_sidebar.announcement.title') }}
+          </p>
+          <svg
+            class="size-16px rotate-270 color-[--text-color] shrink-0"
+            @click="handleOpenAnnoun(announNum === 0 && isAddAnnoun)">
             <use v-if="announNum === 0 && isAddAnnoun" href="#plus"></use>
             <use v-else href="#down"></use>
           </svg>
@@ -41,27 +44,40 @@
         <!-- 公告加载失败提示 -->
         <n-flex v-if="announError" class="h-74px" align="center" justify="center">
           <div class="text-center">
-            <p class="text-(12px #909090) mb-8px">公告加载失败，请重试</p>
-            <n-button size="tiny" @click="handleRetryAnnouncement">重试</n-button>
+            <p class="text-(12px #909090) mb-8px">{{ t('home.chat_sidebar.announcement.load_failed') }}</p>
+            <n-button size="tiny" @click="announcementStore.loadGroupAnnouncements()">
+              {{ t('home.chat_sidebar.actions.retry') }}
+            </n-button>
           </div>
         </n-flex>
 
         <!-- 公告内容 -->
         <n-scrollbar v-else class="h-74px">
           <p class="text-(12px #909090) leading-6 line-clamp-4 max-w-99%" v-if="announNum === 0">
-            请不要把重要信息发到该群，网络不是法外之地，请遵守网络规范，否则直接删除。
+            {{ t('home.chat_sidebar.announcement.default') }}
           </p>
           <p
             v-else
             style="user-select: text"
             class="announcement-text text-(12px #909090) leading-6 line-clamp-4 max-w-99% break-words">
-            {{ announList.length > 0 ? announList[0]?.content : '' }}
+            <template v-if="announcementSegments.length > 0">
+              <template v-for="(segment, index) in announcementSegments" :key="index">
+                <span
+                  v-if="segment.isLink"
+                  class="cursor-pointer hover:underline hover:opacity-80 text-#13987f"
+                  @click.stop="openAnnouncementLink(segment.text)">
+                  {{ segment.text }}
+                </span>
+                <template v-else>{{ segment.text }}</template>
+              </template>
+            </template>
+            <template v-else>{{ announcementContent }}</template>
           </p>
         </n-scrollbar>
       </n-flex>
 
       <n-flex v-if="!isSearch" align="center" justify="space-between" class="pr-8px pl-8px h-42px">
-        <span class="text-14px">在线成员&nbsp;{{ onlineCountDisplay }}</span>
+        <span class="text-14px">{{ t('home.chat_sidebar.online_members', { count: onlineCountDisplay }) }}</span>
         <svg @click="handleSelect" class="size-14px">
           <use href="#search"></use>
         </svg>
@@ -74,7 +90,7 @@
           ref="inputInstRef"
           v-model:value="searchRef"
           clearable
-          placeholder="搜索"
+          :placeholder="t('home.chat_sidebar.search.placeholder')"
           type="text"
           size="tiny"
           spellCheck="false"
@@ -97,7 +113,7 @@
         item-resizable
         @scroll="handleScroll($event)"
         :item-size="46"
-        :items="filteredUserList">
+        :items="displayedUserList">
         <template #default="{ item }">
           <n-popover
             :ref="(el: any) => (infoPopoverRefs[item.uid] = el)"
@@ -113,7 +129,7 @@
                 :menu="optionsList"
                 :special-menu="report">
                 <n-flex
-                  @click="selectKey = item.uid"
+                  @click="onClickMember(item)"
                   :key="item.uid"
                   :size="10"
                   align="center"
@@ -133,7 +149,7 @@
                         @error="userLoadedMap[item.uid] = true" />
                     </div>
                     <n-flex vertical :size="2" class="flex-1 truncate">
-                      <p :title="item.name" class="text-12px truncate flex-1">
+                      <p :title="item.name" class="text-12px truncate flex-1 leading-tight">
                         {{ item.myName ? item.myName : item.name }}
                       </p>
                       <n-flex
@@ -142,8 +158,10 @@
                         :size="4"
                         class="flex-1">
                         <img class="size-12px" :src="getUserState(item.userStateId)?.url" alt="" />
-                        <span class="text-10px text-[--chat-text-color] truncate">
-                          {{ getUserState(item.userStateId)?.title }}
+                        <span
+                          class="text-10px text-[--chat-text-color] flex-1 min-w-0 truncate"
+                          :title="translateStateTitle(getUserState(item.userStateId)?.title)">
+                          {{ translateStateTitle(getUserState(item.userStateId)?.title) }}
                         </span>
                       </n-flex>
                     </n-flex>
@@ -152,12 +170,12 @@
                   <div
                     v-if="item.roleId === RoleEnum.LORD"
                     class="flex px-4px bg-#d5304f30 py-3px rounded-4px size-fit select-none">
-                    <p class="text-(10px #d5304f)">群主</p>
+                    <p class="text-(10px #d5304f)">{{ t('home.chat_sidebar.roles.owner') }}</p>
                   </div>
                   <div
                     v-if="item.roleId === RoleEnum.ADMIN"
                     class="flex px-4px bg-#1a7d6b30 py-3px rounded-4px size-fit select-none">
-                    <p class="text-(10px #008080)">管理员</p>
+                    <p class="text-(10px #008080)">{{ t('home.chat_sidebar.roles.admin') }}</p>
                   </div>
                 </n-flex>
               </ContextMenu>
@@ -171,43 +189,55 @@
   </main>
 </template>
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useDebounceFn } from '@vueuse/core'
 import type { InputInst } from 'naive-ui'
 import { storeToRefs } from 'pinia'
-import { MittEnum, OnlineEnum, RoleEnum, RoomTypeEnum, ThemeEnum } from '@/enums'
+import { MittEnum, OnlineEnum, RoleEnum, ThemeEnum, RoomTypeEnum } from '@/enums'
 import { useChatMain } from '@/hooks/useChatMain.ts'
 import { useMitt } from '@/hooks/useMitt.ts'
 import { usePopover } from '@/hooks/usePopover.ts'
-import { useTauriListener } from '@/hooks/useTauriListener'
 import { useWindow } from '@/hooks/useWindow.ts'
+import { useLinkSegments } from '@/hooks/useLinkSegments'
+import type { UserItem } from '@/services/types'
 import { WsResponseMessageType } from '@/services/wsType.ts'
-import { useCachedStore } from '@/stores/cached.ts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useGroupStore } from '@/stores/group.ts'
 import { useSettingStore } from '@/stores/setting'
-import { useUserStore } from '@/stores/user'
 import { useUserStatusStore } from '@/stores/userStatus'
 import { AvatarUtils } from '@/utils/AvatarUtils'
+import { getUserByIds } from '@/utils/ImRequestUtils'
+import { useAnnouncementStore } from '@/stores/announcement'
 
+const { t } = useI18n()
 const appWindow = WebviewWindow.getCurrent()
 const emit = defineEmits<(e: 'ready') => void>()
 const { createWebviewWindow } = useWindow()
 const groupStore = useGroupStore()
 const globalStore = useGlobalStore()
-const cachedStore = useCachedStore()
-const userStore = useUserStore()
 const settingStore = useSettingStore()
+const announcementStore = useAnnouncementStore()
+const { clearAnnouncements } = announcementStore
 const { themes } = storeToRefs(settingStore)
-const { addListener } = useTauriListener()
 // 当前加载的群聊ID
-const currentLoadingRoomId = ref('')
-const announError = ref(false)
-const onlineCountDisplay = computed(() => groupStore.countInfo?.onlineNum ?? 0)
+// 如果成员列表未完全加载，使用当前列表的在线人数，避免与头像显示不一致
+const onlineCountDisplay = computed(() => {
+  const totalOnline = groupStore.countInfo?.onlineNum ?? 0
+  const loadedOnline =
+    groupStore.onlineCountMap[globalStore.currentSessionRoomId] ??
+    groupStore.userList.filter((m) => m.activeStatus === OnlineEnum.ONLINE).length
+  return groupStore.userListOptions.isLast ? totalOnline : loadedOnline
+})
 const isGroup = computed(() => globalStore.currentSession?.type === RoomTypeEnum.GROUP)
+// 公告相关计算属性
+const { announcementContent, announNum, announError, isAddAnnoun } = storeToRefs(announcementStore)
+const { segments: announcementSegments, openLink: openAnnouncementLink } = useLinkSegments(announcementContent)
+
 /** 是否是搜索模式 */
 const isSearch = ref(false)
 const searchRef = ref('')
+const searchRequestId = ref(0)
 /** List中的Popover组件实例 */
 const infoPopoverRefs = ref<Record<string, any>>([])
 const inputInstRef = ref<InputInst | null>(null)
@@ -216,99 +246,54 @@ const { optionsList, report, selectKey } = useChatMain()
 const { handlePopoverUpdate, enableScroll } = usePopover(selectKey, 'image-chat-sidebar')
 provide('popoverControls', { enableScroll })
 
-const isLord = computed(() => {
-  const currentUser = groupStore.userList.find((user) => user.uid === useUserStore().userInfo?.uid)
-  return currentUser?.roleId === RoleEnum.LORD
-})
-const isAdmin = computed(() => {
-  const currentUser = groupStore.userList.find((user) => user.uid === useUserStore().userInfo?.uid)
-  return currentUser?.roleId === RoleEnum.ADMIN
-})
-
-/** 判断当前用户是否拥有id为6的徽章 并且是频道 */
-const hasBadge6 = computed(() => {
-  // 只有当 roomId 为 "1" 时才进行徽章判断（频道）
-  if (globalStore.currentSession?.roomId !== '1') return false
-
-  const currentUser = groupStore.getUserInfo(userStore.userInfo!.uid!)!
-  return currentUser?.itemIds?.includes('6')
-})
-
-/** 群公告相关 */
-const announList = ref<any[]>([])
-const announNum = ref(0)
-const isAddAnnoun = ref(false)
 // 用于稳定展示的用户列表
-const displayedUserList = ref<any[]>([])
-// 每群成员缓存：roomId -> members
-const memberCache = ref<Map<string, any[]>>(new Map())
+const displayedUserList = ref<UserItem[]>([])
 /** 用户信息加载状态 */
 const userLoadedMap = ref<Record<string, boolean>>({})
 
-// 创建过滤后的用户列表计算属性
-const filteredUserList = computed(() => {
-  let userList = groupStore.userList
-  if (searchRef.value) {
-    userList = userList.filter((user) => {
-      const flag1 = user.name.toLowerCase().includes(searchRef.value.toLowerCase())
-      const flag2 = user.myName?.toLowerCase().includes(searchRef.value.toLowerCase())
-      return flag1 || flag2
-    })
-  }
-  return userList.sort((a, b) => {
-    if (a.activeStatus !== b.activeStatus) {
-      return a.activeStatus - b.activeStatus
+watch(
+  () => [globalStore.currentSessionRoomId, isGroup.value] as const,
+  async ([roomId, isGroupChat], prevValue) => {
+    const [prevRoomId, prevIsGroup] = prevValue ?? [undefined, undefined]
+    if (!roomId || !isGroupChat) {
+      clearAnnouncements()
+      return
     }
 
-    return a.name.localeCompare(b.name)
-  })
-})
+    if (roomId === prevRoomId && prevIsGroup === isGroupChat) {
+      return
+    }
 
-// 监听成员源列表变化
-watch(
-  [() => groupStore.userList],
-  () => {
-    if (groupStore.userList.length > 0 && currentLoadingRoomId.value === globalStore.currentSession?.roomId) {
-      displayedUserList.value = filteredUserList.value
-      // 缓存当前群成员
-      const roomId = globalStore.currentSession?.roomId
-      if (roomId) {
-        memberCache.value.set(roomId, displayedUserList.value)
-      }
+    try {
+      await announcementStore.loadGroupAnnouncements(roomId)
+    } catch (error) {
+      console.error('刷新群公告失败:', error)
     }
   },
   { immediate: true }
 )
 
-// 监听会话变化
-watch(
-  () => globalStore.currentSession,
-  async (newSession, oldSession) => {
-    const currentSession = { ...newSession }
-    if (newSession?.type === RoomTypeEnum.GROUP) {
-      if (newSession?.roomId !== oldSession?.roomId) {
-        currentLoadingRoomId.value = newSession.roomId
-        // 切换时优先显示缓存，无缓存则保留旧内容，避免空白
-        const cached = memberCache.value.get(newSession.roomId)
-        if (cached && Array.isArray(cached)) {
-          displayedUserList.value = cached
-        }
+const onClickMember = async (item: UserItem) => {
+  console.log('点击用户', item)
+  selectKey.value = item.uid
 
-        // 重置群组数据后再加载新的群成员数据（不清空UI）
-        groupStore.resetGroupData()
-        try {
-          await groupStore.getGroupUserList(currentSession.roomId!)
-          // 初始化群公告
-          await handleInitAnnoun()
-          // 在数据完成后替换展示列表
-          displayedUserList.value = filteredUserList.value
-          // 更新缓存
-          memberCache.value.set(currentSession.roomId!, displayedUserList.value)
-        } catch (error) {
-          console.error('加载群组信息失败:', error)
-        }
-      }
+  // 获取用户的最新数据，并更新 pinia
+  getUserByIds([item.uid]).then((users) => {
+    if (users && users.length > 0) {
+      groupStore.updateUserItem(item.uid, users[0])
     }
+  })
+}
+
+// 监听成员源列表变化
+watch(
+  () => groupStore.userList,
+  (newList) => {
+    if (searchRef.value.trim()) {
+      return
+    }
+
+    displayedUserList.value = Array.isArray(newList) ? [...newList] : []
   },
   { immediate: true }
 )
@@ -318,17 +303,30 @@ watch(
  * @param value 输入值
  */
 const handleSearch = useDebounceFn((value: string) => {
-  // 直接更新 searchRef，让计算属性处理过滤逻辑
   searchRef.value = value
+  const keyword = value.trim().toLowerCase()
+
+  // 如果没有搜索关键字,显示全部成员
+  if (!keyword) {
+    displayedUserList.value = Array.isArray(groupStore.userList) ? [...groupStore.userList] : []
+    return
+  }
+
+  // 前端本地过滤成员列表
+  const filteredList = groupStore.userList.filter((member) => {
+    const matchName = member.name?.toLowerCase().includes(keyword)
+    const matchMyName = member.myName?.toLowerCase().includes(keyword)
+    return matchName || matchMyName
+  })
+
+  displayedUserList.value = filteredList
 }, 10)
 
-/**
- * 重置搜索状态
- */
 const handleBlur = () => {
   if (searchRef.value) return
   isSearch.value = false
-  searchRef.value = ''
+  searchRequestId.value++
+  displayedUserList.value = Array.isArray(groupStore.userList) ? [...groupStore.userList] : []
 }
 
 /**
@@ -336,6 +334,10 @@ const handleBlur = () => {
  * @param event 滚动事件
  */
 const handleScroll = (event: Event) => {
+  if (searchRef.value.trim()) {
+    return
+  }
+
   const target = event.target as HTMLElement
   const isBottom = target.scrollHeight - target.scrollTop === target.clientHeight
 
@@ -349,9 +351,16 @@ const handleScroll = (event: Event) => {
  */
 const handleSelect = () => {
   isSearch.value = !isSearch.value
-  nextTick(() => {
-    inputInstRef.value?.select()
-  })
+
+  if (isSearch.value) {
+    nextTick(() => {
+      inputInstRef.value?.select()
+    })
+  } else {
+    searchRequestId.value++
+    searchRef.value = ''
+    displayedUserList.value = Array.isArray(groupStore.userList) ? [...groupStore.userList] : []
+  }
 }
 
 /**
@@ -359,51 +368,14 @@ const handleSelect = () => {
  */
 const handleOpenAnnoun = (isAdd: boolean) => {
   nextTick(async () => {
-    const roomId = globalStore.currentSession?.roomId
-    await createWebviewWindow(isAdd ? '新增群公告' : '查看群公告', `announList/${roomId}/${isAdd ? 0 : 1}`, 420, 620)
+    const roomId = globalStore.currentSessionRoomId
+    await createWebviewWindow(
+      isAdd ? t('home.chat_sidebar.announcement.window.add') : t('home.chat_sidebar.announcement.window.view'),
+      `announList/${roomId}/${isAdd ? 0 : 1}`,
+      420,
+      620
+    )
   })
-}
-
-/**
- * 加载群公告
- */
-const handleLoadGroupAnnoun = async (roomId: string) => {
-  try {
-    // 设置是否可以添加公告
-    isAddAnnoun.value = isLord.value || isAdmin.value || hasBadge6.value!
-    // 获取群公告列表
-    const data = await cachedStore.getGroupAnnouncementList(roomId, 1, 10)
-    if (data) {
-      announList.value = data.records
-      // 处理置顶公告
-      if (announList.value && announList.value.length > 0) {
-        const topAnnouncement = announList.value.find((item: any) => item.top)
-        if (topAnnouncement) {
-          announList.value = [topAnnouncement, ...announList.value.filter((item: any) => !item.top)]
-        }
-      }
-      announNum.value = parseInt(data.total, 10)
-      announError.value = false
-    } else {
-      announError.value = false
-    }
-  } catch (error) {
-    console.error('加载群公告失败:', error)
-    announError.value = true
-  }
-}
-
-/**
- * 初始化群公告所需要的信息
- */
-const handleInitAnnoun = async () => {
-  // 初始化时获取群公告
-  if (isGroup.value) {
-    const roomId = globalStore.currentSession?.roomId
-    if (roomId) {
-      await handleLoadGroupAnnoun(roomId)
-    }
-  }
 }
 
 const userStatusStore = useUserStatusStore()
@@ -413,31 +385,19 @@ const getUserState = (stateId: string) => {
   return stateList.value.find((state: { id: string }) => state.id === stateId)
 }
 
-// 重试加载公告
-const handleRetryAnnouncement = () => {
-  if (globalStore.currentSession?.roomId) {
-    handleLoadGroupAnnoun(globalStore.currentSession.roomId)
-  }
+const translateStateTitle = (title?: string) => {
+  if (!title) return ''
+  const key = `auth.onlineStatus.states.${title}`
+  const translated = t(key)
+  return translated === key ? title : translated
 }
 
-// 重试加载成员列表
-// const handleRetryMembers = async () => {
-//   if (globalStore.currentSession?.roomId) {
-//     try {
-//       await groupStore.getGroupUserList(globalStore.currentSession.roomId)
-//       displayedUserList.value = filteredUserList.value
-//     } catch (error) {
-//       console.error('重试加载成员列表失败:', error)
-//     }
-//   }
-// }
-
-const announcementUpdatedListener = await appWindow.listen('announcementUpdated', async (event: any) => {
+appWindow.listen('announcementUpdated', async (event: any) => {
   if (event.payload) {
     const { hasAnnouncements } = event.payload
     if (hasAnnouncements) {
       // 初始化群公告
-      await handleInitAnnoun()
+      await announcementStore.loadGroupAnnouncements()
       await nextTick()
     }
   }
@@ -453,38 +413,33 @@ onMounted(async () => {
     handlePopoverUpdate(event.uid)
   })
 
-  await addListener(
-    appWindow.listen('announcementClear', async () => {
-      announNum.value = 0
-    }),
-    'announcementClear'
-  )
+  appWindow.listen('announcementClear', async () => {
+    clearAnnouncements()
+  })
 
   // 初始化时获取当前群组用户的信息
   if (groupStore.userList.length > 0) {
     // 初始展示当前列表
-    displayedUserList.value = filteredUserList.value
-    const currentRoom = globalStore.currentSession?.roomId
+    displayedUserList.value = [...groupStore.userList]
+    const currentRoom = globalStore.currentSessionRoomId
     if (currentRoom) {
-      memberCache.value.set(currentRoom, displayedUserList.value)
+      groupStore.updateMemberCache(currentRoom, displayedUserList.value)
     }
     const handleAnnounInitOnEvent = (shouldReload: boolean) => {
       return async (event: any) => {
         if (shouldReload || event) {
-          await handleInitAnnoun()
+          await announcementStore.loadGroupAnnouncements()
         }
       }
     }
     // 监听群公告消息
     useMitt.on(WsResponseMessageType.ROOM_GROUP_NOTICE_MSG, handleAnnounInitOnEvent(true))
     useMitt.on(WsResponseMessageType.ROOM_EDIT_GROUP_NOTICE_MSG, handleAnnounInitOnEvent(true))
-
-    await handleInitAnnoun()
   }
 })
 
 onUnmounted(() => {
-  announcementUpdatedListener()
+  groupStore.cleanupSession()
 })
 </script>
 

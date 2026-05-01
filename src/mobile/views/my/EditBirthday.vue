@@ -1,73 +1,57 @@
 <template>
-  <AutoFixHeightPage :show-footer="false">
+  <MobileScaffold :show-footer="false">
     <template #header>
-      <HeaderBar
-        :isOfficial="false"
-        class="bg-white"
-        style="border-bottom: 1px solid; border-color: #dfdfdf"
-        :hidden-right="true"
-        room-name="编辑生日" />
+      <HeaderBar :isOfficial="false" border :hidden-right="true" :room-name="t('mobile_edit_brithday.title')" />
     </template>
 
-    <template #container="{ height }">
-      <img src="@/assets/mobile/chat-home/background.webp" class="w-100% relative top-0 z-1" alt="hula" />
-      <div :style="{ height: height + 'px' }" class="z-2 flex flex-col absolute overflow-auto min-h-70vh w-full">
-        <div class="flex flex-col p-20px gap-20px">
-          <div class="flex justify-center w-full bg-white rounded-10px shadow">
-            <n-date-picker panel type="date" />
-          </div>
+    <template #container>
+      <div class="flex flex-col overflow-auto h-full">
+        <div class="flex flex-col flex-1 gap-20px py-15px px-20px">
+          <n-date-picker panel type="date" block class="m-auto rounded-16px" />
 
-          <div class="flex bg-white rounded-10px w-full h-auto shadow">
-            <div class="px-15px flex flex-col w-full">
-              <!-- 群号 -->
-              <div
-                style="border-bottom: 1px solid; border-color: #ebebeb"
-                class="flex justify-between py-12px items-center">
-                <div class="text-14px">展示生日标签</div>
-                <n-switch />
+          <n-list class="px-15px flex flex-col w-full box-border rounded-16px">
+            <n-list-item>
+              <div class="flex w-full justify-between items-center">
+                <n-text class="text-14px shrink-0">{{ t('mobile_edit_brithday.options.display_birthday_tag') }}</n-text>
+                <n-switch class="shrink-0" />
               </div>
-            </div>
-          </div>
+            </n-list-item>
+          </n-list>
 
-          <div class="flex bg-white rounded-10px w-full h-auto shadow">
-            <div class="px-15px flex flex-col w-full">
-              <div
-                style="border-bottom: 1px solid; border-color: #ebebeb"
-                class="flex justify-between py-12px items-center">
-                <div class="text-14px">展示年龄</div>
-                <n-switch />
+          <n-list class="px-15px flex flex-col w-full box-border rounded-10px">
+            <n-list-item>
+              <div class="flex w-full justify-between items-center">
+                <n-text class="text-14px shrink-0">{{ t('mobile_edit_brithday.options.displsy_age') }}</n-text>
+                <n-switch class="shrink-0" />
               </div>
-              <div
-                style="border-bottom: 1px solid; border-color: #ebebeb"
-                class="flex justify-between py-12px items-center">
-                <div class="text-14px">展示星座</div>
-                <n-switch />
+            </n-list-item>
+
+            <n-divider class="m-0! p-0!" />
+            <n-list-item>
+              <div class="flex w-full justify-between items-center">
+                <n-text class="text-14px shrink-0">
+                  {{ t('mobile_edit_brithday.options.display_constellation') }}
+                </n-text>
+                <n-switch class="shrink-0" />
               </div>
-            </div>
-          </div>
+            </n-list-item>
+          </n-list>
 
           <div class="flex justify-center mt-20px">
-            <div
-              class="w-20%"
-              style="
-                background: linear-gradient(145deg, #7eb7ac, #6fb0a4, #5fa89c);
-                border-radius: 30px;
-                padding: 10px 30px;
-                color: white;
-                font-weight: 500;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-                text-align: center;
-                display: inline-block;
-              ">
-              保存
-            </div>
+            <n-button strong secondary round type="primary" block>
+              {{ t('mobile_edit_brithday.save_btn') }}
+            </n-button>
           </div>
         </div>
       </div>
     </template>
-  </AutoFixHeightPage>
+  </MobileScaffold>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+</script>
 
 <style lang="scss" scoped></style>

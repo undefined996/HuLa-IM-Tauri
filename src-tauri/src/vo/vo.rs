@@ -28,32 +28,22 @@ pub struct LoginReq {
     pub system_type: String,
     pub device_type: String,
     pub client_id: String,
+    pub code: Option<String>,
+    pub redirect_uri: Option<String>,
     pub account: String,
     pub password: String,
     #[serde(default)]
     pub is_auto_login: bool,
+    pub async_data: bool,
     pub uid: Option<String>, // 用于自动登录时传递用户ID
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResp {
     pub token: String,
     pub client: String,
     pub refresh_token: String,
-    pub expire: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct RefreshTokenReq {
-    pub refresh_token: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct RefreshTokenResp {
-    pub token: String,
-    pub refresh_token: String,
+    pub uid: String,
     pub expire: String,
 }

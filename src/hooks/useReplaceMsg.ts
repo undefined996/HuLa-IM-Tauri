@@ -1,5 +1,4 @@
 import { MsgEnum, RoomTypeEnum } from '@/enums'
-import { useCommon } from '@/hooks/useCommon.ts'
 import type { MessageType } from '@/services/types'
 import { useChatStore } from '@/stores/chat'
 import { useGroupStore } from '@/stores/group'
@@ -20,12 +19,13 @@ export const useReplaceMsg = () => {
    * @returns 是否@当前用户
    */
   const checkMessageAtMe = (message: MessageType) => {
-    if (!message?.message?.body?.atUidList || !userStore.userInfo!.uid) {
+    const currentUid = userStore.userInfo?.uid
+    if (!message?.message?.body?.atUidList || !currentUid) {
       return false
     }
 
     // 确保类型一致的比较
-    return message.message.body.atUidList.some((atUid: string) => String(atUid) === String(userStore.userInfo!.uid))
+    return message.message.body.atUidList.some((atUid: string) => String(atUid) === String(currentUid))
   }
 
   /**
@@ -57,19 +57,6 @@ export const useReplaceMsg = () => {
   }
 
   /**
-   * 获取带有@提醒标记的消息内容
-   * @param isAtMe 是否@当前用户
-   * @param content 原始消息内容
-   * @returns 带有@提醒标记的消息内容
-   */
-  const getAtMeContent = (isAtMe: boolean, content: string) => {
-    if (!isAtMe) return content
-
-    const atPrefix = '<span class="text-#d5304f mr-4px">[有人@我]</span>'
-    return `${atPrefix}${content}`
-  }
-
-  /**
    * 处理撤回消息显示逻辑
    * @param message 消息对象
    * @param roomType 房间类型
@@ -77,12 +64,16 @@ export const useReplaceMsg = () => {
    * @returns 格式化后的撤回消息文本
    */
   const formatRecallMessage = (message: MessageType, roomType: RoomTypeEnum, userName: string) => {
-    const { userUid } = useCommon()
+    const currentUid = userStore.userInfo?.uid
+    const content = message.message?.body?.content
+    if (typeof content === 'string' && content.trim().length > 0) {
+      return content
+    }
 
     if (roomType === RoomTypeEnum.GROUP) {
       return `${userName}:撤回了一条消息`
     } else {
-      return message.fromUser.uid === userUid.value ? '你撤回了一条消息' : '对方撤回了一条消息'
+      return message.fromUser.uid === currentUid ? '你撤回了一条消息' : '对方撤回了一条消息'
     }
   }
 
@@ -92,54 +83,65 @@ export const useReplaceMsg = () => {
    * @param defaultName 默认名称（可选）
    * @returns 发送者用户名
    */
-  const getMessageSenderName = (message: MessageType, defaultName: string = '', roomId: string) => {
-    if (!message?.fromUser?.uid) return defaultName
-    const session = chatStore.getSession(roomId)
-    if (session.type === RoomTypeEnum.GROUP) {
-      const user = groupStore.getUser(roomId, message.fromUser.uid)
-      return user?.myName || user?.name || ''
-    } else {
-      return groupStore.getUserInfo(message.fromUser.uid)?.name || defaultName
+  const getMessageSenderName = (
+    message: MessageType,
+    defaultName: string = '',
+    roomId?: string,
+    roomTypeHint?: RoomTypeEnum
+  ) => {
+    if (!message?.fromUser?.uid) {
+      return defaultName
     }
+
+    const resolvedRoomId = roomId || message.message?.roomId || ''
+    const fallbackName = message.fromUser?.username || defaultName || message.fromUser?.uid || ''
+    const session = chatStore.getSession(resolvedRoomId)
+    const resolvedRoomType = roomTypeHint ?? session?.type
+
+    const globalUser = groupStore.getUserInfo(message.fromUser.uid, resolvedRoomId)
+
+    if (resolvedRoomType === RoomTypeEnum.GROUP) {
+      const user = groupStore.getUser(resolvedRoomId, message.fromUser.uid)
+      const resolvedName = user?.myName || user?.name || globalUser?.name || fallbackName
+      return resolvedName
+    }
+
+    const resolvedName = globalUser?.name || fallbackName
+    return resolvedName
   }
 
   /**
-   * 处理消息内容，包括撤回消息和@提醒
+   * 处理消息内容，包括撤回消息
    * @param message 消息对象
    * @param roomType 房间类型
    * @param userName 发送消息用户的名称（可选，如果不提供会自动从消息中提取）
-   * @param isAtMe 是否有人@我
    * @returns 格式化后的消息内容
    */
   const formatMessageContent = (
     message: MessageType,
     roomType: RoomTypeEnum,
     userName: string = '',
-    isAtMe: boolean
+    roomId?: string
   ) => {
-    // 如果没有提供用户名，自动从消息中获取
-    const senderName = userName
+    const resolvedRoomId = roomId ?? message.message?.roomId ?? ''
+    const senderName = userName || getMessageSenderName(message, '', resolvedRoomId, roomType)
     // 判断是否是撤回消息
     if (message.message?.type === MsgEnum.RECALL) {
       return formatRecallMessage(message, roomType, senderName)
     }
 
     // 正常消息，处理内容
-    const messageContent = renderReplyContent(
+    return renderReplyContent(
       senderName,
       message.message?.type,
       message.message?.body?.content || message.message?.body,
       roomType
     ) as string
-
-    // 处理@提醒
-    return getAtMeContent(isAtMe, messageContent)
   }
 
   return {
     checkMessageAtMe,
     checkRoomAtMe,
-    getAtMeContent,
     formatRecallMessage,
     formatMessageContent,
     getMessageSenderName

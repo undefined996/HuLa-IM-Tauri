@@ -27,9 +27,10 @@ pub async fn save_message_mark(
     state: State<'_, AppData>,
 ) -> Result<(), String> {
     let result: Result<(), CommonError> = async {
+        let db = state.db_conn.read().await;
         let messages: Vec<im_message::Model> = im_message::Entity::find()
             .filter(im_message::Column::Id.eq(data.msg_id.clone()))
-            .all(state.db_conn.as_ref())
+            .all(&*db)
             .await?;
 
         for message in messages {
@@ -49,13 +50,13 @@ pub async fn save_message_mark(
 
                 // 更新数据库
                 im_message::Entity::update(active_message)
-                    .exec(state.db_conn.as_ref())
+                    .exec(&*db)
                     .await?;
             }
         }
 
         // 开启事务保存到数据库
-        let tx = state.db_conn.begin().await?;
+        let tx = db.begin().await?;
         // im_message_mark_repository::save_msg_mark(&tx, message_mark).await?;
         tx.commit().await?;
 
@@ -104,6 +105,7 @@ fn get_new_message_marks(
         }
     }
 
-    let new_message_marks = serde_json::to_string(&message_marks).map_err(|e| anyhow::anyhow!("序列化消息标记错误: {}", e))?;
+    let new_message_marks = serde_json::to_string(&message_marks)
+        .map_err(|e| anyhow::anyhow!("序列化消息标记错误: {}", e))?;
     Ok(new_message_marks)
 }

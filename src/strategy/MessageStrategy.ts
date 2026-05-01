@@ -1,6 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
-import { appCacheDir, join } from '@tauri-apps/api/path'
-import { BaseDirectory, readFile, remove, writeFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, readFile, writeFile } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import type { Ref } from 'vue'
 import { AppException } from '@/common/exception.ts'
@@ -11,7 +9,10 @@ import type { MessageType } from '@/services/types.ts'
 import { fixFileMimeType, isVideoUrl } from '@/utils/FileType'
 import { getMimeTypeFromExtension, removeTag } from '@/utils/Formatting'
 import { getImageDimensions } from '@/utils/ImageUtils'
+import { isMobile } from '@/utils/PlatformConstants'
+import { generateVideoThumbnail } from '@/utils/VideoThumbnail'
 import { useGroupStore } from '../stores/group'
+import { removeTempFile } from '@/utils/TempFileManager'
 
 interface MessageStrategy {
   getMsg: (msgInputValue: string, replyValue: any, fileList?: File[]) => any
@@ -52,14 +53,14 @@ abstract class AbstractMessageStrategy implements MessageStrategy {
       },
       message: {
         id: messageId,
-        roomId: globalStore.currentSession.roomId,
+        roomId: globalStore.currentSessionRoomId,
         sendTime: currentTime,
         status: MessageStatusEnum.PENDING,
         type: this.msgType,
         body: messageBody,
         messageMarks: {}
       },
-      sendTime: new Date(currentTime).toISOString(),
+      sendTime: Date.now(),
       loading: false
     }
   }
@@ -115,10 +116,13 @@ class TextMessageStrategyImpl extends AbstractMessageStrategy {
       if (replyDiv) {
         replyDiv.parentNode?.removeChild(replyDiv)
       }
-      tempDiv.innerHTML = DOMPurify.sanitize(removeTag(tempDiv.innerHTML))
+      tempDiv.innerHTML = DOMPurify.sanitize(removeTag(tempDiv.innerHTML), { RETURN_DOM: false })
 
       // 确保所有的&nbsp;都被替换为空格
-      msg.content = tempDiv.innerHTML.replace(/&nbsp;/g, ' ')
+      msg.content = tempDiv.innerHTML
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\n+/g, '\n')
+        .trim()
     }
     // 验证消息长度
     if (msg.content.length > 500) {
@@ -149,10 +153,17 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
   private readonly MAX_UPLOAD_SIZE = 2 * 1024 * 1024
   // 支持的图片类型
   private readonly ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-  private uploadHook = useUpload()
+  private _uploadHook: ReturnType<typeof useUpload> | null = null
 
   constructor() {
     super(MsgEnum.IMAGE)
+  }
+
+  private get uploadHook() {
+    if (!this._uploadHook) {
+      this._uploadHook = useUpload()
+    }
+    return this._uploadHook
   }
 
   /**
@@ -171,7 +182,7 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
 
     // 检查文件大小
     if (fixedFile.size > this.MAX_UPLOAD_SIZE) {
-      throw new AppException('图片大小不能超过2MB')
+      throw new AppException('图片大小不能超过2MB', { showError: true })
     }
 
     return fixedFile
@@ -237,8 +248,6 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
    * @returns 处理后的消息
    */
   async getMsg(msgInputValue: string, replyValue: any, fileList?: File[]): Promise<any> {
-    console.log('开始处理图片消息:', msgInputValue, replyValue, fileList?.length ? '有附件文件' : '无附件文件')
-
     // 优先处理fileList中的文件
     if (fileList && fileList.length > 0) {
       const file = fileList[0]
@@ -251,9 +260,8 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
 
       // 将文件保存到缓存目录
       const tempPath = `temp-image-${Date.now()}-${file.name}`
-      const arrayBuffer = await file.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      await writeFile(tempPath, uint8Array, { baseDir: BaseDirectory.AppCache })
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+      await writeFile(tempPath, file.stream(), { baseDir })
 
       return {
         type: this.msgType,
@@ -321,7 +329,8 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
     console.log('标准化路径:', normalizedPath)
 
     try {
-      const fileData = await readFile(normalizedPath, { baseDir: BaseDirectory.AppCache })
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+      const fileData = await readFile(normalizedPath, { baseDir })
 
       const fileName = path.split('/').pop() || 'image.png'
       const fileType = getMimeTypeFromExtension(fileName)
@@ -446,15 +455,127 @@ class ImageMessageStrategyImpl extends AbstractMessageStrategy {
 }
 
 /**
+ * 处理位置消息的策略
+ */
+class LocationMessageStrategyImpl extends AbstractMessageStrategy {
+  constructor() {
+    super(MsgEnum.LOCATION)
+  }
+
+  /**
+   * 构建位置消息对象
+   * @param msgInputValue 位置数据JSON字符串
+   * @param replyValue 回复信息
+   * @returns 位置消息对象
+   */
+  getMsg(msgInputValue: string, replyValue: any): any {
+    try {
+      // 解析位置数据
+      const locationData = JSON.parse(msgInputValue)
+
+      // 验证必要字段
+      if (!locationData.latitude || !locationData.longitude || !locationData.address) {
+        throw new AppException('无效的位置数据，缺少必要字段')
+      }
+
+      return {
+        type: this.msgType,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        address: locationData.address,
+        precision: locationData.precision || '高精度',
+        timestamp: locationData.timestamp || Date.now(),
+        reply: replyValue.content
+          ? {
+              content: replyValue.content,
+              key: replyValue.key
+            }
+          : undefined
+      }
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new AppException('位置数据格式错误，必须是有效的JSON')
+      }
+      throw error
+    }
+  }
+
+  /**
+   * 构建消息体
+   * @param msg 位置消息对象
+   * @param reply 回复信息
+   * @returns 消息体
+   */
+  buildMessageBody(msg: any, reply: any): any {
+    return {
+      latitude: msg.latitude,
+      longitude: msg.longitude,
+      address: msg.address,
+      precision: msg.precision,
+      timestamp: msg.timestamp,
+      replyMsgId: msg.reply?.key || undefined,
+      reply: reply.value.content
+        ? {
+            body: reply.value.content,
+            id: reply.value.key,
+            username: reply.value.accountName,
+            type: msg.type
+          }
+        : undefined
+    }
+  }
+
+  /**
+   * 构建完整的位置消息
+   * @param messageId 消息ID
+   * @param messageBody 消息体
+   * @param globalStore 全局存储
+   * @param userUid 用户UID
+   * @returns 完整消息对象
+   */
+  buildMessageType(messageId: string, messageBody: any, globalStore: any, userUid: Ref<any>): MessageType {
+    const groupStore = useGroupStore()
+    const userInfo = groupStore.getUserInfo(userUid.value)
+
+    return {
+      fromUser: {
+        uid: userUid.value || 0,
+        username: userInfo?.name || '',
+        avatar: userInfo?.avatar || '',
+        locPlace: userInfo?.locPlace || ''
+      },
+      message: {
+        id: messageId,
+        roomId: globalStore.currentSessionRoomId,
+        sendTime: Date.now(),
+        status: MessageStatusEnum.PENDING,
+        type: this.msgType,
+        body: messageBody,
+        messageMarks: {}
+      },
+      sendTime: Date.now(),
+      loading: false
+    }
+  }
+}
+
+/**
  * 处理文件消息
  */
 class FileMessageStrategyImpl extends AbstractMessageStrategy {
-  // 最大上传文件大小 100MB
-  private readonly MAX_UPLOAD_SIZE = 100 * 1024 * 1024
-  private uploadHook = useUpload()
+  // 最大上传文件大小 500MB
+  private readonly MAX_UPLOAD_SIZE = 500 * 1024 * 1024
+  private _uploadHook: ReturnType<typeof useUpload> | null = null
 
   constructor() {
     super(MsgEnum.FILE)
+  }
+
+  private get uploadHook() {
+    if (!this._uploadHook) {
+      this._uploadHook = useUpload()
+    }
+    return this._uploadHook
   }
 
   /**
@@ -465,7 +586,7 @@ class FileMessageStrategyImpl extends AbstractMessageStrategy {
   private async validateFile(file: File): Promise<File> {
     // 检查文件大小
     if (file.size > this.MAX_UPLOAD_SIZE) {
-      throw new AppException('文件大小不能超过100MB')
+      throw new AppException('文件大小不能超过500MB')
     }
     return file
   }
@@ -478,7 +599,8 @@ class FileMessageStrategyImpl extends AbstractMessageStrategy {
   private async getFileFromPath(path: string): Promise<File> {
     try {
       const normalizedPath = path.replace(/\\/g, '/')
-      const fileData = await readFile(normalizedPath, { baseDir: BaseDirectory.AppCache })
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+      const fileData = await readFile(normalizedPath, { baseDir })
 
       const fileName = normalizedPath.split('/').pop() || 'unknown'
       const fileType = getMimeTypeFromExtension(fileName)
@@ -514,9 +636,8 @@ class FileMessageStrategyImpl extends AbstractMessageStrategy {
     const tempPath = `temp-file-${Date.now()}-${validatedFile.name}`
 
     // 将文件保存到临时位置
-    const arrayBuffer = await validatedFile.arrayBuffer()
-    const uint8Array = new Uint8Array(arrayBuffer)
-    await writeFile(tempPath, uint8Array, { baseDir: BaseDirectory.AppCache })
+    const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+    await writeFile(tempPath, validatedFile.stream(), { baseDir })
 
     return {
       type: this.msgType,
@@ -691,7 +812,18 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
   private readonly MAX_UPLOAD_SIZE = 50 * 1024 * 1024
   // 支持的视频类型
   private readonly ALLOWED_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv']
-  private uploadHook = useUpload()
+  private _uploadHook: ReturnType<typeof useUpload> | null = null
+
+  constructor() {
+    super(MsgEnum.VIDEO)
+  }
+
+  private get uploadHook() {
+    if (!this._uploadHook) {
+      this._uploadHook = useUpload()
+    }
+    return this._uploadHook
+  }
 
   // 暴露上传进度监听
   getUploadProgress() {
@@ -699,10 +831,6 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
       progress: this.uploadHook.progress,
       onChange: this.uploadHook.onChange
     }
-  }
-
-  constructor() {
-    super(MsgEnum.VIDEO)
   }
 
   /**
@@ -721,124 +849,6 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
     return file
   }
 
-  /**
-   * 压缩缩略图
-   * @param file 原始缩略图文件
-   * @param maxWidth 最大宽度，默认300px
-   * @param maxHeight 最大高度，默认150px
-   * @param quality 压缩质量，默认0.6
-   */
-  private async compressThumbnail(
-    file: File,
-    maxWidth: number = 300,
-    maxHeight: number = 150,
-    quality: number = 0.6
-  ): Promise<File> {
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')!
-
-      img.onload = () => {
-        // 计算压缩后的尺寸
-        let { width, height } = img
-
-        // 按比例缩放
-        if (width > height) {
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width
-            width = maxWidth
-          }
-        } else {
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height
-            height = maxHeight
-          }
-        }
-
-        canvas.width = width
-        canvas.height = height
-
-        // 绘制压缩后的图片
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // 转换为压缩后的文件
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(new File([blob], file.name, { type: 'image/jpeg' }))
-            } else {
-              reject(new AppException('缩略图压缩失败'))
-            }
-          },
-          'image/jpeg',
-          quality
-        )
-      }
-
-      img.onerror = () => {
-        reject(new AppException('缩略图加载失败'))
-      }
-
-      img.src = URL.createObjectURL(file)
-    })
-  }
-
-  /**
-   * 获取视频缩略图
-   * @param file 视频文件
-   */
-  private async getVideoThumbnail(file: File): Promise<File> {
-    try {
-      // 首先将文件保存到临时位置
-      const tempPath = `temp-video-${Date.now()}-${file.name}`
-      const arrayBuffer = await file.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-
-      // 写入临时文件
-      await writeFile(tempPath, uint8Array, { baseDir: BaseDirectory.AppCache })
-
-      // 构建完整的文件路径
-      const fullPath = await join(await appCacheDir(), tempPath)
-
-      // 调用 Rust 函数生成缩略图
-      const thumbnailInfo = await invoke<{
-        thumbnail_base64: string
-        width: number
-        height: number
-        duration: number
-      }>('get_video_thumbnail', {
-        videoPath: fullPath,
-        targetTime: 0.1 // 第1秒对应约0.1秒
-      })
-
-      // 将 base64 转换为 File 对象
-      const base64Data = thumbnailInfo.thumbnail_base64
-      const binaryString = atob(base64Data)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-      }
-
-      const thumbnailBlob = new Blob([bytes], { type: 'image/jpeg' })
-      const thumbnailFile = new File([thumbnailBlob], 'thumbnail.jpg', { type: 'image/jpeg' })
-
-      // 清理临时文件
-      try {
-        await remove(tempPath, { baseDir: BaseDirectory.AppCache })
-      } catch (cleanupError) {
-        console.warn('清理临时文件失败:', cleanupError)
-      }
-
-      // 压缩缩略图
-      const compressedThumbnail = await this.compressThumbnail(thumbnailFile)
-      return compressedThumbnail
-    } catch (error) {
-      console.error('Rust 缩略图生成失败:', error)
-      throw new AppException(`生成视频缩略图失败: ${error}`)
-    }
-  }
-
   async getMsg(msgInputValue: string, replyValue: any, fileList?: File[]): Promise<any> {
     // 1. 优先处理fileList中的文件
     if (fileList && fileList.length > 0) {
@@ -846,13 +856,12 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
 
       // 验证视频文件
       const validatedFile = await this.validateVideo(file)
-      const thumbnail = await this.getVideoThumbnail(validatedFile)
+      const thumbnail = await generateVideoThumbnail(validatedFile)
 
       // 将文件保存到缓存目录
       const tempPath = `temp-video-${Date.now()}-${file.name}`
-      const arrayBuffer = await file.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      await writeFile(tempPath, uint8Array, { baseDir: BaseDirectory.AppCache })
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+      await writeFile(tempPath, validatedFile.stream(), { baseDir })
 
       return {
         type: this.msgType,
@@ -878,7 +887,7 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
 
     // 4. 验证视频文件
     const validatedFile = await this.validateVideo(actualFile)
-    const thumbnail = await this.getVideoThumbnail(validatedFile)
+    const thumbnail = await generateVideoThumbnail(validatedFile)
     const path = parseInnerText(msgInputValue, 'temp-video')
     if (!path) {
       throw new AppException('文件不存在')
@@ -927,8 +936,9 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
     // 5. 处理合法字符串路径的情况
     try {
       const normalizedPath = videoFile.replace(/\\/g, '/')
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
       const fileData = await readFile(normalizedPath, {
-        baseDir: BaseDirectory.AppCache
+        baseDir
       })
 
       const fileName = normalizedPath.split('/').pop() || 'video.mp4'
@@ -1003,22 +1013,15 @@ class VideoMessageStrategyImpl extends AbstractMessageStrategy {
       // 将File对象写入临时文件，然后使用现有的doUpload方法
       const tempPath = `temp-thumbnail-${Date.now()}-${thumbnailFile.name}`
 
-      // 将File对象转换为ArrayBuffer，然后写入临时文件
-      const arrayBuffer = await thumbnailFile.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-
       // 写入临时文件
-      await writeFile(tempPath, uint8Array, { baseDir: BaseDirectory.AppCache })
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+      await writeFile(tempPath, thumbnailFile.stream(), { baseDir })
 
       // enableDeduplication启用文件去重，使用哈希值计算
       const result = await this.uploadHook.doUpload(tempPath, uploadUrl, { ...options, enableDeduplication: true })
 
       // 清理临时文件
-      try {
-        await remove(tempPath, { baseDir: BaseDirectory.AppCache })
-      } catch (cleanupError) {
-        console.warn('清理临时文件失败:', cleanupError)
-      }
+      await removeTempFile(tempPath, { baseDir })
 
       // 如果是七牛云上传，返回qiniuUrl
       if (options?.provider === UploadProviderEnum.QINIU) {
@@ -1316,6 +1319,7 @@ const videoMessageStrategy = new VideoMessageStrategyImpl()
 const voiceMessageStrategy = new VoiceMessageStrategyImpl()
 const videoCallMessageStrategy = new VideoCallMessageStrategyImpl()
 const audioCallMessageStrategy = new AudioCallMessageStrategyImpl()
+const locationMessageStrategy = new LocationMessageStrategyImpl()
 
 export const messageStrategyMap: Record<MsgEnum, MessageStrategy> = {
   [MsgEnum.FILE]: fileMessageStrategy,
@@ -1335,5 +1339,6 @@ export const messageStrategyMap: Record<MsgEnum, MessageStrategy> = {
   [MsgEnum.AI]: unsupportedMessageStrategy,
   [MsgEnum.BOT]: unsupportedMessageStrategy,
   [MsgEnum.VIDEO_CALL]: videoCallMessageStrategy,
-  [MsgEnum.AUDIO_CALL]: audioCallMessageStrategy
+  [MsgEnum.AUDIO_CALL]: audioCallMessageStrategy,
+  [MsgEnum.LOCATION]: locationMessageStrategy
 }

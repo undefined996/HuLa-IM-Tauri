@@ -1,11 +1,14 @@
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { error, info } from '@tauri-apps/plugin-log'
+import { initConfig } from '@/utils/ImRequestUtils'
 import { CallTypeEnum, RTCCallStatus } from '@/enums'
 import rustWebSocketClient from '@/services/webSocketRust'
 import { useUserStore } from '@/stores/user'
 import { WsRequestMsgType, WsResponseMessageType } from '../services/wsType'
+import { isMobile } from '../utils/PlatformConstants'
 import { useMitt } from './useMitt'
+import { useTauriListener } from './useTauriListener'
 
 interface RtcMsgVO {
   roomId: string
@@ -45,21 +48,40 @@ export interface WSRtcCallMsg {
 }
 
 // const TURN_SERVER = import.meta.env.VITE_TURN_SERVER_URL
-const MAX_TIME_OUT_SECONDS = 30 // 拨打 超时时间
-const configuration: RTCConfiguration = {
-  // 默认配置
+const MAX_TIME_OUT_SECONDS = 30
+let configuration: RTCConfiguration = {
   iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:117.72.67.248:3478' },
     {
-      urls: [
-        'turn:117.72.67.248:3478?transport=udp', // UDP 协议
-        'turn:117.72.67.248:3478?transport=tcp' // TCP 协议
-      ],
-      username: 'chr', // 你的 TURN 用户名
-      credential: '123456' // 你的 TURN 密码
+      urls: ['turn:117.72.67.248:3478?transport=udp', 'turn:117.72.67.248:3478?transport=tcp'],
+      username: 'chr',
+      credential: '123456'
     }
-  ]
+  ],
+  iceTransportPolicy: 'all'
 }
+
+const loadIceServers = async () => {
+  try {
+    const init: any = await initConfig()
+    const ice = init?.iceServer
+    if (ice && Array.isArray(ice.urls) && ice.urls.length > 0) {
+      const entry: RTCIceServer =
+        ice.username && ice.credential
+          ? { urls: ice.urls, username: ice.username, credential: ice.credential }
+          : { urls: ice.urls }
+      configuration = { iceServers: [entry], iceTransportPolicy: 'all' }
+      info(`ICE 配置已加载: ${JSON.stringify(configuration)}`)
+    } else {
+      info('ICE 配置为空，使用内置默认配置')
+    }
+  } catch (e) {
+    error(`加载 ICE 配置失败: ${String(e)}`)
+  }
+}
+
+// const settings = await getSettings()
+// configuration.iceServers?.push(settings.ice_server)
 // const isSupportScreenSharing = !!navigator?.mediaDevices?.getDisplayMedia
 // TODO 改成动态配置
 const rtcCallBellUrl = '/sound/hula_bell.mp3'
@@ -69,6 +91,10 @@ const rtcCallBellUrl = '/sound/hula_bell.mp3'
  * @returns rtc 相关的状态和方法
  */
 export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTypeEnum, isReceiver: boolean) => {
+  const { addListener } = useTauriListener()
+
+  const router = useRouter()
+
   info(`useWebRtc, roomId: ${roomId}, remoteUserId: ${remoteUserId}, callType: ${callType}, isReceiver: ${isReceiver}`)
   const rtcMsg = ref<Partial<RtcMsgVO>>({
     roomId: undefined,
@@ -225,7 +251,12 @@ export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTy
   const endCall = async () => {
     try {
       info('[收到通知] 结束通话')
-      await getCurrentWebviewWindow().close()
+      // 移动端router 回退
+      if (!isMobile()) {
+        await getCurrentWebviewWindow().close()
+      } else {
+        router.back()
+      }
     } finally {
       clear()
     }
@@ -607,7 +638,7 @@ export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTy
   // 处理收到的 offer - 接听者
   const handleOffer = async (signal: RTCSessionDescriptionInit, video: boolean, roomId: string) => {
     try {
-      info('收到 offer')
+      console.log('处理 offer')
       connectionStatus.value = RTCCallStatus.CALLING
       await nextTick()
 
@@ -666,7 +697,7 @@ export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTy
         video: callType === CallTypeEnum.VIDEO
       }
 
-      info('发送SDP answer')
+      console.log('发送SDP answer', signalData)
       await rustWebSocketClient.sendMessage({
         type: WsRequestMsgType.WEBRTC_SIGNAL,
         data: signalData
@@ -817,6 +848,52 @@ export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTy
     } catch (error) {
       window.$message.error('切换音频设备失败！')
       console.error('切换音频设备失败:', error)
+    }
+  }
+
+  // 获取前置和后置摄像头设备
+  const getFrontAndBackCameras = () => {
+    const frontCamera = videoDevices.value.find(
+      (device) =>
+        device.label.toLowerCase().includes('front') ||
+        device.label.toLowerCase().includes('前置') ||
+        device.label.toLowerCase().includes('user')
+    )
+
+    const backCamera = videoDevices.value.find(
+      (device) =>
+        device.label.toLowerCase().includes('back') ||
+        device.label.toLowerCase().includes('后置') ||
+        device.label.toLowerCase().includes('environment') ||
+        device.label.toLowerCase().includes('rear')
+    )
+
+    return { frontCamera, backCamera }
+  }
+
+  // 切换前置/后置摄像头（移动端专用）
+  const switchCameraFacing = async () => {
+    if (!isMobile) {
+      console.warn('摄像头翻转功能仅在移动端可用')
+      return
+    }
+
+    try {
+      const { frontCamera, backCamera } = getFrontAndBackCameras()
+
+      if (!frontCamera || !backCamera) {
+        // 如果无法通过设备名称识别，则使用 facingMode 约束
+        await switchVideoDevice('user')
+        return
+      }
+
+      // 如果能识别前置和后置摄像头，直接切换
+      const currentDevice = selectedVideoDevice.value
+      const targetDevice = currentDevice === frontCamera.deviceId ? backCamera : frontCamera
+      await switchVideoDevice(targetDevice.deviceId)
+    } catch (error) {
+      window.$message.error('摄像头翻转失败！')
+      console.error('摄像头翻转失败:', error)
     }
   }
 
@@ -993,71 +1070,76 @@ export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTy
     }
   }
 
-  // 监听 WebRTC 信令消息
+  // 监听 WebRTC 信令消息（注册并保存卸载函数）
   // useMitt.on(WsResponseMessageType.WEBRTC_SIGNAL, handleSignalMessage)
-  listen('ws-webrtc-signal', (event: any) => {
-    info(`收到信令消息: ${JSON.stringify(event.payload)}`)
-    handleSignalMessage(event.payload)
-  })
-  listen('ws-call-accepted', (event: any) => {
-    info(`通话被接受: ${JSON.stringify(event.payload)}`)
-    // // 接受方，发送是否接受
-    // info(`收到 CallAccepted'消息 ${isReceiver}`)
-    if (!isReceiver) {
-      sendOffer(offer.value!)
-      // 对方接通后，主叫方窗口前置并聚焦
-      void focusCurrentWindow()
-    }
-  })
-  listen('ws-room-closed', (event: any) => {
-    info(`房间已关闭: ${JSON.stringify(event.payload)}`)
-    endCall()
-  })
-  listen('ws-dropped', (_: any) => {
-    endCall()
-  })
-  listen('ws-call-rejected', (event: any) => {
-    info(`通话被拒绝: ${JSON.stringify(event.payload)}`)
-    endCall()
-  })
-  listen('ws-cancel', (event: any) => {
-    info(`已取消通话: ${JSON.stringify(event.payload)}`)
-    endCall()
-  })
-  listen('ws-timeout', (event: any) => {
-    info(`已取消通话: ${JSON.stringify(event.payload)}`)
-    endCall()
-  })
-  // useMitt.on(WsResponseMessageType.RoomClosed, () => endCall())
-  // useMitt.on(WsResponseMessageType.DROPPED, () => endCall())
-  // useMitt.on(WsResponseMessageType.TIMEOUT, () => endCall())
-  // useMitt.on(WsResponseMessageType.CallRejected, () => endCall())
-  // useMitt.on(WsResponseMessageType.CANCEL, () => endCall())
+  void (async () => {
+    await addListener(
+      listen('ws-webrtc-signal', (event: any) => {
+        info(`收到信令消息: ${JSON.stringify(event.payload)}`)
+        handleSignalMessage(event.payload)
+      }),
+      `${roomId}-ws-webrtc-signal`
+    )
+    await addListener(
+      listen('ws-call-accepted', (event: any) => {
+        info(`通话被接受: ${JSON.stringify(event.payload)}`)
+        // // 接受方，发送是否接受
+        // info(`收到 CallAccepted'消息 ${isReceiver}`)
+        if (!isReceiver) {
+          sendOffer(offer.value!)
+          // 对方接通后，主叫方窗口前置并聚焦
+          void focusCurrentWindow()
+        }
+      }),
+      `${roomId}-ws-call-accepted`
+    )
+    await addListener(
+      listen('ws-room-closed', (event: any) => {
+        info(`房间已关闭: ${JSON.stringify(event.payload)}`)
+        endCall()
+      }),
+      `${roomId}-ws-room-closed`
+    )
+    await addListener(
+      listen('ws-dropped', (_: any) => {
+        endCall()
+      }),
+      `${roomId}-ws-dropped`
+    )
+    await addListener(
+      listen('ws-call-rejected', (event: any) => {
+        info(`通话被拒绝: ${JSON.stringify(event.payload)}`)
+        endCall()
+      }),
+      `${roomId}-ws-call-rejected`
+    )
+    await addListener(
+      listen('ws-cancel', (event: any) => {
+        info(`已取消通话: ${JSON.stringify(event.payload)}`)
+        endCall()
+      }),
+      `${roomId}-ws-cancel`
+    )
+    await addListener(
+      listen('ws-timeout', (event: any) => {
+        info(`已取消通话: ${JSON.stringify(event.payload)}`)
+        endCall()
+      }),
+      `${roomId}-ws-timeout`
+    )
+  })()
 
   onMounted(async () => {
+    await loadIceServers()
     if (!isReceiver) {
       console.log(`调用方发送${callType === CallTypeEnum.VIDEO ? '视频' : '语音'}通话请求`)
       await startCall(roomId, callType, [remoteUserId])
-      try {
-        await rustWebSocketClient.sendMessage({
-          type: WsRequestMsgType.VIDEO_CALL_REQUEST,
-          data: {
-            targetUid: remoteUserId,
-            roomId: roomId,
-            isVideo: callType === CallTypeEnum.VIDEO
-          }
-        })
-      } catch (error) {
-        console.error('发送通话请求失败:', error)
-      }
     }
   })
 
   onUnmounted(() => {
     // 移除 WebRTC 信令消息监听器
     useMitt.off(WsResponseMessageType.WEBRTC_SIGNAL, handleSignalMessage)
-    // 移除 CallAccepted 监听器
-    useMitt.off(WsResponseMessageType.CallAccepted, createPeerConnection)
   })
 
   return {
@@ -1066,6 +1148,7 @@ export const useWebRtc = (roomId: string, remoteUserId: string, callType: CallTy
     startScreenShare,
     toggleVideo,
     switchVideoDevice,
+    switchCameraFacing,
     switchAudioDevice,
     isScreenSharing,
     selectedVideoDevice,

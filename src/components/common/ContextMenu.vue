@@ -20,20 +20,23 @@
                 <span>{{ item.title }}</span>
               </n-popover>
             </div>
-            <div v-if="!showAllEmojis && emoji.length > 4" class="p-4px">
-              <div class="emoji-more-btn" @click="showAllEmojis = true">更多</div>
+            <div v-if="!showAllEmojis && emoji.length > 4" class="py-4px">
+              <div class="emoji-more-btn" @click="showAllEmojis = true">{{ t('menu.ctx_menu_more') }}</div>
             </div>
           </div>
         </div>
         <!-- 普通右键菜单 -->
         <div
-          v-if="showMenu && !(emoji && emoji.length > 0 && showAllEmojis)"
+          v-if="!isMobile() && showMenu && !(emoji && emoji.length > 0 && showAllEmojis)"
           class="context-menu select-none"
           :style="{
             left: `${pos.posX}px`,
             top: `${pos.posY}px`
           }">
-          <div v-resize="handleSize" v-if="visibleMenu && visibleMenu.length > 0" class="menu-list">
+          <div
+            v-resize="handleSize"
+            v-if="(visibleMenu && visibleMenu.length > 0) || (visibleSpecialMenu && visibleSpecialMenu.length > 0)"
+            class="menu-list">
             <div v-for="(item, index) in visibleMenu" :key="index">
               <!-- 禁止的菜单选项需要禁止点击事件  -->
               <div class="menu-item-disabled" v-if="item.disabled" @click.prevent="$event.preventDefault()">
@@ -60,8 +63,8 @@
             </div>
             <!-- 判断是否有特别的菜单项才需要分割线 -->
             <div v-if="visibleSpecialMenu.length > 0" class="flex-col-y-center gap-6px">
-              <!-- 分割线 -->
-              <div class="h-1px bg-[--line-color] m-[2px_8px]"></div>
+              <!-- 分割线（只有当常规菜单存在时才显示） -->
+              <div v-if="visibleMenu && visibleMenu.length > 0" class="h-1px bg-[--line-color] m-[2px_8px]"></div>
               <div
                 @click="handleClick(item)"
                 class="menu-item"
@@ -74,6 +77,35 @@
             </div>
           </div>
         </div>
+
+        <!-- 移动端菜单 -->
+        <div
+          v-if="isMobile() && showMenu && !(emoji && emoji.length > 0 && showAllEmojis)"
+          class="context-menu select-none"
+          :style="{
+            left: `${pos.posX}px`,
+            top: `${pos.posY}px`
+          }">
+          <div
+            v-resize="handleSize"
+            v-if="(visibleMenu && visibleMenu.length > 0) || (visibleSpecialMenu && visibleSpecialMenu.length > 0)"
+            class="max-w-70vw grid grid-cols-5 gap-5px h-auto!">
+            <div
+              @click="handleClick(item)"
+              v-for="(item, index) in visibleMenu"
+              :key="index"
+              class="w-45px h-45px flex justify-center items-center">
+              <div class="flex w-45px flex-col active:bg-gray-200 justify-center items-center max-h-45px">
+                <svg class="w-18px w-18px"><use :href="`#${getMenuItemProp(item, 'icon')}`"></use></svg>
+                <p class="h-24px text-12px">{{ getMenuItemProp(item, 'label') }}</p>
+                <svg v-if="shouldShowArrow(item)" class="arrow-icon w-18px w-18px">
+                  <use href="#right"></use>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 二级菜单 -->
         <div v-if="showSubmenu && activeSubmenu" class="context-submenu" :style="submenuPosition">
           <div class="menu-list">
@@ -99,6 +131,8 @@
 <script setup lang="ts">
 import { useContextMenu } from '@/hooks/useContextMenu.ts'
 import { useViewport } from '@/hooks/useViewport.ts'
+import { isMobile } from '@/utils/PlatformConstants'
+import { useI18n } from 'vue-i18n'
 
 type Props = {
   content?: Record<string, any>
@@ -106,6 +140,7 @@ type Props = {
   emoji?: any[]
   specialMenu?: any[]
 }
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<Props>(), {
   content: () => ({}),
@@ -435,12 +470,73 @@ const shouldShowArrow = (item: any) => {
   }
 }
 
+@mixin menu-item-wrap {
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+  .menu-item-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
 // menu-list通用样式
 @mixin menu-list {
   -webkit-backdrop-filter: blur(10px);
   padding: 5px;
   display: flex;
   flex-direction: column;
+  gap: 6px;
+
+  .menu-item {
+    @include menu-item();
+    display: flex;
+    align-items: center;
+    &:hover {
+      background-color: var(--bg-menu-hover);
+      svg {
+        animation: twinkle 0.3s ease-in-out;
+      }
+    }
+  }
+}
+
+@mixin menu-list-wrap {
+  -webkit-backdrop-filter: blur(10px);
+  padding: 5px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  .menu-item-wrap {
+    @include menu-item();
+    display: flex;
+    align-items: center;
+    &:hover {
+      background-color: var(--bg-menu-hover);
+      svg {
+        animation: twinkle 0.3s ease-in-out;
+      }
+    }
+  }
+}
+
+// menu-list通用样式
+@mixin menu-list-wrap {
+  -webkit-backdrop-filter: blur(10px);
+  padding: 5px;
+  display: flex;
+  flex-direction: row;
   gap: 6px;
 
   .menu-item {
@@ -470,12 +566,33 @@ const shouldShowArrow = (item: any) => {
   }
 
   .emoji-more-btn {
-    @apply flex-center size-28px rounded-4px text-12px cursor-pointer bg-[--bg-menu-hover] hover:bg-[--emoji-hover];
+    @apply flex-center size-28px px-4px rounded-4px text-12px cursor-pointer bg-[--bg-menu-hover] hover:bg-[--emoji-hover];
   }
   .menu-list {
     @include menu-list();
+    width: max-content;
     .menu-item-disabled {
       @include menu-item();
+      color: var(--disabled-color);
+      svg {
+        color: var(--disabled-color);
+      }
+    }
+    .menu-item-danger {
+      color: #d03553;
+      svg {
+        color: #d03553;
+      }
+    }
+  }
+
+  .menu-list-wrap {
+    display: flex;
+    justify-content: row;
+    flex-wrap: wrap;
+    @include menu-list-wrap();
+    .menu-item-disabled {
+      @include menu-item-wrap();
       color: var(--disabled-color);
       svg {
         color: var(--disabled-color);
@@ -509,13 +626,26 @@ const shouldShowArrow = (item: any) => {
 
 .menu-item {
   .menu-item-content {
-    gap: 10px;
-    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 12px;
+    width: max-content;
     position: relative;
+    svg {
+      flex-shrink: 0;
+      min-width: 16px;
+    }
+    p {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
     .arrow-icon {
-      position: absolute;
-      right: 0;
+      position: static;
+      justify-self: end;
       width: 12px;
       height: 12px;
       color: var(--text-color);

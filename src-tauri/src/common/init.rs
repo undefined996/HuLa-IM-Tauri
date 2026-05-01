@@ -8,20 +8,8 @@ pub trait CustomInit {
 
 /// 构建平台特定的日志插件
 fn build_log_plugin<R: Runtime>() -> TauriPlugin<R> {
-    // 根据平台确定默认日志级别，移动端使用 Warn，其他平台使用 Info
-    let default_level = {
-        #[cfg(mobile)]
-        {
-            tracing::log::LevelFilter::Warn
-        }
-        #[cfg(not(mobile))]
-        {
-            tracing::log::LevelFilter::Info
-        }
-    };
-
     let builder = tauri_plugin_log::Builder::new()
-        .level(default_level)
+        .level(tracing::log::LevelFilter::Info)
         .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
         .level_for("sqlx", tracing::log::LevelFilter::Warn)
         .level_for("sqlx::query", tracing::log::LevelFilter::Warn)
@@ -41,8 +29,7 @@ fn build_log_plugin<R: Runtime>() -> TauriPlugin<R> {
             Target::new(TargetKind::Webview),
             Target::new(TargetKind::LogDir {
                 file_name: Some("logs".to_string()),
-              },
-            ),
+            }),
         ])
         .with_colors(ColoredLevelConfig {
             error: Color::Red,

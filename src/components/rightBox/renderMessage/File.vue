@@ -6,12 +6,24 @@
     <!-- 文件信息 -->
     <div class="file-info select-none">
       <div class="file-name" :title="body?.fileName">
-        {{ truncateFileName(body?.fileName || '未知文件') }}
+        <n-highlight
+          v-if="props.searchKeyword"
+          :text="truncateFileName(body?.fileName || fallbackFileName)"
+          :patterns="[props.searchKeyword]"
+          :highlight-style="{
+            padding: '0 4px',
+            borderRadius: '6px',
+            color: '#000',
+            background: '#13987f'
+          }" />
+        <template v-else>
+          {{ truncateFileName(body?.fileName || fallbackFileName) }}
+        </template>
       </div>
       <div class="file-size">
         {{ formatBytes(body?.size != null && !isNaN(body.size) ? body.size : 0) }}
         <span class="download-status" :class="{ downloaded: fileStatus?.isDownloaded }">
-          {{ fileStatus?.isDownloaded ? '已下载' : '未下载' }}
+          {{ fileStatus?.isDownloaded ? t('message.file.status.downloaded') : t('message.file.status.not_downloaded') }}
         </span>
       </div>
     </div>
@@ -98,25 +110,33 @@
 <script setup lang="ts">
 import { join } from '@tauri-apps/api/path'
 import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener'
-import { MessageStatusEnum } from '@/enums'
+import { MessageStatusEnum, TauriCommand } from '@/enums'
 import { useDownload } from '@/hooks/useDownload'
-import type { FileBody, FilesMeta } from '@/services/types'
+import type { FileBody, FilesMeta, MsgType } from '@/services/types'
 import { useFileDownloadStore } from '@/stores/fileDownload'
 import { useGlobalStore } from '@/stores/global'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
 import { formatBytes, getFileSuffix } from '@/utils/Formatting'
-import { getFilesMeta, getUserAbsoluteVideosDir } from '@/utils/PathUtil'
+import { getFilesMeta } from '@/utils/PathUtil'
+import { invokeSilently } from '@/utils/TauriInvokeHandler'
+import { useI18n } from 'vue-i18n'
 
 const userStore = useUserStore()
 const globalStore = useGlobalStore()
+const chatStore = useChatStore()
+const { t } = useI18n()
 
 const { isDownloading: legacyIsDownloading } = useDownload()
 const fileDownloadStore = useFileDownloadStore()
+const fallbackFileName = computed(() => t('message.file.unknown_file'))
 
 const props = defineProps<{
   body: FileBody
   messageStatus?: MessageStatusEnum
   uploadProgress?: number
+  searchKeyword?: string
+  message?: MsgType
 }>()
 
 // 图标尺寸状态
@@ -142,10 +162,36 @@ const downloadProgress = computed(() => {
   return fileStatus.value?.progress || 0
 })
 
+const persistFileLocalPath = async (absolutePath: string) => {
+  if (!props.message?.id || !absolutePath) return
+  const target = chatStore.getMessage(props.message.id)
+  if (!target) return
+  if (target.message.body?.localPath === absolutePath) return
+
+  const nextBody = { ...(target.message.body || {}), localPath: absolutePath }
+  chatStore.updateMsg({ msgId: target.message.id, status: target.message.status, body: nextBody })
+  const updated = { ...target, message: { ...target.message, body: nextBody } }
+  await invokeSilently(TauriCommand.SAVE_MSG, { data: updated as any })
+}
+
+const revealInDirSafely = async (targetPath?: string | null) => {
+  if (!targetPath) {
+    window.$message?.error(t('message.file.toast.missing_local'))
+    return
+  }
+  try {
+    await revealItemInDir(targetPath)
+  } catch (error) {
+    console.error('在文件夹中显示文件失败:', error)
+    window.$message?.error(t('message.file.toast.reveal_fail'))
+  }
+}
+
 // 是否需要下载（文件未下载到本地且不是上传/下载状态）
 const needsDownload = computed(() => {
   if (isUploading.value || isDownloading.value) return false
   if (!props.body?.url) return false
+  if (props.body.localPath) return false
 
   // 如果是本地文件路径，不需要下载
   if (props.body.url.startsWith('file://') || props.body.url.startsWith('/')) return false
@@ -185,9 +231,19 @@ watch(
   { immediate: false }
 )
 
+watch(
+  fileStatus,
+  (status) => {
+    if (status?.isDownloaded && status.absolutePath) {
+      void persistFileLocalPath(status.absolutePath)
+    }
+  },
+  { immediate: true }
+)
+
 // 截断文件名，保留后缀
-const truncateFileName = (fileName: string): string => {
-  if (!fileName) return '未知文件'
+const truncateFileName = (fileName?: string): string => {
+  if (!fileName) return fallbackFileName.value
 
   const maxWidth = 160 // 最大宽度像素
   const averageCharWidth = 9 // 平均字符宽度（基于14px Arial字体）
@@ -248,7 +304,7 @@ const handleFileClick = async () => {
       try {
         await openPath(status.absolutePath)
       } catch (openError) {
-        await revealItemInDir(status.absolutePath)
+        await revealInDirSafely(status.absolutePath)
       }
     } else if (needsDownload.value) {
       // 需要下载文件
@@ -259,22 +315,22 @@ const handleFileClick = async () => {
         await openPath(props.body.url)
       } catch (openError) {
         console.warn('无法直接打开文件，尝试在文件管理器中显示:', openError)
-        await revealItemInDir(props.body.url)
+        await revealInDirSafely(props.body.url)
       }
     }
   } catch (error) {
     console.error('打开文件失败:', error)
-    const errorMessage = error instanceof Error ? error.message : '未知错误'
+    const errorMessage = error instanceof Error ? error.message : t('message.file.unknown_error')
     if (errorMessage.includes('Not allowed to open path') || errorMessage.includes('revealItemInDir')) {
       console.error('无法打开或显示文件。请手动在文件管理器中找到并打开文件。')
     } else {
       console.error(`打开文件失败: ${errorMessage}`)
     }
   } finally {
-    const currentChatRoomId = globalStore.currentSession!.roomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
+    const currentChatRoomId = globalStore.currentSessionRoomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
     const currentUserUid = userStore.userInfo!.uid as string
 
-    const resourceDirPath = await getUserAbsoluteVideosDir(currentUserUid, currentChatRoomId)
+    const resourceDirPath = await userStore.getUserRoomAbsoluteDir()
     const absolutePath = await join(resourceDirPath, props.body.fileName)
 
     const [fileMeta] = await getFilesMeta<FilesMeta>([absolutePath || props.body.url])
@@ -298,21 +354,22 @@ const downloadAndOpenFile = async () => {
     const absolutePath = await fileDownloadStore.downloadFile(props.body.url, fileName)
 
     if (absolutePath) {
+      void persistFileLocalPath(absolutePath)
       // 下载成功后尝试打开文件
       try {
         await openPath(absolutePath)
       } catch (openError) {
         console.warn('无法直接打开文件，尝试在文件管理器中显示:', openError)
-        await revealItemInDir(absolutePath)
+        await revealInDirSafely(absolutePath)
       }
     }
   } catch (error) {
     console.error('下载文件失败:', error)
     const errorMessage = error instanceof Error ? error.message : '未知错误'
     if (errorMessage.includes('Not allowed to open path') || errorMessage.includes('revealItemInDir')) {
-      window.$message?.error('文件下载成功，但无法打开或显示文件。请手动在文件管理器中查找下载的文件。')
+      window.$message?.error(t('message.file.toast.download_open_fail'))
     } else {
-      window.$message?.error(`下载文件失败: ${errorMessage}`)
+      window.$message?.error(t('message.file.toast.download_failed', { reason: errorMessage }))
     }
   }
 }
@@ -323,15 +380,18 @@ const downloadFileOnly = async () => {
 
   try {
     const fileName = props.body.fileName
-    await fileDownloadStore.downloadFile(props.body.url, fileName)
+    const absolutePath = await fileDownloadStore.downloadFile(props.body.url, fileName)
+    if (absolutePath) {
+      void persistFileLocalPath(absolutePath)
+    }
   } catch (error) {
     console.error('下载文件失败:', error)
   } finally {
     // 刷新文件状态
-    const currentChatRoomId = globalStore.currentSession!.roomId
+    const currentChatRoomId = globalStore.currentSessionRoomId
     const currentUserUid = userStore.userInfo!.uid as string
 
-    const resourceDirPath = await getUserAbsoluteVideosDir(currentUserUid, currentChatRoomId)
+    const resourceDirPath = await userStore.getUserRoomAbsoluteDir()
     const absolutePath = await join(resourceDirPath, props.body.fileName)
 
     const [fileMeta] = await getFilesMeta<FilesMeta>([absolutePath || props.body.url])
@@ -406,6 +466,7 @@ onMounted(async () => {
   line-height: 1.2;
   margin-bottom: 8px;
   white-space: nowrap;
+  padding: 2px 0;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 170px;

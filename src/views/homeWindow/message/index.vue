@@ -1,18 +1,29 @@
 <template>
   <n-scrollbar ref="msg-scrollbar" style="max-height: calc(100vh / var(--page-scale, 1) - 70px)">
+    <!-- 消息同步加载提示 -->
+    <div v-if="syncLoading" class="flex-center gap-10px py-12px text-(12px [--text-color])">
+      <n-spin :size="14" />
+      <span>{{ t('message.message_list.sync_loading') }}</span>
+    </div>
+    <!-- 当右侧 chatBox 未展示时，在列表区域提示网络/连接状态 -->
+    <div
+      v-if="networkBanner && !syncLoading && !globalStore.currentSessionRoomId"
+      class="mx-10px mt-6px border-(1px solid [--danger-text]) flex items-center gap-8px rounded-6px bg-[--danger-bg] px-12px py-10px text-(12px [--danger-text])"
+      style="position: sticky; top: 6px; z-index: 999">
+      <svg class="size-16px flex-shrink-0">
+        <use href="#cloudError"></use>
+      </svg>
+      <span class="leading-tight">{{ networkBanner.text }}</span>
+    </div>
     <!--  会话列表  -->
     <div v-if="sessionList.length > 0" class="p-[4px_10px_0px_8px]">
       <ContextMenu
         v-for="item in sessionList"
         :key="item.roomId"
-        :class="[
-          { active: globalStore.currentSession?.roomId === item.roomId },
-          { 'bg-[--bg-msg-first-child] rounded-12px relative': item.top },
-          { 'context-menu-active': activeContextMenuRoomId === item.roomId }
-        ]"
+        :class="getItemClasses(item)"
         :data-key="item.roomId"
-        :menu="menuList"
-        :special-menu="specialMenuList"
+        :menu="visibleMenu(item)"
+        :special-menu="visibleSpecialMenu(item)"
         :content="item"
         class="msg-box w-full h-75px mb-5px"
         @click="handleMsgClick(item)"
@@ -35,33 +46,70 @@
                 <n-popover trigger="hover" v-if="item.hotFlag === IsAllUserEnum.Yes">
                   <template #trigger>
                     <svg
-                      :class="[globalStore.currentSession?.roomId === item.roomId ? 'color-#33ceab' : 'color-#13987f']"
+                      :class="[globalStore.currentSessionRoomId === item.roomId ? 'color-#33ceab' : 'color-#13987f']"
                       class="size-20px select-none outline-none cursor-pointer">
                       <use href="#auth"></use>
                     </svg>
                   </template>
-                  <span>官方群聊认证</span>
+                  <span>{{ t('message.message_list.official_popover') }}</span>
+                </n-popover>
+
+                <n-popover trigger="hover" v-if="item.account === UserType.BOT">
+                  <template #trigger>
+                    <svg class="size-20px select-none outline-none cursor-pointer color-#13987f">
+                      <use href="#authenticationUser"></use>
+                    </svg>
+                  </template>
+                  <span>{{ t('message.message_list.bot_popover') }}</span>
                 </n-popover>
               </n-flex>
-              <span class="text text-10px w-fit truncate text-right">{{ item.lastMsgTime }}</span>
+              <span
+                v-if="item.account !== UserType.BOT"
+                :class="{ 'color-#d5304f90!': item.shield && globalStore.currentSessionRoomId === item.roomId }"
+                class="text text-10px w-fit truncate text-right">
+                {{ item.lastMsgTime }}
+              </span>
             </n-flex>
 
             <n-flex align="center" justify="space-between">
               <template v-if="item.isAtMe">
-                <span
-                  class="text flex-1 leading-tight text-12px truncate"
-                  v-html="String(item.lastMsg || '').replace(':', '：')" />
+                <span class="text flex-1 leading-tight text-12px truncate">
+                  <span class="text-#d5304f mr-4px">{{ t('message.message_list.mention_tag') }}</span>
+                  <span>{{ String(item.lastMsg || '').replace(':', '：') }}</span>
+                </span>
+              </template>
+              <template v-else-if="item.shield">
+                <span class="text flex-1 leading-tight text-12px truncate">
+                  <span :class="globalStore.currentSessionRoomId === item.roomId ? 'color-#d5304f90' : 'color-#909090'">
+                    {{
+                      item.type === RoomTypeEnum.GROUP
+                        ? t('message.message_list.shield_group')
+                        : t('message.message_list.shield_user')
+                    }}
+                  </span>
+                </span>
               </template>
               <template v-else>
                 <span
-                  class="text flex-1 leading-tight text-12px truncate"
-                  v-text="String(item.lastMsg || '').replace(':', '：')" />
+                  :class="[
+                    'text flex-1 leading-tight text-12px truncate',
+                    { 'text-[#707070]! dark:text-[#fff]!': item.account === UserType.BOT }
+                  ]">
+                  {{ String(item.lastMsg || t('message.message_list.default_last_msg')).replace(':', '：') }}
+                </span>
               </template>
 
               <!-- 消息提示 -->
-              <template v-if="item.muteNotification === 1 && !item.unreadCount">
+              <template v-if="item.shield">
                 <svg
-                  :class="[globalStore.currentSession?.roomId === item.roomId ? 'color-#fefefe' : 'color-#909090']"
+                  :class="[globalStore.currentSessionRoomId === item.roomId ? 'color-#d5304f90' : 'color-#909090']"
+                  class="size-14px">
+                  <use href="#forbid"></use>
+                </svg>
+              </template>
+              <template v-else-if="item.muteNotification === 1 && !item.unreadCount">
+                <svg
+                  :class="[globalStore.currentSessionRoomId === item.roomId ? 'color-#fefefe' : 'color-#909090']"
                   class="size-14px">
                   <use href="#close-remind"></use>
                 </svg>
@@ -70,6 +118,7 @@
                 v-else
                 :max="99"
                 :value="item.unreadCount"
+                :show="globalStore.unreadReady && item.unreadCount > 0"
                 :color="item.muteNotification === 1 ? 'rgba(128, 128, 128, 0.5)' : undefined" />
             </n-flex>
           </n-flex>
@@ -102,17 +151,16 @@
     </n-flex>
 
     <!-- 没有数据显示的提示 -->
-    <n-result v-else class="absolute-center" status="418" description="快和朋友聊天吧！">
+    <n-result v-else class="absolute-center" status="418" :description="t('message.message_list.empty_description')">
       <template #footer>
-        <n-button secondary type="primary">寻找好友</n-button>
+        <n-button secondary type="primary">{{ t('message.message_list.empty_action') }}</n-button>
       </template>
     </n-result>
   </n-scrollbar>
 </template>
 <script lang="ts" setup name="message">
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import SysNTF from '@/components/common/SystemNotification.tsx'
-import { MittEnum, RoomTypeEnum, ThemeEnum } from '@/enums'
+import { MittEnum, RoomTypeEnum, ThemeEnum, UserType, MsgEnum } from '@/enums'
 import { useCommon } from '@/hooks/useCommon.ts'
 import { useMessage } from '@/hooks/useMessage.ts'
 import { useMitt } from '@/hooks/useMitt'
@@ -123,65 +171,137 @@ import { useChatStore } from '@/stores/chat.ts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useGroupStore } from '@/stores/group.ts'
 import { useSettingStore } from '@/stores/setting'
+import { useBotStore } from '@/stores/bot'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { AvatarUtils } from '@/utils/AvatarUtils'
 import { formatTimestamp } from '@/utils/ComputedTime.ts'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
+const route = useRoute()
 const appWindow = WebviewWindow.getCurrent()
 const chatStore = useChatStore()
 const globalStore = useGlobalStore()
 const groupStore = useGroupStore()
 const settingStore = useSettingStore()
+const botStore = useBotStore()
 const { addListener } = useTauriListener()
 const { themes } = storeToRefs(settingStore)
+const { syncLoading } = storeToRefs(chatStore)
+const botDisplayText = computed(() => botStore.displayText)
+const { checkRoomAtMe, getMessageSenderName, formatMessageContent } = useReplaceMsg()
 const { openMsgSession } = useCommon()
 const msgScrollbar = useTemplateRef<HTMLElement>('msg-scrollbar')
-const { handleMsgClick, handleMsgDelete, menuList, specialMenuList, handleMsgDblclick } = useMessage()
+const { handleMsgClick, handleMsgDelete, handleMsgDblclick, visibleMenu, visibleSpecialMenu } = useMessage()
 // 跟踪当前显示右键菜单的会话ID
 const activeContextMenuRoomId = ref<string | null>(null)
+const networkStatus = useNetworkStatus()
+const networkBanner = computed(() => {
+  if (!networkStatus.browserOnline.value) {
+    return { text: t('home.chat_main.network_offline') }
+  }
 
-// 会话列表 TODO: 需要后端返回对应字段
+  if (networkStatus.isWsConnecting.value) {
+    return { text: t('home.chat_main.network_connecting') }
+  }
+
+  if (networkStatus.wsOnline.value === false) {
+    return { text: t('home.chat_main.network_ws_offline') }
+  }
+
+  return null
+})
+// 未读清空的定时器
+let clearUnreadTimer: NodeJS.Timeout | null = null
+
+type SessionMsgCacheItem = { msg: string; isAtMe: boolean; time: number; senderName: string }
+
+// 缓存每个会话的格式化消息，避免重复计算
+const sessionMsgCache = reactive<Record<string, SessionMsgCacheItem>>({})
+// 当会话最后一条消息需要强制刷新时递增，配合 mitt 事件触发重算
+const sessionCacheRefreshKey = ref(0)
+
+// 会话列表
 const sessionList = computed(() => {
+  // 依赖 refreshKey，确保外部缓存失效时触发重算
+  sessionCacheRefreshKey.value
+
   return (
     chatStore.sessionList
       .map((item) => {
         // 获取最新的头像
         let latestAvatar = item.avatar
-        if (item.type === RoomTypeEnum.SINGLE && item.id) {
-          latestAvatar = groupStore.getUserInfo(item.id)?.avatar || item.avatar
+        if (item.type === RoomTypeEnum.SINGLE && item.detailId) {
+          latestAvatar = groupStore.getUserInfo(item.detailId)?.avatar || item.avatar
         }
 
         // 获取群聊备注名称（如果有）
         let displayName = item.name
         if (item.type === RoomTypeEnum.GROUP && item.remark) {
-          // 使用群组备注（如果存在）
           displayName = item.remark
         }
 
-        const { checkRoomAtMe, getMessageSenderName, formatMessageContent } = useReplaceMsg()
         // 获取该会话的所有消息用于检查@我
         const messages = chatStore.chatMessageListByRoomId(item.roomId)
-        // 检查是否有@我的消息
-        const isAtMe = checkRoomAtMe(
-          item.roomId,
-          item.type,
-          globalStore.currentSession?.roomId!,
-          messages,
-          item.unreadCount
-        )
 
-        // 处理显示消息
+        // 优化：使用缓存的消息，或者计算新的消息
         let displayMsg = ''
+        let isAtMe = false
 
         const lastMsg = messages[messages.length - 1]
+        const cacheKey = item.roomId
+        const cached = sessionMsgCache[cacheKey]
+        const sendTime = lastMsg?.message?.sendTime || 0
+
+        // 如果有消息且缓存不存在或已过期，重新计算
         if (lastMsg) {
-          const senderName = getMessageSenderName(lastMsg, '', item.roomId)
-          displayMsg = formatMessageContent(lastMsg, item.type, senderName, isAtMe)
+          const senderName = getMessageSenderName(lastMsg, '', item.roomId, item.type)
+          const shouldRefreshCache = !cached || cached.time < sendTime || cached.senderName !== senderName
+
+          if (shouldRefreshCache) {
+            isAtMe = checkRoomAtMe(
+              item.roomId,
+              item.type,
+              globalStore.currentSessionRoomId!,
+              messages,
+              item.unreadCount
+            )
+            // 获取纯文本消息内容（不包含 @我 标记）
+            displayMsg = formatMessageContent(lastMsg, item.type, senderName, item.roomId)
+
+            // 如果是群系统消息（如成员加入），不再前置发送者昵称
+            if (item.type === RoomTypeEnum.GROUP && lastMsg.message?.type === MsgEnum.SYSTEM && displayMsg) {
+              const separatorIndex = displayMsg.indexOf(':')
+              if (separatorIndex > -1) {
+                displayMsg = displayMsg.slice(separatorIndex + 1)
+              }
+            }
+
+            // 更新缓存（只缓存纯文本消息内容）
+            sessionMsgCache[cacheKey] = {
+              msg: displayMsg,
+              isAtMe,
+              time: sendTime,
+              senderName
+            }
+          } else {
+            displayMsg = cached.msg
+            isAtMe = item.unreadCount > 0 ? cached.isAtMe : false
+          }
+        } else if (cached) {
+          // 使用缓存的值，但如果未读数为0，强制isAtMe为false
+          displayMsg = cached.msg
+          isAtMe = item.unreadCount > 0 ? cached.isAtMe : false
+        }
+
+        if (item.account === UserType.BOT) {
+          displayMsg = botDisplayText.value || displayMsg
         }
 
         return {
           ...item,
           avatar: latestAvatar,
-          name: displayName, // 使用可能修改过的显示名称
+          name: displayName,
           lastMsg: displayMsg || '欢迎使用HuLa',
           lastMsgTime: formatTimestamp(item?.activeTime),
           isAtMe
@@ -204,7 +324,7 @@ watch(
   async (newVal) => {
     if (newVal) {
       // 避免重复调用：如果新会话与当前会话相同，跳过处理，不然会触发两次
-      if (newVal.roomId === globalStore.currentSession?.roomId) {
+      if (newVal.roomId === globalStore.currentSessionRoomId) {
         return
       }
 
@@ -227,29 +347,80 @@ watch(
   { immediate: true }
 )
 
+// 监听路由变化：当切换回/message页面且有选中会话时，延迟2秒后清空未读并上报
+watch(
+  () => route.path,
+  async (newPath) => {
+    // 清理之前的定时器
+    if (clearUnreadTimer) {
+      clearTimeout(clearUnreadTimer)
+      clearUnreadTimer = null
+    }
+
+    // 只在路由切换到/message时处理
+    if (newPath === '/message') {
+      // 检查是否有选中的会话
+      const currentRoomId = globalStore.currentSessionRoomId
+      if (currentRoomId) {
+        const session = chatStore.getSession(currentRoomId)
+        // 如果选中的会话有未读数，则延迟2秒后清空并上报
+        if (session?.unreadCount && session.unreadCount > 0) {
+          clearUnreadTimer = setTimeout(() => {
+            chatStore.markSessionRead(currentRoomId)
+            clearUnreadTimer = null
+          }, 2000) // 等待2秒
+        }
+      }
+    }
+  },
+  { immediate: true }
+)
+
 // 处理右键菜单显示状态变化
 const handleMenuShow = (roomId: string, isShow: boolean) => {
   activeContextMenuRoomId.value = isShow ? roomId : null
 }
 
+// 判断对应样式
+const getItemClasses = (item: SessionItem) => {
+  const isCurrentSession = globalStore.currentSessionRoomId === item.roomId
+  const isContextMenuActive = activeContextMenuRoomId.value === item.roomId
+
+  return {
+    active: isCurrentSession,
+    'active-bot': isCurrentSession && item.account === UserType.BOT,
+    'active-shield': isCurrentSession && item.shield,
+    'bg-[--bg-msg-first-child] rounded-12px relative': item.top,
+    'context-menu-active': isContextMenuActive,
+    'context-menu-active-shield': item.shield && isContextMenuActive,
+    'active-context-menu': isContextMenuActive && isCurrentSession
+  }
+}
+
 onBeforeMount(async () => {
-  // 请求回话列表
-  await chatStore.getSessionList(true)
   // 从联系人页面切换回消息页面的时候自动定位到选中的会话
-  useMitt.emit(MittEnum.LOCATE_SESSION, { roomId: globalStore.currentSession?.roomId })
+  useMitt.emit(MittEnum.LOCATE_SESSION, { roomId: globalStore.currentSessionRoomId })
 })
 
 onMounted(async () => {
-  SysNTF
-  // 监听其他窗口发来的WebSocket发送请求
+  // TODO: 待完善
+  // SysNTF
+
   // TODO：频繁切换会话会导致频繁请求，切换的时候也会有点卡顿
   if (appWindow.label === 'home') {
     await addListener(
       appWindow.listen('search_to_msg', (event: { payload: { uid: string; roomType: number } }) => {
         openMsgSession(event.payload.uid, event.payload.roomType)
-      })
+      }),
+      'search_to_msg'
     )
   }
+  useMitt.on(MittEnum.UPDATE_SESSION_LAST_MSG, (payload?: { roomId?: string }) => {
+    const roomId = payload?.roomId
+    if (!roomId) return
+    Reflect.deleteProperty(sessionMsgCache, roomId)
+    sessionCacheRefreshKey.value++
+  })
   useMitt.on(MittEnum.DELETE_SESSION, async (roomId: string) => {
     await handleMsgDelete(roomId)
   })
@@ -264,6 +435,14 @@ onMounted(async () => {
       })
     }
   })
+})
+
+onUnmounted(() => {
+  // 清理未读清空的定时器，避免内存泄漏
+  if (clearUnreadTimer) {
+    clearTimeout(clearUnreadTimer)
+    clearUnreadTimer = null
+  }
 })
 </script>
 

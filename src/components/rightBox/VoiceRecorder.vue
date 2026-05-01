@@ -6,9 +6,9 @@
       <div class="voice-status">
         <div v-if="!isRecording && !audioBlob && !isProcessing">
           <span class="text-#909090 flex-y-center gap-6px select-none">
-            点击
+            {{ t('message.voice_recorder.tap_prefix') }}
             <svg class="size-14px color-#13987f"><use href="#voice"></use></svg>
-            说话
+            {{ t('message.voice_recorder.tap_suffix') }}
           </span>
         </div>
 
@@ -16,14 +16,14 @@
           <div class="recording-animation">
             <div class="pulse-dot"></div>
           </div>
-          <span>{{ formatTime(recordingTime) }} 正在录音</span>
+          <span>{{ formatTime(recordingTime) }} {{ t('message.voice_recorder.recording') }}</span>
         </div>
 
         <div v-if="!isRecording && isProcessing" class="status-processing">
           <div class="processing-animation">
             <div class="loading-spinner"></div>
           </div>
-          <span>正在处理音频</span>
+          <span>{{ t('message.voice_recorder.processing') }}</span>
         </div>
 
         <div v-if="!isRecording && audioBlob && !isProcessing" class="status-completed">
@@ -98,6 +98,9 @@
 
 <script setup lang="ts">
 import { useVoiceRecordRust } from '@/hooks/useVoiceRecordRust'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // 事件定义
 const emit = defineEmits<{
@@ -137,7 +140,7 @@ const {
     createAudioElement()
   },
   onError: () => {
-    window.$message?.error('录音失败')
+    window.$message?.error(t('message.voice_recorder.error'))
     isProcessing.value = false
   }
 })
@@ -155,6 +158,25 @@ const stopRecording = async () => {
   await stopRecord()
 }
 
+// 重置录音状态
+const resetRecordingState = () => {
+  // 清理音频播放器
+  if (audioElement.value) {
+    audioElement.value.pause()
+    if (audioElement.value.src) {
+      URL.revokeObjectURL(audioElement.value.src)
+    }
+    audioElement.value = null
+  }
+
+  // 重置所有状态
+  audioBlob.value = null
+  recordingDuration.value = 0
+  localAudioPath.value = ''
+  isPlaying.value = false
+  isProcessing.value = false
+}
+
 // 取消录音
 const cancelRecording = () => {
   cancelRecord()
@@ -165,14 +187,7 @@ const cancelRecording = () => {
 
 // 重新录制
 const reRecord = () => {
-  audioBlob.value = null
-  recordingDuration.value = 0
-  localAudioPath.value = ''
-  isProcessing.value = false
-  if (audioElement.value) {
-    audioElement.value.pause()
-    audioElement.value = null
-  }
+  resetRecordingState()
 }
 
 // 创建音频元素用于播放
@@ -221,6 +236,9 @@ const handleSend = async () => {
 
     console.log('🎤 发送语音数据:', voiceData)
     emit('send', voiceData)
+
+    // 发送后立即重置状态，避免下次打开时还显示这条录音
+    resetRecordingState()
   } catch (error) {
     console.error('🎤 发送语音失败:', error)
   } finally {
@@ -258,7 +276,7 @@ onUnmounted(() => {
 }
 
 .voice-recorder-container {
-  @apply flex flex-col relative w-full h-110px bg-[--bg-color] rounded-8px p-16px;
+  @apply flex flex-col relative w-full h-110px bg-[--bg-color] rounded-8px;
 }
 
 .voice-recorder-main {

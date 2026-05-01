@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.13</string>
+	<string>3.0.9</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.13</string>
+	<string>3.0.9</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
@@ -43,6 +43,17 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>HuLa needs local network access to reach your development server</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>HuLa 需要允许通知与角标以显示未读消息</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>

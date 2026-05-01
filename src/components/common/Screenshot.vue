@@ -11,6 +11,7 @@
       <!-- 内部拖动区域 -->
       <div
         :class="['drag-area', currentDrawTool ? 'cannot-drag' : 'can-drag']"
+        :title="t('message.screenshot.tooltip_drag')"
         @mousedown="handleSelectionDragStart"
         @mousemove="handleSelectionDragMove"
         @mouseup="handleSelectionDragEnd"
@@ -19,64 +20,88 @@
       <!-- resize控制点 - 四个角 -->
       <div
         :class="['resize-handle', 'resize-nw', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'nw')"></div>
       <div
         :class="['resize-handle', 'resize-ne', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'ne')"></div>
       <div
         :class="['resize-handle', 'resize-sw', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'sw')"></div>
       <div
         :class="['resize-handle', 'resize-se', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'se')"></div>
 
       <!-- resize控制点 - 四条边的中间 -->
       <div
         :class="['resize-handle', 'resize-n', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'n')"></div>
       <div
         :class="['resize-handle', 'resize-e', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'e')"></div>
       <div
         :class="['resize-handle', 'resize-s', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 's')"></div>
       <div
         :class="['resize-handle', 'resize-w', { disabled: currentDrawTool }]"
+        :title="t('message.screenshot.tooltip_resize')"
         @mousedown.stop="handleResizeStart($event, 'w')"></div>
 
       <!-- 圆角控制器 -->
       <div class="border-radius-controller" :style="borderRadiusControllerStyle" @click.stop>
-        <label>圆角:</label>
+        <label>{{ t('message.screenshot.border_radius') }}:</label>
         <input type="range" :value="borderRadius" @input="handleBorderRadiusChange" min="0" max="100" step="1" />
         <span>{{ borderRadius }}px</span>
       </div>
     </div>
 
     <div ref="buttonGroup" class="button-group" v-show="showButtonGroup && !isDragging && !isResizing">
-      <span :class="{ active: currentDrawTool === 'rect' }" @click="drawImgCanvas('rect')">
+      <span
+        :class="{ active: currentDrawTool === 'rect' }"
+        :title="t('message.screenshot.tool_rect')"
+        @click="drawImgCanvas('rect')">
         <svg><use href="#square"></use></svg>
       </span>
-      <span :class="{ active: currentDrawTool === 'circle' }" @click="drawImgCanvas('circle')">
+      <span
+        :class="{ active: currentDrawTool === 'circle' }"
+        :title="t('message.screenshot.tool_circle')"
+        @click="drawImgCanvas('circle')">
         <svg><use href="#round"></use></svg>
       </span>
-      <span :class="{ active: currentDrawTool === 'arrow' }" @click="drawImgCanvas('arrow')">
+      <span
+        :class="{ active: currentDrawTool === 'arrow' }"
+        :title="t('message.screenshot.tool_arrow')"
+        @click="drawImgCanvas('arrow')">
         <svg><use href="#arrow-right-up"></use></svg>
       </span>
-      <span :class="{ active: currentDrawTool === 'mosaic' }" @click="drawImgCanvas('mosaic')">
+      <span
+        :class="{ active: currentDrawTool === 'mosaic' }"
+        :title="t('message.screenshot.tool_mosaic')"
+        @click="drawImgCanvas('mosaic')">
         <svg><use href="#mosaic"></use></svg>
       </span>
       <!-- 重做 -->
-      <span @click="drawImgCanvas('redo')">
+      <span :title="t('message.screenshot.redo')" @click="drawImgCanvas('redo')">
         <svg><use href="#refresh"></use></svg>
       </span>
       <!-- 撤回：当没有涂鸦时禁用 -->
-      <span :class="{ disabled: !canUndo }" :aria-disabled="!canUndo" @click.stop="drawImgCanvas('undo')">
+      <span
+        :class="{ disabled: !canUndo }"
+        :aria-disabled="!canUndo"
+        :title="t('message.screenshot.undo')"
+        @click.stop="drawImgCanvas('undo')">
         <svg><use href="#return"></use></svg>
       </span>
-      <span @click="confirmSelection">
+      <span :title="t('message.screenshot.confirm')" @click="confirmSelection">
         <svg><use href="#check-small"></use></svg>
       </span>
-      <span @click="cancelSelection">
+      <span :title="t('message.screenshot.cancel')" @click="cancelSelection">
         <svg><use href="#close"></use></svg>
       </span>
     </div>
@@ -89,9 +114,9 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { writeImage } from '@tauri-apps/plugin-clipboard-manager'
 import type { Ref } from 'vue'
 import { useCanvasTool } from '@/hooks/useCanvasTool'
-import { useTauriListener } from '@/hooks/useTauriListener'
 import { isMac } from '@/utils/PlatformConstants'
 import { ErrorType, invokeWithErrorHandler } from '@/utils/TauriInvokeHandler.ts'
+import { useI18n } from 'vue-i18n'
 
 type ScreenConfig = {
   startX: number
@@ -106,8 +131,8 @@ type ScreenConfig = {
 }
 
 // 获取当前窗口实例
+const { t } = useI18n()
 const appWindow = WebviewWindow.getCurrent()
-const { addListener } = useTauriListener()
 const canvasbox: Ref<HTMLDivElement | null> = ref(null)
 
 // 图像层
@@ -197,7 +222,7 @@ const restoreWindowState = async () => {
  */
 const drawImgCanvas = (type: string) => {
   if (!drawTools) {
-    console.warn('🚫 绘图工具未初始化')
+    console.warn('绘图工具未初始化')
     return
   }
 
@@ -230,9 +255,9 @@ const drawImgCanvas = (type: string) => {
     // 调用绘图方法，确保绘图工具被正确激活
     try {
       drawTools.draw(type)
-      console.log(`🎨 绘图工具已激活: ${type}`)
+      console.log(`绘图工具已激活: ${type}`)
     } catch (error) {
-      console.error(`🚫 绘图工具激活失败: ${type}`, error)
+      console.error(`绘图工具激活失败: ${type}`, error)
       currentDrawTool.value = null
       // 激活失败时也要禁用事件
       if (drawCanvas.value) {
@@ -252,14 +277,14 @@ const drawImgCanvas = (type: string) => {
       drawCanvas.value.style.pointerEvents = 'none'
       drawCanvas.value.style.zIndex = '5'
     }
-    console.log('🧹 已清空全部涂鸦 (通过重做按钮)')
+    console.log('已清空全部涂鸦 (通过重做按钮)')
   } else if (type === 'undo') {
     // 没有可撤回的内容时直接忽略点击
     if (!canUndo.value) return
     // 先停止可能正在进行的绘制，确保一次点击立即生效
     drawTools.stopDrawing && drawTools.stopDrawing()
     drawTools.undo && drawTools.undo()
-    console.log('↩️ 执行撤销')
+    console.log('执行撤销')
   }
 }
 
@@ -278,7 +303,7 @@ const resetDrawTools = () => {
   // 清除绘图canvas的内容
   if (drawCtx.value && drawCanvas.value) {
     drawCtx.value.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height)
-    console.log('🧹 绘图内容已清除')
+    console.log('绘图内容已清除')
   }
 
   // 重置时禁用绘图canvas事件，让事件穿透到选区
@@ -287,7 +312,7 @@ const resetDrawTools = () => {
     drawCanvas.value.style.zIndex = '5'
   }
 
-  console.log('🔄 绘图工具已重置')
+  console.log('绘图工具已重置')
 }
 
 /**
@@ -339,7 +364,7 @@ const initCanvas = async () => {
     // 清除绘图canvas的内容
     if (drawCtx.value) {
       drawCtx.value.clearRect(0, 0, canvasWidth, canvasHeight)
-      console.log('🧹 绘图canvas已清除')
+      console.log('绘图canvas已清除')
     }
 
     // 获取屏幕缩放比例
@@ -375,7 +400,7 @@ const initCanvas = async () => {
             if (drawTools?.canUndo) {
               watch(drawTools.canUndo, (val: boolean) => (canUndo.value = val), { immediate: true })
             }
-            console.log('🎨 绘图工具初始化完成 (备用方式)')
+            console.log('绘图工具初始化完成 (备用方式)')
           }
           isImageLoaded = true
         } catch (error) {
@@ -421,7 +446,7 @@ const initCanvas = async () => {
           if (drawTools?.canUndo) {
             watch(drawTools.canUndo, (val: boolean) => (canUndo.value = val), { immediate: true })
           }
-          console.log('🎨 绘图工具初始化完成')
+          console.log('绘图工具初始化完成')
         }
         isImageLoaded = true
       } catch (error) {
@@ -784,7 +809,7 @@ const handleSelectionDragStart = (event: MouseEvent) => {
   document.addEventListener('mousemove', handleSelectionDragMove)
   document.addEventListener('mouseup', handleSelectionDragEnd)
 
-  console.log('🎯 开始拖动，隐藏按钮组')
+  console.log('开始拖动，隐藏按钮组')
 }
 
 // 选区拖动移动
@@ -843,7 +868,7 @@ const handleSelectionDragEnd = () => {
     updateButtonGroupPosition()
   })
 
-  console.log('🎯 拖动结束，显示按钮组')
+  console.log('拖动结束，显示按钮组')
 }
 
 // resize开始
@@ -1238,21 +1263,26 @@ const confirmSelection = async () => {
 
               try {
                 await writeImage(buffer)
+                window.$message?.success(t('message.screenshot.save_success'))
               } catch (clipboardError) {
                 console.error('复制到剪贴板失败:', clipboardError)
+                window.$message?.error(t('message.screenshot.save_failed'))
               }
 
               await resetScreenshot()
             } catch (error) {
+              window.$message?.error(t('message.screenshot.save_failed'))
               await resetScreenshot()
             }
           } else {
+            window.$message?.error(t('message.screenshot.save_failed'))
             await resetScreenshot()
           }
         }, 'image/png')
       }
     } catch (error) {
       console.error('Canvas操作失败:', error)
+      window.$message?.error(t('message.screenshot.save_failed'))
       await resetScreenshot()
     }
   }
@@ -1351,24 +1381,18 @@ const handleScreenshot = () => {
 }
 
 onMounted(async () => {
-  await addListener(
-    appWindow.listen('capture', () => {
-      resetDrawTools()
-      initCanvas()
-      initMagnifier()
-    }),
-    'capture'
-  )
+  appWindow.listen('capture', () => {
+    resetDrawTools()
+    initCanvas()
+    initMagnifier()
+  })
 
   // 监听窗口隐藏时的重置事件
-  await addListener(
-    appWindow.listen('capture-reset', () => {
-      resetDrawTools()
-      resetScreenshot()
-      console.log('📷 Screenshot组件已重置')
-    }),
-    'capture-reset'
-  )
+  appWindow.listen('capture-reset', () => {
+    resetDrawTools()
+    resetScreenshot()
+    console.log('📷 Screenshot组件已重置')
+  })
 
   // 监听自定义截图事件
   window.addEventListener('trigger-screenshot', handleScreenshot)

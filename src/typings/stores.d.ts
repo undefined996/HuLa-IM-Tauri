@@ -69,6 +69,7 @@ declare namespace STO {
       fonts: string
       /** 高斯模糊 */
       blur: boolean
+      lang: string
     }
     /** 更新设置 */
     update: {
@@ -79,6 +80,13 @@ declare namespace STO {
     screenshot: {
       /** 截图时是否隐藏窗口 */
       isConceal: boolean
+    }
+    /** 消息通知设置 */
+    notification: {
+      /** 是否开启消息提示音 */
+      messageSound: boolean
+      /** 提示音音量，范围 0-100 */
+      volume: number
     }
   }
 

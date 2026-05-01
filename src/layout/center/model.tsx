@@ -4,25 +4,38 @@ import { useContactStore } from '@/stores/contacts.ts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useGroupStore } from '@/stores/group.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
-import * as ImRequestUtils from '@/utils/ImRequestUtils'
+import { UserType } from '@/enums'
 
 const contactStore = useContactStore()
 const groupStore = useGroupStore()
 const globalStore = useGlobalStore()
 
-export const options = computed(
-  () =>
-    contactStore.contactsList.map((item) => ({
-      label: groupStore.getUserInfo(item.uid)!.name,
-      value: item.uid,
-      avatar: AvatarUtils.getAvatarUrl(groupStore.getUserInfo(item.uid)!.avatar)
-    })) as any
-)
+export const options = computed(() => {
+  return contactStore.contactsList
+    .map((item) => {
+      const userInfo = groupStore.getUserInfo(item.uid)
+      const contactAccount = (item as any).account
+      const isBotAccount =
+        (userInfo?.account && userInfo.account.toLowerCase() === UserType.BOT) ||
+        (typeof contactAccount === 'string' && contactAccount.toLowerCase() === UserType.BOT)
+
+      if (isBotAccount) {
+        return null
+      }
+
+      return {
+        label: userInfo?.name || item.remark,
+        value: item.uid,
+        avatar: AvatarUtils.getAvatarUrl(userInfo?.avatar || '/logoD.png')
+      }
+    })
+    .filter(Boolean) as any
+})
 
 // 获取已禁用选项的值列表
 export const getDisabledOptions = () => {
   // 当前选中的房间id
-  const currentRoomId = globalStore.currentSession?.roomId
+  const currentRoomId = globalStore.currentSessionRoomId
 
   if (!currentRoomId || !groupStore.userList.length) return []
 
@@ -36,7 +49,7 @@ export const getFilteredOptions = () => {
   // 获取禁用选项列表
   const disabledOptions = getDisabledOptions()
   // 当前选中的房间id
-  const currentRoomId = globalStore.currentSession?.roomId
+  const currentRoomId = globalStore.currentSessionRoomId
   // 如果没有房间ID，返回所有好友
   if (!currentRoomId) return options.value
 
@@ -57,19 +70,12 @@ export const getFilteredOptions = () => {
   })
 }
 
-export const createGroup = async (selectedUids: string[]) => {
-  try {
-    const uidList = selectedUids.map((uid) => uid)
-    const result = await ImRequestUtils.createGroup({ uidList })
-    return result
-  } catch (error) {
-    console.error('创建群聊失败:', error)
-    throw error
-  }
-}
-
 // 统一的源列表渲染函数，通过参数控制是否使用过滤后的选项
-export const renderSourceList = (preSelectedFriendId = '', enablePreSelection = true): TransferRenderSourceList => {
+export const renderSourceList = (
+  preSelectedFriendId = '',
+  enablePreSelection = true,
+  placeholder = ''
+): TransferRenderSourceList => {
   return ({ onCheck, checkedOptions, pattern }) => {
     // 使用过滤后的选项列表，确保已在群内的好友被正确标记为禁用
     const baseOptions = getFilteredOptions()
@@ -81,6 +87,7 @@ export const renderSourceList = (preSelectedFriendId = '', enablePreSelection = 
 
     return (
       <div class="select-none">
+        {placeholder && <div class="text-(12px [--chat-text-color]) pb-6px">{placeholder}</div>}
         {displayOptions.map((option: any) => {
           // 判断是否是预选中的好友（仅在启用预选中时生效）
           const isPreSelected = enablePreSelection && option.value === preSelectedFriendId
@@ -159,7 +166,12 @@ export const renderLabel: TransferRenderTargetLabel = ({ option }: { option: any
 }
 
 // 创建自定义的目标列表渲染函数
-export const renderTargetList = (preSelectedFriendId = '', enablePreSelection = true) => {
+export const renderTargetList = (
+  preSelectedFriendId = '',
+  enablePreSelection = true,
+  placeholder = '',
+  requiredTag = ''
+) => {
   return ({
     onCheck,
     checkedOptions,
@@ -178,6 +190,7 @@ export const renderTargetList = (preSelectedFriendId = '', enablePreSelection = 
 
     return (
       <div>
+        {placeholder && <div class="text-(12px [--chat-text-color]) pb-6px">{placeholder}</div>}
         {displayOptions.map((option: any) => {
           const isPreSelected = enablePreSelection && option.value === preSelectedFriendId
 
@@ -223,14 +236,14 @@ export const renderTargetList = (preSelectedFriendId = '', enablePreSelection = 
                 </svg>
               )}
 
-              {isPreSelected && (
+              {isPreSelected && requiredTag && (
                 <div
                   style={{
                     fontSize: '10px',
                     color: '#909090',
                     marginLeft: '8px'
                   }}>
-                  必选
+                  {requiredTag}
                 </div>
               )}
             </div>

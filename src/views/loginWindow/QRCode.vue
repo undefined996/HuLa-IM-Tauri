@@ -1,122 +1,303 @@
 <template>
-  <n-config-provider :theme="lightTheme" data-tauri-drag-region class="login-box size-full rounded-8px select-none">
+  <n-config-provider :theme="naiveTheme" data-tauri-drag-region class="login-box size-full rounded-8px select-none">
     <!--顶部操作栏-->
     <ActionBar :max-w="false" :shrink="false" proxy data-tauri-drag-region />
 
     <n-flex justify="center" class="mt-15px" data-tauri-drag-region>
-      <img src="@/assets/logo/hula.png" class="w-140px h-60px drop-shadow-xl" alt="" data-tauri-drag-region />
+      <img src="/hula.png" class="w-100px h-40px drop-shadow-xl" alt="" data-tauri-drag-region />
     </n-flex>
 
     <!-- 二维码 -->
-    <n-flex justify="center" class="mt-25px" data-tauri-drag-region>
+    <n-flex justify="center" class="mt-15px" data-tauri-drag-region>
       <n-skeleton v-if="loading" style="border-radius: 12px" :width="204" :height="204" :sharp="false" size="medium" />
-      <n-qr-code
-        v-else
-        :size="180"
-        class="rounded-12px relative"
-        :class="{ blur: scanStatus.show }"
-        :value="QRCode"
-        icon-src="/logo.png"
-        error-correction-level="H" />
-      <!-- 二维码状态 -->
-      <n-flex
-        v-if="scanStatus.show"
-        vertical
-        :size="12"
-        align="center"
-        class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-        <svg class="size-42px animate-pulse"><use :href="`#${scanStatus.icon}`"></use></svg>
-        <span class="text-(16px #e3e3e3)">{{ scanStatus.text }}</span>
-      </n-flex>
+      <div v-else class="relative">
+        <n-qr-code
+          :size="180"
+          class="rounded-12px"
+          :class="{ blur: scanStatus.show || refreshing }"
+          :value="qrCodeValue"
+          :color="qrCodeColor"
+          :bg-color="qrCodeBgColor"
+          :type="qrCodeType"
+          :icon-src="qrCodeIcon"
+          :icon-size="36"
+          :icon-margin="2"
+          :error-correction-level="qrErrorCorrectionLevel"
+          @click="refreshQRCode" />
+        <!-- 二维码状态 -->
+        <n-flex
+          v-if="scanStatus.show"
+          vertical
+          :size="12"
+          align="center"
+          class="w-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+          style="pointer-events: none">
+          <svg class="size-42px animate-pulse">
+            <use :href="`#${scanStatus.icon}`"></use>
+          </svg>
+          <span class="text-(14px #e3e3e3)">{{ scanStatusText }}</span>
+        </n-flex>
+
+        <n-flex
+          v-if="refreshing"
+          vertical
+          :size="12"
+          align="center"
+          class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+          style="pointer-events: none">
+          <n-spin size="small" />
+          <span class="text-(16px #e3e3e3)">{{ t('login.qr.overlay.refreshing') }}</span>
+        </n-flex>
+      </div>
     </n-flex>
 
-    <n-flex justify="center" class="mt-15px text-(14px #808080)">{{ loadText }}</n-flex>
+    <n-flex justify="center" class="mt-15px text-(14px #808080)">
+      {{ loadText }}
+    </n-flex>
+
+    <!-- 第三方登录 -->
+    <div class="w-full pb-22px pt-14px">
+      <ThirdPartyLogin :extra-disabled="thirdPartyExtraDisabled" :login-context="loginContext" />
+    </div>
 
     <!-- 底部操作栏 -->
-    <n-flex justify="center" class="text-14px mt-48px" data-tauri-drag-region>
-      <div class="color-#13987f cursor-pointer" @click="router.push('/login')">账密登录</div>
-      <div class="w-1px h-14px bg-#ccc"></div>
-      <div class="color-#13987f cursor-pointer" @click="createWebviewWindow('注册', 'register', 600, 600)">
-        注册账号
+    <n-flex justify="center" class="text-14px" data-tauri-drag-region>
+      <div class="color-#13987f cursor-pointer" @click="router.push('/login')">
+        {{ t('login.qr.actions.account_login') }}
+      </div>
+      <div class="w-1px h-14px bg-#ccc dark:bg-#707070"></div>
+      <div
+        class="color-#13987f cursor-pointer"
+        @click="createWebviewWindow(t('login.qr.actions.register_title'), 'register', 600, 600)">
+        {{ t('login.qr.actions.register') }}
       </div>
     </n-flex>
   </n-config-provider>
 </template>
 <script setup lang="ts">
-import { delay } from 'lodash-es'
-import { lightTheme } from 'naive-ui'
-import { OnlineEnum } from '@/enums'
-import { useLogin } from '@/hooks/useLogin.ts'
-import { useMitt } from '@/hooks/useMitt.ts'
+import { invoke } from '@tauri-apps/api/core'
+import { darkTheme, lightTheme } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useWindow } from '@/hooks/useWindow.ts'
 import router from '@/router'
-import { type LoginInitResType, type LoginSuccessResType, WsResponseMessageType } from '@/services/wsType.ts'
-import { useGroupStore } from '@/stores/group'
-import { useUserStore } from '@/stores/user'
-import { LoginStatus, useWsLoginStore } from '@/stores/ws.ts'
+import { useLogin } from '@/hooks/useLogin'
+import { getEnhancedFingerprint } from '@/services/fingerprint'
+import { loginCommand } from '@/services/tauriCommand'
+import { TauriCommand } from '@/enums'
+import { useGlobalStore } from '@/stores/global'
+import { useSettingStore } from '@/stores/setting'
+import { checkQRStatus, generateQRCode } from '@/utils/ImRequestUtils'
+import ThirdPartyLogin, { type ThirdPartyLoginContext } from './ThirdPartyLogin.vue'
 
-const loginStore = useWsLoginStore()
-const userStore = useUserStore()
-const groupStore = useGroupStore()
-/** 获取登录二维码 */
-// const loginQrCode = computed(() => loginStore.loginQrCode)
-/** 登录状态 */
-const loginStatus = computed(() => loginStore.loginStatus)
-const { setLoginState } = useLogin()
+const globalStore = useGlobalStore()
+const settingStore = useSettingStore()
+const { themes } = storeToRefs(settingStore)
+const naiveTheme = computed(() => (themes.value.content === 'dark' ? darkTheme : lightTheme))
 const { createWebviewWindow } = useWindow()
+const { isTrayMenuShow } = storeToRefs(globalStore)
+const { t } = useI18n()
+type LoadTextKey = 'loading' | 'refreshing' | 'scan_hint' | 'login' | 'retry' | 'auth_pending'
+type ScanStatusTextKey = 'success' | 'error' | 'auth' | 'expired' | 'fetch_failed' | 'generate_fail' | 'general_error'
+const loadTextKey = ref<LoadTextKey>('loading')
+const loadText = computed(() => t(`login.qr.load_text.${loadTextKey.value}`))
 const loading = ref(true)
-const loadText = ref('加载中...')
-const QRCode = ref()
+const refreshing = ref(false) // 是否正在刷新
+const qrCodeValue = ref('')
+const qrCodeResp = ref()
+const qrCodeColor = ref('#000000')
+const qrCodeBgColor = ref('#FFFFFF')
+const qrCodeType = ref('canvas' as const)
+const qrCodeIcon = ref('/logo.png')
+const qrErrorCorrectionLevel = ref('H' as const)
+const pollInterval = ref<NodeJS.Timeout | null>(null)
+const pollStartAt = ref<number | null>(null)
+const MAX_POLL_DURATION = 5 * 60 * 1000 // 5分钟超时，防止长时间占用内存
+const pollingRequesting = ref(false)
+const confirmedHandled = ref(false)
+
 const scanStatus = ref<{
   status: 'error' | 'success' | 'auth'
   icon: 'cloudError' | 'success' | 'Security'
-  text: string
+  textKey: ScanStatusTextKey | ''
   show: boolean
-}>({ status: 'success', icon: 'success', text: '扫码成功', show: false })
+}>({ status: 'success', icon: 'success', textKey: '', show: false })
 
-watchEffect(() => {
-  // 等待授权中
-  if (loginStatus.value === LoginStatus.Waiting) {
-    handleAuth()
+const scanStatusText = computed(() =>
+  scanStatus.value.textKey ? t(`login.qr.overlay.${scanStatus.value.textKey}`) : ''
+)
+
+// 第三方登录相关逻辑
+const { giteeLogin, githubLogin, gitcodeLogin, loading: loginLoading, loginDisabled } = useLogin()
+const loginContext: ThirdPartyLoginContext = {
+  giteeLogin,
+  githubLogin,
+  gitcodeLogin,
+  loading: loginLoading,
+  loginDisabled
+}
+const thirdPartyExtraDisabled = computed(() => loading.value)
+
+/** 刷新二维码 */
+const refreshQRCode = () => {
+  if (scanStatus.value.status !== 'error' && scanStatus.value.status !== 'auth') {
+    return
   }
-})
 
-/** 处理二维码显示和刷新 */
-const handleQRCodeLogin = () => {
-  loading.value = false
+  refreshing.value = true
+  loadTextKey.value = 'refreshing'
+
   scanStatus.value = {
-    status: 'error',
-    icon: 'cloudError',
-    text: '扫码功能暂时下线',
-    show: true
+    status: 'success',
+    icon: 'success',
+    textKey: '',
+    show: false
   }
-  loadText.value = '请使用账号密码注册后登录'
-  // QRCode.value = loginQrCode.value
-  // loading.value = false
-  // loadText.value = '请使用微信扫码登录'
+
+  // 先清除之前的轮询
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value)
+    pollInterval.value = null
+  }
+  pollStartAt.value = null
+  pollingRequesting.value = false
+  confirmedHandled.value = false
+  // 重新生成二维码
+  handleQRCodeLogin()
 }
 
-/** 处理登录成功 */
-const handleLoginSuccess = async () => {
-  scanStatus.value.show = true
-  loadText.value = '登录中...'
-  delay(async () => {
-    await createWebviewWindow('HuLa', 'home', 960, 720, 'login', true, undefined, 480)
-    await setLoginState()
-  }, 1000)
+const clearPolling = () => {
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value)
+    pollInterval.value = null
+  }
+  pollStartAt.value = null
+}
+
+const handleConfirmed = async (res: any) => {
+  if (confirmedHandled.value) {
+    return
+  }
+  confirmedHandled.value = true
+  clearPolling()
+  try {
+    await invoke(TauriCommand.UPDATE_TOKEN, {
+      req: {
+        uid: res.data.uid,
+        token: res.data.token,
+        refreshToken: res.data.refreshToken || ''
+      }
+    })
+
+    await loginCommand({ uid: res.data.uid }, true).then(() => {
+      scanStatus.value = {
+        status: 'success',
+        icon: 'success',
+        textKey: 'success',
+        show: true
+      }
+      loadTextKey.value = 'login'
+    })
+  } catch (error) {
+    console.error('获取用户详情失败:', error)
+    confirmedHandled.value = false
+    handleError('fetch_failed')
+  }
+}
+
+const startPolling = () => {
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value)
+  }
+  pollStartAt.value = Date.now()
+  pollInterval.value = setInterval(async () => {
+    // 超时保护：超过 5 分钟自动停止并提示
+    if (pollStartAt.value && Date.now() - pollStartAt.value > MAX_POLL_DURATION) {
+      clearPolling()
+      handleError('expired')
+      return
+    }
+
+    if (pollingRequesting.value || confirmedHandled.value) {
+      return
+    }
+    pollingRequesting.value = true
+    try {
+      const res: any = await checkQRStatus({
+        qrId: qrCodeResp.value.qrId,
+        clientId: localStorage.getItem('clientId') as string,
+        deviceHash: qrCodeResp.value.deviceHash,
+        deviceType: 'PC'
+      })
+      switch (res.status) {
+        case 'PENDING':
+          // 等待中
+          break
+        case 'SCANNED':
+          // 已扫描，等待确认
+          handleAuth()
+          break
+        case 'CONFIRMED':
+          await handleConfirmed(res)
+          break
+        case 'EXPIRED':
+          clearPolling()
+          handleError('expired')
+          break
+        default:
+          break
+      }
+    } catch (error) {
+      if (!confirmedHandled.value) {
+        handleQRCodeLogin()
+      }
+    } finally {
+      if (!confirmedHandled.value) {
+        pollingRequesting.value = false
+      }
+    }
+  }, 2000)
+}
+
+/** 处理二维码显示和刷新 */
+const handleQRCodeLogin = async () => {
+  try {
+    qrCodeResp.value = await generateQRCode()
+    qrCodeValue.value = JSON.stringify({ type: 'login', qrId: qrCodeResp.value.qrId })
+    loadTextKey.value = 'scan_hint'
+    loading.value = false
+    refreshing.value = false
+
+    if (scanStatus.value.show) {
+      scanStatus.value.show = false
+      scanStatus.value.textKey = ''
+    }
+
+    // 启动轮询
+    confirmedHandled.value = false
+    pollingRequesting.value = false
+    startPolling()
+  } catch (error) {
+    handleError('generate_fail')
+  }
 }
 
 /** 处理失败场景 */
-const handleError = (e: any) => {
+const handleError = (key: ScanStatusTextKey = 'general_error') => {
   loading.value = false
   scanStatus.value = {
     status: 'error',
     icon: 'cloudError',
-    text: e,
+    textKey: key,
     show: true
   }
-  loadText.value = '请稍后再试'
+  loadTextKey.value = 'retry'
 }
+
+onUnmounted(() => {
+  // 组件卸载时清除轮询
+  clearPolling()
+})
 
 /** 处理授权场景 */
 const handleAuth = () => {
@@ -124,62 +305,22 @@ const handleAuth = () => {
   scanStatus.value = {
     status: 'auth',
     icon: 'Security',
-    text: '扫码成功,等待授权',
+    textKey: 'auth',
     show: true
   }
-  loadText.value = '等待授权...'
+  loadTextKey.value = 'auth_pending'
 }
 
-// TODO 做一个二维码过期时间重新刷新二维码的功能 (nyh -> 2024-01-27 00:37:18)
-onMounted(() => {
+onMounted(async () => {
+  isTrayMenuShow.value = false
+  // 存储此次登陆设备指纹
+  const clientId = await getEnhancedFingerprint()
+  localStorage.setItem('clientId', clientId)
+
   handleQRCodeLogin()
-  // if (!localStorage.getItem('wsLogin')) {
-  //   wsIns.send({ type: WsRequestMsgType.RequestLoginQrCode })
-  // } else {
-  //   handleQRCodeLogin()
-  // }
-  useMitt.on(WsResponseMessageType.LOGIN_QR_CODE, (loginInitResType: LoginInitResType) => {
-    loginStore.loginQrCode = loginInitResType.loginUrl
-    handleQRCodeLogin()
-  })
-  useMitt.on(WsResponseMessageType.LOGIN_SUCCESS, async (loginSuccessResType: LoginSuccessResType) => {
-    const { token, ...rest } = loginSuccessResType
-    // FIXME 可以不需要赋值了，单独请求了接口。
-    userStore.userInfo = { ...userStore.userInfo!, ...rest }
-    localStorage.setItem('TOKEN', token)
-    localStorage.removeItem('wsLogin')
-    // 获取用户详情
-    userStore.getUserDetailAction()
-    // 自己更新自己上线
-    await groupStore.updateUserStatus({
-      activeStatus: OnlineEnum.ONLINE,
-      avatar: rest.avatar,
-      account: rest.account,
-      name: rest.name,
-      uid: rest.uid,
-      lastOptTime: Date.now()
-    })
-    // TODO 先不获取 emoji 列表，当我点击 emoji 按钮的时候再获取
-    // await emojiStore.getEmojiList()
-    await handleLoginSuccess()
-  })
-  useMitt.on(WsResponseMessageType.NO_INTERNET, (e: any) => {
-    handleError(e.msg)
-  })
 })
 </script>
 
 <style scoped lang="scss">
 @use '@/styles/scss/global/login-bg';
-:deep(.hover-box) {
-  @apply w-28px h24px flex-center hover:bg-#e7e7e7;
-  svg {
-    color: #404040;
-  }
-}
-:deep(.action-close) {
-  svg {
-    color: #404040;
-  }
-}
 </style>

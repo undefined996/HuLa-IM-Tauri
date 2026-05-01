@@ -29,8 +29,8 @@
         :disabled-options="disabledOptions" />
 
       <n-flex align="center" justify="end" class="p-16px">
-        <n-button color="#13987f" @click="handleInvite">确定</n-button>
-        <n-button secondary @click="handleClose">取消</n-button>
+        <n-button color="#13987f" @click="handleInvite">{{ t('home.chat_header.modal.confirm') }}</n-button>
+        <n-button secondary @click="handleClose">{{ t('home.chat_header.modal.cancel') }}</n-button>
       </n-flex>
     </div>
   </div>
@@ -38,15 +38,19 @@
 <script setup lang="ts">
 import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useMitt } from '@/hooks/useMitt'
+import { useWindow } from '@/hooks/useWindow'
 import { getDisabledOptions, getFilteredOptions, renderLabel, renderSourceList } from '@/layout/center/model.tsx'
-import { useGlobalStore } from '@/stores/global'
 import { useGroupStore } from '@/stores/group'
 import { inviteGroupMember } from '@/utils/ImRequestUtils'
+import { useI18n } from 'vue-i18n'
 
-const globalStore = useGlobalStore()
+const { t } = useI18n()
+const { getWindowPayload } = useWindow()
 const groupStore = useGroupStore()
 const windowTitle = ref('')
 const selectedValue = ref([])
+// 从父窗口传递过来的 roomId
+const roomId = ref<string>('')
 // 使用model.tsx中的getDisabledOptions
 const disabledOptions = computed(() => getDisabledOptions())
 
@@ -55,8 +59,8 @@ const filteredOptions = computed(() => getFilteredOptions())
 
 // 初始化群成员数据
 const initGroupMembers = async () => {
-  if (globalStore.currentSession?.roomId) {
-    await groupStore.getGroupUserList(globalStore.currentSession.roomId)
+  if (roomId.value) {
+    await groupStore.getGroupUserList(roomId.value)
   }
 }
 
@@ -66,11 +70,14 @@ const handleInvite = async () => {
   try {
     // 调用邀请群成员API
     await inviteGroupMember({
-      roomId: globalStore.currentSession!.roomId,
+      roomId: roomId.value,
       uidList: selectedValue.value
     })
 
     window.$message.success('邀请成功')
+    setTimeout(() => {
+      handleClose()
+    }, 1000)
   } catch (error) {
     console.error('邀请失败:', error)
     window.$message.error('邀请失败，请重试')
@@ -86,6 +93,12 @@ onMounted(async () => {
 
   // 获取窗口标题
   windowTitle.value = await getCurrentWebviewWindow().title()
+
+  // 获取父窗口传递的 payload
+  const payload = await getWindowPayload<{ roomId: string; type: number }>('modal-invite')
+  if (payload?.roomId) {
+    roomId.value = payload.roomId
+  }
 
   // 初始化群成员数据
   await initGroupMembers()

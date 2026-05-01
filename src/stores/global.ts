@@ -1,18 +1,19 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { info } from '@tauri-apps/plugin-log'
 import { defineStore } from 'pinia'
-import { NotificationTypeEnum, StoresEnum } from '@/enums'
-import type { ContactItem, RequestFriendItem, SessionItem } from '@/services/types'
+import { MittEnum, StoresEnum } from '@/enums'
+import type { FriendItem, RequestFriendItem, SessionItem } from '@/services/types'
 import { useChatStore } from '@/stores/chat'
-import { isMac } from '@/utils/PlatformConstants'
+import { useFeedStore } from '@/stores/feed'
 import { clearQueue, readCountQueue } from '@/utils/ReadCountQueue.ts'
-import { markMsgRead } from '../utils/ImRequestUtils'
-import { invokeWithErrorHandler } from '../utils/TauriInvokeHandler'
+import { useMitt } from '@/hooks/useMitt.ts'
+import { unreadCountManager } from '@/utils/UnreadCountManager'
 
 export const useGlobalStore = defineStore(
   StoresEnum.GLOBAL,
   () => {
     const chatStore = useChatStore()
+    const feedStore = useFeedStore()
 
     // 未读消息标记：好友请求未读数和新消息未读数
     const unReadMark = reactive<{
@@ -24,6 +25,7 @@ export const useGlobalStore = defineStore(
       newGroupUnreadCount: 0,
       newMsgUnreadCount: 0
     })
+    const unreadReady = ref<boolean>(true)
 
     // 当前阅读未读列表状态
     const currentReadUnreadList = reactive<{ show: boolean; msgId: number | null }>({
@@ -32,13 +34,37 @@ export const useGlobalStore = defineStore(
     })
 
     const currentSessionRoomId = ref('')
-    // 当前会话信息：包含房间ID和房间类型
-    const currentSession = computed((): SessionItem => {
-      return chatStore.getSession(currentSessionRoomId.value)
+    const lastKnownSession = ref<SessionItem | null>(null)
+    type CurrentSessionView = Omit<SessionItem, 'roomId'>
+    const stripRoomId = (session?: SessionItem | null): CurrentSessionView | null => {
+      if (!session) return null
+      const { roomId: _omit, ...rest } = session
+      return rest
+    }
+    // 当前会话信息：不暴露 roomId，统一从 currentSessionRoomId 读取
+    const currentSession = computed((): CurrentSessionView | null => {
+      const cachedRoomId = currentSessionRoomId.value
+      if (!cachedRoomId) {
+        lastKnownSession.value = null
+        return null
+      }
+
+      let session: SessionItem | undefined = chatStore.getSession(cachedRoomId)
+      if (!session) {
+        session = chatStore.sessionList.find((item) => item.roomId === cachedRoomId)
+      }
+      if (session) {
+        lastKnownSession.value = session
+        return stripRoomId(session)
+      }
+
+      return lastKnownSession.value && lastKnownSession.value.roomId === cachedRoomId
+        ? stripRoomId(lastKnownSession.value)
+        : null
     })
 
     /** 当前选中的联系人信息 */
-    const currentSelectedContact = ref<ContactItem | RequestFriendItem>()
+    const currentSelectedContact = ref<FriendItem | RequestFriendItem>()
 
     // 添加好友模态框信息 TODO: 虚拟列表添加好友有时候会不展示对应的用户信息
     const addFriendModalInfo = ref<{ show: boolean; uid?: string }>({
@@ -70,58 +96,69 @@ export const useGlobalStore = defineStore(
     /** 系统托盘菜单显示的状态 */
     const isTrayMenuShow = ref<boolean>(false)
 
-    // home窗口位置、宽高信息
-    const homeWindowState = ref<{ width?: number; height?: number }>({})
-
-    // 更新全局未读消息计数
-    const updateGlobalUnreadCount = async () => {
-      info('[global]更新全局未读消息计数')
-      // 计算所有会话的未读消息总数，排除免打扰的会话
-      const totalUnread = chatStore.sessionList.reduce((total, session) => {
-        // 如果是免打扰的会话，不计入总数
-        if (session.muteNotification === NotificationTypeEnum.NOT_DISTURB) {
-          return total
-        }
-        return total + (session.unreadCount || 0)
-      }, 0)
-      unReadMark.newMsgUnreadCount = totalUnread
-      if (isMac()) {
-        const count = totalUnread > 0 ? totalUnread : undefined
-        await invokeWithErrorHandler('set_badge_count', { count })
-      }
-    }
-
-    // 监听当前会话变化，添加防重复触发逻辑
-    watch(currentSessionRoomId, async (val, oldVal) => {
-      if (WebviewWindow.getCurrent().label !== 'home') {
-        return
-      }
-      // 只有当房间ID真正发生变化时才执行操作
-      if (!oldVal || val! !== oldVal) {
-        info(`[global]当前会话发生实际变化: ${oldVal} -> ${val}`)
-        // 清理已读数查询队列
-        clearQueue()
-        // 延迟1秒后开始查询已读数
-        setTimeout(readCountQueue, 1000)
-        // 标记该房间的消息为已读
-        // apis.markMsgRead({ roomId: val.roomId || '1' })
-        markMsgRead(val! || '1')
-        // 更新会话的已读状态
-        chatStore.markSessionRead(val! || '1')
-        // 更新全局未读计数
-        await updateGlobalUnreadCount()
-      }
-    })
-
     // 设置提示框显示状态
     const setTipVisible = (visible: boolean) => {
       tipVisible.value = visible
     }
 
-    // 设置home窗口位置、宽高信息
-    const setHomeWindowState = (newState: { width: number; height: number }) => {
-      homeWindowState.value = { ...homeWindowState.value, ...newState }
+    // 更新全局未读消息计数
+    const updateGlobalUnreadCount = () => {
+      info('[global]更新全局未读消息计数')
+      // 使用统一的计数管理器，避免重复逻辑（包含朋友圈未读数）
+      unreadCountManager.calculateTotal(chatStore.sessionList, unReadMark, feedStore.unreadCount)
     }
+
+    // 兜底同步 Dock/角标，防止未读数与徽章不同步
+    watch(
+      () => ({
+        msg: unReadMark.newMsgUnreadCount,
+        friend: unReadMark.newFriendUnreadCount,
+        group: unReadMark.newGroupUnreadCount,
+        feed: feedStore.unreadCount // 添加朋友圈未读数监听
+      }),
+      () => {
+        if (!unreadReady.value) return
+        unreadCountManager.refreshBadge(unReadMark, feedStore.unreadCount)
+      }
+    )
+
+    // 监听当前会话变化，添加防重复触发逻辑
+    watch(currentSessionRoomId, async (val, oldVal) => {
+      if (!val || val === oldVal) {
+        return
+      }
+
+      try {
+        await chatStore.changeRoom()
+      } catch (error) {
+        console.error('[global] 切换会话时加载消息失败:', error)
+        return
+      }
+
+      const webviewWindowLabel = WebviewWindow.getCurrent()
+      if (webviewWindowLabel.label !== 'home' && webviewWindowLabel.label !== '/mobile/message') {
+        useMitt.emit(MittEnum.SESSION_CHANGED, {
+          roomId: val,
+          oldRoomId: oldVal ?? null
+        })
+        return
+      }
+
+      const session = chatStore.getSession(val)
+      if (session?.unreadCount) {
+        info(`[global]当前会话发生实际变化: ${oldVal} -> ${val}`)
+        // 清理已读数查询队列
+        clearQueue()
+        // 延攱1秒后开始查询已读数
+        setTimeout(readCountQueue, 1000)
+        chatStore.markSessionRead(val)
+      }
+
+      useMitt.emit(MittEnum.SESSION_CHANGED, {
+        roomId: val,
+        oldRoomId: oldVal ?? null
+      })
+    })
 
     const updateCurrentSessionRoomId = (id: string) => {
       currentSessionRoomId.value = id
@@ -137,10 +174,9 @@ export const useGlobalStore = defineStore(
       createGroupModalInfo,
       tipVisible,
       isTrayMenuShow,
-      homeWindowState,
+      unreadReady,
       setTipVisible,
       updateGlobalUnreadCount,
-      setHomeWindowState,
       updateCurrentSessionRoomId,
       currentSessionRoomId
     }

@@ -8,10 +8,8 @@
       :current-label="WebviewWindow.getCurrent().label" />
 
     <!-- 标题 -->
-    <p
-      class="absolute-x-center h-fit pt-6px text-(13px [--text-color]) select-none cursor-default"
-      data-tauri-drag-region>
-      申请加好友
+    <p class="absolute-x-center h-fit pt-6px text-(13px [--text-color]) select-none cursor-default">
+      {{ t('message.friend_verify.title') }}
     </p>
 
     <!-- 内容区域 -->
@@ -22,17 +20,16 @@
 
           <n-flex vertical :size="10">
             <p class="text-[--text-color]">{{ userInfo.name }}</p>
-            <p class="text-(12px [--text-color])">账号: {{ userInfo.account }}</p>
+            <p class="text-(12px [--text-color])">
+              {{ t('message.friend_verify.account', { account: userInfo.account }) }}
+            </p>
           </n-flex>
         </n-flex>
 
         <n-input
           v-model:value="requestMsg"
           :allow-input="(value: string) => !value.startsWith(' ') && !value.endsWith(' ')"
-          :autosize="{
-            minRows: 3,
-            maxRows: 3
-          }"
+          :autosize="requestMsgAutosize"
           :maxlength="60"
           :count-graphemes="countGraphemes"
           show-count
@@ -41,9 +38,11 @@
           autoCorrect="off"
           autoCapitalize="off"
           type="textarea"
-          placeholder="输入几句话，对TA说些什么吧" />
+          :placeholder="t('message.friend_verify.placeholder')" />
 
-        <n-button class="mt-30px" color="#13987f" @click="addFriend">添加好友</n-button>
+        <n-button class="mt-30px" color="#13987f" @click="addFriend">
+          {{ t('message.friend_verify.send_btn') }}
+        </n-button>
       </n-flex>
     </div>
   </div>
@@ -55,12 +54,15 @@ import { useGlobalStore } from '@/stores/global.ts'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
 import { sendAddFriendRequest } from '@/utils/ImRequestUtils'
-import { useGroupStore } from '~/src/stores/group'
+import { useGroupStore } from '@/stores/group'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const globalStore = useGlobalStore()
 const userStore = useUserStore()
 const groupStore = useGroupStore()
 const { countGraphemes } = useCommon()
+const requestMsgAutosize = { minRows: 3, maxRows: 3 }
 const userInfo = ref(groupStore.getUserInfo(globalStore.addFriendModalInfo.uid!)!)
 const avatarSrc = computed(() => AvatarUtils.getAvatarUrl(userInfo.value!.avatar as string))
 const requestMsg = ref()
@@ -77,7 +79,7 @@ const addFriend = async () => {
     msg: requestMsg.value,
     targetUid: globalStore.addFriendModalInfo.uid as string
   })
-  window.$message.success('已发送好友申请')
+  window.$message.success(t('message.friend_verify.toast_success'))
   setTimeout(async () => {
     await getCurrentWebviewWindow().close()
   }, 2000)
@@ -87,7 +89,7 @@ onMounted(async () => {
   console.log(userInfo.value)
 
   await getCurrentWebviewWindow().show()
-  requestMsg.value = `我是${userStore.userInfo!.name}`
+  requestMsg.value = t('message.friend_verify.default_msg', { name: userStore.userInfo!.name })
 })
 </script>
 

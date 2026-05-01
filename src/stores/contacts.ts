@@ -1,24 +1,29 @@
 import { defineStore } from 'pinia'
 import { StoresEnum } from '@/enums'
-import type { ContactItem, RequestFriendItem } from '@/services/types'
-import { RequestFriendAgreeStatus } from '@/services/types'
+import type { FriendItem, NoticeItem } from '@/services/types'
+import { RequestNoticeAgreeStatus } from '@/services/types'
 import { useGlobalStore } from '@/stores/global'
+import { useFeedStore } from '@/stores/feed'
+import { useGroupStore } from '@/stores/group'
 import {
   deleteFriend,
-  getApplyUnreadCount,
   getFriendPage,
+  getNoticeUnreadCount,
   handleInvite,
-  requestApplyPage
+  requestNoticePage
 } from '@/utils/ImRequestUtils'
+import { unreadCountManager } from '@/utils/UnreadCountManager'
 // 定义分页大小常量
 export const pageSize = 20
 export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
   const globalStore = useGlobalStore()
+  const feedStore = useFeedStore()
+  const groupStore = useGroupStore()
 
   /** 联系人列表 */
-  const contactsList = ref<ContactItem[]>([])
+  const contactsList = ref<FriendItem[]>([])
   /** 好友请求列表 */
-  const requestFriendsList = ref<RequestFriendItem[]>([])
+  const requestFriendsList = ref<NoticeItem[]>([])
 
   /** 联系人列表分页选项 */
   const contactsOptions = ref({ isLast: false, isLoading: false, cursor: '' })
@@ -32,22 +37,31 @@ export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
   const getContactList = async (isFresh = false) => {
     // 非刷新模式下，如果已经加载完或正在加载中，则直接返回
     if (!isFresh) {
-      if (contactsOptions.value.isLast || contactsOptions.value.isLoading) return
+      console.log(contactsOptions.value.isLast)
+      if (contactsOptions.value.isLast) return
+    }
+    if (isFresh) {
+      contactsOptions.value.cursor = ''
+      contactsOptions.value.isLast = false
     }
     contactsOptions.value.isLoading = true
-    const res = await getFriendPage()
-    if (!res) return
-    const data = res
-    // 刷新模式下替换整个列表，否则追加到列表末尾
-    isFresh
-      ? contactsList.value.splice(0, contactsList.value.length, ...data.list)
-      : contactsList.value.push(...data.list)
-    contactsOptions.value.cursor = data.cursor
-    contactsOptions.value.isLast = data.isLast
-    contactsOptions.value.isLoading = false
+    try {
+      const data = await getFriendPage({ cursor: contactsOptions.value.cursor })
 
-    // 获取数据后更新联系人列表
-    contactsList.value.splice(0, contactsList.value.length, ...contactsList.value)
+      if (!data) return
+      // 刷新模式下替换整个列表，否则追加到列表末尾
+      if (isFresh) {
+        contactsList.value = data.list
+      } else {
+        contactsList.value.push(...data.list)
+      }
+      contactsOptions.value.cursor = data.cursor
+      contactsOptions.value.isLast = data.isLast
+    } catch (error) {
+      console.error('获取联系人列表失败:', error)
+    } finally {
+      contactsOptions.value.isLoading = false
+    }
   }
 
   /**
@@ -55,18 +69,21 @@ export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
    * 更新全局store中的未读计数
    */
   const getApplyUnReadCount = async () => {
-    const res: any = await getApplyUnreadCount()
+    const res: any = await getNoticeUnreadCount()
     if (!res) return
     // 更新全局store中的未读计数
     globalStore.unReadMark.newFriendUnreadCount = res.unReadCount4Friend
     globalStore.unReadMark.newGroupUnreadCount = res.unReadCount4Group
+
+    unreadCountManager.refreshBadge(globalStore.unReadMark, feedStore.unreadCount)
   }
 
   /**
    * 获取好友申请列表
    * @param isFresh 是否刷新列表，true则重新加载，false则加载更多
+   * @param click 是否点击刷新，true则点击清空通知未读，false则仅仅请求通知列表
    */
-  const getApplyPage = async (isFresh = false) => {
+  const getApplyPage = async (applyType: string, isFresh = false, click = false) => {
     // 非刷新模式下，如果已经加载完或正在加载中，则直接返回
     if (!isFresh) {
       if (applyPageOptions.value.isLast) return
@@ -79,9 +96,11 @@ export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
     }
 
     try {
-      const res = await requestApplyPage({
+      const res = await requestNoticePage({
         pageNo: applyPageOptions.value.pageNo,
         pageSize: 30,
+        click: click,
+        applyType,
         cursor: isFresh ? '' : applyPageOptions.value.cursor
       })
       if (!res) return
@@ -107,29 +126,74 @@ export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
     }
   }
 
+  const deleteContact = (uid: string) => {
+    contactsList.value = contactsList.value.filter((item) => item.uid !== uid)
+  }
+
   /**
    * 处理好友/群申请
    * @param apply 好友申请信息
    * @param state 处理状态 0拒绝 2同意 3忽略
    */
-  const onHandleInvite = async (apply: { applyId: string; state: number }) => {
-    // 同意好友申请
-    handleInvite(apply).then(async () => {
+  const resolveApplyType = (applyType?: 'friend' | 'group', type?: number): 'friend' | 'group' => {
+    if (applyType === 'friend' || applyType === 'group') return applyType
+    // 后端 type: 1 群聊通知, 2 好友通知
+    return type === 2 ? 'friend' : 'group'
+  }
+
+  const onHandleInvite = async (apply: {
+    applyId: string
+    state: number
+    roomId?: string
+    type?: number
+    applyType?: 'friend' | 'group'
+    markAsRead?: boolean
+  }) => {
+    const targetApplyType = resolveApplyType(apply.applyType, apply.type)
+    const markAsRead = apply.markAsRead ?? false
+
+    try {
+      await handleInvite({ applyId: apply.applyId, state: apply.state })
+
       // 刷新好友申请列表
-      await getApplyPage(true)
+      await getApplyPage(targetApplyType, true, markAsRead)
+      if (markAsRead) {
+        targetApplyType === 'friend'
+          ? (globalStore.unReadMark.newFriendUnreadCount = 0)
+          : (globalStore.unReadMark.newGroupUnreadCount = 0)
+        unreadCountManager.refreshBadge(globalStore.unReadMark, feedStore.unreadCount)
+      }
       // 刷新好友列表
       await getContactList(true)
       // 获取最新的未读数
       await getApplyUnReadCount()
+
+      // 如果是同意群邀请/群申请，则刷新群信息与成员列表
+      const isGroupApply =
+        apply.state === RequestNoticeAgreeStatus.ACCEPTED &&
+        targetApplyType === 'group' &&
+        apply.roomId &&
+        Number(apply.roomId) > 0
+
+      if (isGroupApply) {
+        try {
+          await groupStore.addGroupDetail(apply.roomId!)
+          await groupStore.getGroupUserList(apply.roomId!, true)
+        } catch (error) {
+          console.error('刷新群成员信息失败:', error)
+        }
+      }
+
       // 更新当前选中联系人的状态
       if (globalStore.currentSelectedContact) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        globalStore.currentSelectedContact.status = RequestFriendAgreeStatus.Agree
+        globalStore.currentSelectedContact.status = RequestNoticeAgreeStatus.ACCEPTED
       }
-      // 获取最新的未读数
-      await getApplyUnReadCount()
-    })
+    } catch (error) {
+      console.error('处理好友/群申请失败:', error)
+      throw error
+    }
   }
 
   /**
@@ -139,12 +203,10 @@ export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
    * 1. 调用删除好友接口
    * 2. 刷新好友列表
    */
-  const onDeleteContact = async (uid: string) => {
+  const onDeleteFriend = async (uid: string) => {
     if (!uid) return
     // 删除好友
     await deleteFriend({ targetUid: uid })
-    // 刷新好友申请列表
-    // getRequestFriendsList(true)
     // 刷新好友列表
     await getContactList(true)
   }
@@ -157,7 +219,8 @@ export const useContactStore = defineStore(StoresEnum.CONTACTS, () => {
     requestFriendsList,
     contactsOptions,
     applyPageOptions,
-    onDeleteContact,
-    onHandleInvite
+    onDeleteFriend,
+    onHandleInvite,
+    deleteContact
   }
 })

@@ -26,11 +26,14 @@ src-tauri/target
 .history/
 
 /coverage
-.cursorrules
-.claude/
 
 target
 .claude/
+.serena/
 *.sqlite
 db.sqlite
 .idea
+.qoder
+
+src/typings/components.pc.d.ts
+src/typings/components.mobile.d.ts

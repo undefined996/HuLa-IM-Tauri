@@ -1,4 +1,4 @@
-import { type } from '@tauri-apps/plugin-os'
+import { type, version } from '@tauri-apps/plugin-os'
 
 /**
  * 平台类型枚举
@@ -16,6 +16,8 @@ export type OSType = 'windows' | 'macos' | 'linux' | 'android' | 'ios'
 class PlatformDetector {
   private static _osType: OSType
   private static _platformType: PlatformType
+  private static _osVersion: string | undefined
+  private static _isWindows10 = false
   private static _initialized = false
 
   /**
@@ -28,9 +30,12 @@ class PlatformDetector {
       const detectedType = type()
       PlatformDetector._osType = PlatformDetector.normalizeOSType(detectedType)
       PlatformDetector._platformType = PlatformDetector.isDesktopOS(PlatformDetector._osType) ? 'desktop' : 'mobile'
+      PlatformDetector._osVersion = PlatformDetector.detectVersion()
+      PlatformDetector._isWindows10 =
+        PlatformDetector._osType === 'windows' && PlatformDetector.isWindows10Version(PlatformDetector._osVersion)
 
       if (import.meta.env.DEV) {
-        console.log(`🖥️ Platform detected: ${PlatformDetector._osType} (${PlatformDetector._platformType})`)
+        console.log(`Platform detected: ${PlatformDetector._osType} (${PlatformDetector._platformType})`)
       }
     } catch (error) {
       console.warn('Failed to detect platform type, defaulting to desktop:', error)
@@ -60,9 +65,39 @@ class PlatformDetector {
     return osType === 'windows' || osType === 'linux' || osType === 'macos'
   }
 
+  private static detectVersion(): string | undefined {
+    try {
+      return version()
+    } catch (error) {
+      console.warn('Failed to detect platform version:', error)
+      return undefined
+    }
+  }
+
+  private static isWindows10Version(osVersion?: string): boolean {
+    if (!osVersion) return false
+    const numbers = osVersion
+      .match(/\d+/g)
+      ?.map((num) => Number.parseInt(num, 10))
+      .filter((num) => !Number.isNaN(num))
+    if (!numbers || numbers.length === 0) return false
+    const [major, minor, patch] = numbers
+    const buildNumber = typeof patch === 'number' ? patch : typeof minor === 'number' ? minor : undefined
+    return major === 10 && typeof buildNumber === 'number' && buildNumber < 22000
+  }
+
   static get osType(): OSType {
     return PlatformDetector._osType
   }
+
+  static get osVersion(): string | undefined {
+    return PlatformDetector._osVersion
+  }
+
+  static get isWindows10(): boolean {
+    return PlatformDetector._isWindows10
+  }
+
   static get platformType(): PlatformType {
     return PlatformDetector._platformType
   }
@@ -83,6 +118,11 @@ export const getOSType = (): OSType => PlatformDetector.osType
 export const getPlatformType = (): PlatformType => PlatformDetector.platformType
 
 /**
+ * 获取系统版本号
+ */
+export const getOSVersion = (): string | undefined => PlatformDetector.osVersion
+
+/**
  * 是否为桌面端
  */
 export const isDesktop = (): boolean => PlatformDetector.platformType === 'desktop'
@@ -98,9 +138,27 @@ export const isMobile = (): boolean => PlatformDetector.platformType === 'mobile
 export const isWindows = (): boolean => PlatformDetector.osType === 'windows'
 
 /**
+ * 是否为 Windows 10
+ */
+export const isWindows10 = (): boolean => PlatformDetector.isWindows10
+
+/**
  * 是否为 macOS 系统
  */
 export const isMac = (): boolean => PlatformDetector.osType === 'macos'
+
+export const isMac26 = (): boolean => {
+  if (!isMac()) return false
+  const osVersion = getOSVersion()
+  if (!osVersion) return false
+  const numbers = osVersion
+    .match(/\d+/g)
+    ?.map((num) => Number.parseInt(num, 10))
+    .filter((num) => !Number.isNaN(num))
+  if (!numbers || numbers.length === 0) return false
+  const [major] = numbers
+  return major >= 26
+}
 
 /**
  * 是否为 Linux 系统
@@ -129,6 +187,7 @@ export const Platform = {
   // 获取信息
   getOSType,
   getPlatformType,
+  getOSVersion,
 
   // 平台判断
   isDesktop,
@@ -136,7 +195,9 @@ export const Platform = {
 
   // 系统判断
   isWindows,
+  isWindows10,
   isMac,
+  isMac26,
   isLinux,
   isAndroid,
   isIOS,

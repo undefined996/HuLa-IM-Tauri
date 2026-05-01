@@ -3,7 +3,7 @@
     <!-- 搜索结果为空时显示建议和历史记录 -->
     <template v-if="searchResults.length === 0 && !searchQuery">
       <!-- 搜索建议 -->
-      <p class="text-(12px #909090)">搜索建议</p>
+      <p class="text-(12px #909090)">{{ t('home.search_suggestions') }}</p>
       <n-flex align="center" class="text-(12px #909090)">
         <p class="p-6px bg-[--search-color] rounded-8px cursor-pointer" @click="applySearchTerm('hula')">hula</p>
       </n-flex>
@@ -12,8 +12,8 @@
 
       <!-- 历史记录 -->
       <n-flex v-if="historyList.length > 0" align="center" justify="space-between">
-        <p class="text-(12px #909090)">历史记录</p>
-        <p class="cursor-pointer text-(12px #13987f)" @click="clearHistory">清除</p>
+        <p class="text-(12px #909090)">{{ t('home.search_history') }}</p>
+        <p class="cursor-pointer text-(12px #13987f)" @click="clearHistory">{{ t('home.clear_search_history') }}</p>
       </n-flex>
 
       <n-flex
@@ -22,7 +22,7 @@
         :size="14"
         class="p-6px mb-6px mr-10px cursor-pointer rounded-8px hover:bg-[--list-hover-color]">
         <n-avatar :size="38" round src="msgAction/clapping.png" />
-        <p class="text-(12px [--chat-text-color]) flex-1 truncate">在搜索框内搜索</p>
+        <p class="text-(12px [--chat-text-color]) flex-1 truncate">{{ t('home.search_guide') }}</p>
       </n-flex>
 
       <n-scrollbar style="max-height: calc(100vh / var(--page-scale, 1) - 212px)">
@@ -41,7 +41,7 @@
 
     <!-- 搜索结果 -->
     <template v-else-if="searchResults.length > 0">
-      <p class="text-(12px #909090) mb-6px">搜索结果</p>
+      <p class="text-(12px #909090) mb-6px">{{ t('home.search_result') }}</p>
 
       <n-scrollbar style="max-height: calc(100vh / var(--page-scale, 1) - 118px)">
         <template v-for="item in searchResults" :key="item.roomId">
@@ -61,7 +61,7 @@
     <template v-else-if="searchQuery && searchResults.length === 0">
       <div style="height: calc(100vh / var(--page-scale, 1) - 212px)" class="flex-col-center gap-12px">
         <img class="size-64px" src="/msgAction/exploding-head.png" />
-        <p class="text-(12px [--chat-text-color])">未找到相关结果</p>
+        <p class="text-(12px [--chat-text-color])">{{ t('home.no_search_results') }}</p>
       </div>
     </template>
   </n-flex>
@@ -74,11 +74,13 @@ import { useCommon } from '@/hooks/useCommon.ts'
 import { useMitt } from '@/hooks/useMitt'
 import { useChatStore } from '@/stores/chat.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
+import { useI18n } from 'vue-i18n'
 
 type SessionItem = {
   avatar: string
   name: string
   id?: string
+  detailId: string
   roomId: string
   type: number
 }
@@ -86,11 +88,13 @@ type HistoryItem = {
   avatar: string
   name: string
   id: string
+  detailId: string
   roomId: string
   type: number
   timestamp?: number
 }
 
+const { t } = useI18n()
 const router = useRouter()
 const chatStore = useChatStore()
 const { openMsgSession } = useCommon()
@@ -178,7 +182,8 @@ const saveSessionToHistory = (session: SessionItem) => {
   const historyItem: HistoryItem = {
     avatar: session.avatar || '',
     name: session.name || '',
-    id: session.id || session.roomId,
+    id: session.id || session.detailId,
+    detailId: session.detailId,
     roomId: session.roomId,
     type: session.type || RoomTypeEnum.SINGLE,
     timestamp: Date.now() // 添加当前时间戳
@@ -212,7 +217,7 @@ const clearHistory = () => {
 }
 
 // 打开会话
-const openConversation = (item: SessionItem | HistoryItem) => {
+const openConversation = async (item: SessionItem | HistoryItem) => {
   // 保存会话到历史记录
   saveSessionToHistory(item)
   // 保存搜索记录
@@ -222,8 +227,8 @@ const openConversation = (item: SessionItem | HistoryItem) => {
   // 返回上一页（关闭搜索页面）
   router.go(-1)
   // 打开对应会话
-  const id = item.type === RoomTypeEnum.GROUP ? item.roomId : item.id
-  openMsgSession(id || item.roomId, item.type)
+  const id = item.type === RoomTypeEnum.GROUP ? item.roomId : item.detailId
+  await openMsgSession(id, item.type)
   // 定位到对应的会话（让聊天列表滚动到选中的会话）
   nextTick(() => {
     useMitt.emit(MittEnum.LOCATE_SESSION, { roomId: item.roomId })

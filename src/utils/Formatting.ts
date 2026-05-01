@@ -1,5 +1,5 @@
 import DOMPurify from 'dompurify'
-import { MsgEnum } from '@/enums'
+import { compact } from 'es-toolkit'
 
 /**
  * 文件大小格式化
@@ -17,7 +17,7 @@ export const formatBytes = (bytes: number): string => {
   return size + ' ' + units[unitIndex]
 }
 
-/** 注意！这是文件图标映射关系表，如有修改需求-请联系前端管理同学 */
+/** 文件图标映射关系表 */
 const fileSuffixMap: Record<string, string> = {
   jpg: 'jpg',
   jpeg: 'jpg',
@@ -46,7 +46,8 @@ const fileSuffixMap: Record<string, string> = {
   svg: 'svg',
   sketch: 'sketch',
   exe: 'exe',
-  md: 'md'
+  md: 'md',
+  ts: 'ts'
 }
 /**
  * 获取文件对应的Icon
@@ -60,44 +61,6 @@ export const getFileSuffix = (fileName: string): string => {
   if (!suffix) return 'other'
 
   return fileSuffixMap[suffix] || 'other'
-}
-
-// 生成消息体
-export const generateBody = (fileInfo: any, msgType: MsgEnum, isMock?: boolean) => {
-  const { size, width, height, downloadUrl, name, second, tempUrl, thumbWidth, thumbHeight, thumbUrl, thumbSize } =
-    fileInfo
-  const url = isMock ? tempUrl : downloadUrl
-  const baseBody = { size, url }
-  let body = {}
-
-  if (msgType === MsgEnum.IMAGE) {
-    body = { ...baseBody, width, height }
-  } else if (msgType === MsgEnum.VOICE) {
-    body = { ...baseBody, second }
-  } else if (msgType === MsgEnum.VIDEO) {
-    body = { ...baseBody, thumbWidth, thumbHeight, thumbUrl, thumbSize }
-  } else if (msgType === MsgEnum.FILE) {
-    body = { ...baseBody, fileName: name, url: downloadUrl }
-  }
-  return { body, type: msgType }
-}
-
-/**
- * 地址转Blob
- */
-export const urlToBlob = async (url: string): Promise<Blob> => {
-  const response = await fetch(url)
-  return await response.blob()
-}
-
-/**
- * 地址转文件
- */
-export const urlToFile = async (url: string, fileName?: string): Promise<File> => {
-  const blob = await urlToBlob(url)
-  const fileType = blob.type
-  const name = fileName || Date.now() + '_emoji.png' // 时间戳生成唯一文件名
-  return new File([blob], name, { type: fileType })
 }
 
 /**
@@ -136,5 +99,29 @@ export const getMimeTypeFromExtension = (fileName: string): string => {
  * */
 export const removeTag = (fragment: string) => {
   const sanitizedFragment = DOMPurify.sanitize(fragment)
-  return new DOMParser().parseFromString(sanitizedFragment, 'text/html').body.textContent || fragment
+  const normalizedFragment = sanitizedFragment
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(div|p|li|tr|td|blockquote|h[1-6])>/gi, '')
+    .replace(/<(div|p|li|tr|td|blockquote|h[1-6])[^>]*>/gi, '\n')
+    .replace(/\r\n|\r/g, '\n')
+
+  const textContent = new DOMParser().parseFromString(normalizedFragment, 'text/html').body.textContent || fragment
+
+  return textContent.replace(/\u00A0/g, ' ')
+}
+
+/**
+ * 非中文文本超过指定非空格字符数时截断并追加省略号
+ */
+export const formatBottomText = (text: string, maxLength = 6, omission = '...') => {
+  const pureText = text.replace(/\s/g, '')
+  const hasChinese = /[\u4e00-\u9fa5]/.test(pureText)
+  if (hasChinese || pureText.length <= maxLength) {
+    return text
+  }
+
+  const nonSpaceIndexes = compact(Array.from(text).map((char, idx) => (char.trim().length > 0 ? idx : undefined)))
+  const cutIndex = nonSpaceIndexes[maxLength - 1] ?? text.length - 1
+
+  return `${text.slice(0, cutIndex + 1).trimEnd()}${omission}`
 }

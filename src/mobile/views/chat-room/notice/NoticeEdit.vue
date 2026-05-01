@@ -1,106 +1,207 @@
 <template>
-  <AutoFixHeightPage :show-footer="false">
+  <MobileScaffold :show-footer="false">
     <template #header>
       <HeaderBar
         :isOfficial="false"
         class="bg-white"
-        style="border-bottom: 1px solid; border-color: #dfdfdf"
+        border
         :hidden-right="true"
-        room-name="编辑群公告" />
+        :room-name="isEditMode ? '编辑群公告' : '新增群公告'" />
     </template>
 
-    <template #container="{ height }">
-      <img src="@/assets/mobile/chat-home/background.webp" class="w-100% relative top-0 z-1" alt="hula" />
-      <div :style="{ height: height + 'px' }" class="z-2 flex flex-col absolute overflow-auto min-h-70vh w-full">
-        <div class="flex flex-col p-20px gap-20px">
-          <n-form class="bg-white rounded-15px p-10px shadow" label-placement="left" label-width="100px">
-            <n-form-item>
-              <n-input
-                v-model:value="noticeTitle"
-                type="textarea"
-                placeholder="请输入公告标题"
-                class="w-full"
-                :autosize="{ minRows: 5, maxRows: 10 }"
-                :maxlength="1000"
-                :show-count="true" />
-            </n-form-item>
+    <template #container>
+      <n-card :bordered="false" class="h-full" content-class="p-10px!">
+        <n-input
+          v-model:value="announcementContent"
+          type="textarea"
+          placeholder="请输入公告内容..."
+          class="w-full p-0! m-0!"
+          :autosize="announcementAutosize"
+          :maxlength="1000"
+          :show-count="true" />
 
-            <n-form-item>
-              <n-upload
-                class="w-full h-84px"
-                action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f"
-                :default-file-list="fileList"
-                list-type="image-card">
-                点击上传
-              </n-upload>
-            </n-form-item>
-          </n-form>
+        <div class="upload-image-container pt-10px">
+          <n-upload action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f" list-type="image-card" :max="4" disabled>
+            <div class="upload-trigger">
+              <svg class="size-24px text-#999">
+                <use href="#plus"></use>
+              </svg>
+              <span class="text-12px text-#999 mt-5px">点击上传</span>
+            </div>
+          </n-upload>
+        </div>
 
-          <n-form class="bg-white flex flex-col rounded-15px shadow">
-            <div class="flex bg-white rounded-10px w-full h-auto shadow">
-              <div class="px-15px flex flex-col w-full">
-                <!-- 群号 -->
-                <div
-                  style="border-bottom: 1px solid; border-color: #ebebeb"
-                  class="flex justify-between py-12px items-center">
-                  <div class="text-14px">使用弹窗显示公告</div>
-                  <n-switch v-model:value="active1" />
+        <template #action>
+          <div class="pb-10px">
+            <!-- 置顶设置区域 -->
+            <div class="flex flex-col w-full">
+              <div class="flex justify-between py-15px px-15px items-center border-b border-gray-200">
+                <div class="flex flex-col">
+                  <div class="text-14px font-medium">设为置顶</div>
+                  <div class="text-12px text-gray-500 mt-5px">公告将显示在群公告列表顶部</div>
                 </div>
-                <div
-                  style="border-bottom: 1px solid; border-color: #ebebeb"
-                  class="flex justify-between py-12px items-center">
-                  <div class="text-14px">需群成员确认收到</div>
-                  <n-switch v-model:value="active2" />
-                </div>
-
-                <div
-                  style="border-bottom: 1px solid; border-color: #ebebeb"
-                  class="flex justify-between py-12px items-center">
-                  <div class="text-14px">设为置顶</div>
-                  <n-switch v-model:value="active2" />
-                </div>
+                <n-switch v-model:value="top" />
               </div>
             </div>
-          </n-form>
 
-          <div class="flex justify-center">
-            <div
-              class="w-20%"
-              style="
-                background: linear-gradient(145deg, #7eb7ac, #6fb0a4, #5fa89c);
-                border-radius: 30px;
-                padding: 10px 30px;
-                color: white;
-                font-weight: 500;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-                text-align: center;
-                display: inline-block;
-              ">
-              确定
+            <!-- 操作按钮 -->
+            <div class="flex justify-center gap-15px">
+              <n-button type="default" class="w-40%" strong secondary round size="large" @click="handleCancel">
+                取消
+              </n-button>
+              <n-button
+                type="primary"
+                class="w-40%"
+                strong
+                secondary
+                round
+                size="large"
+                @click="handleSubmit"
+                :loading="submitting">
+                保存
+              </n-button>
             </div>
           </div>
-        </div>
-      </div>
+        </template>
+      </n-card>
     </template>
-  </AutoFixHeightPage>
+  </MobileScaffold>
 </template>
 
 <script setup lang="ts">
-import type { UploadFileInfo } from 'naive-ui'
+import { useRoute, useRouter } from 'vue-router'
+import { useGlobalStore } from '@/stores/global'
+import { getAnnouncementDetail, editAnnouncement, pushAnnouncement } from '@/utils/ImRequestUtils'
 
-const noticeTitle = ref('')
+defineOptions({
+  name: 'mobileChatNoticeEdit'
+})
 
-const active1 = ref(false)
-const active2 = ref(false)
+const route = useRoute()
+const router = useRouter()
+const globalStore = useGlobalStore()
+const announcementAutosize = { minRows: 5, maxRows: 10 }
 
-const fileList = ref<UploadFileInfo[]>([
-  {
-    id: 'c',
-    name: '我是自带url的图片.png',
-    status: 'finished',
-    url: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'
+// 判断是编辑模式还是新增模式
+const isEditMode = computed(() => !!route.params.id)
+
+// 公告内容
+const announcementContent = ref('')
+const top = ref(false)
+const submitting = ref(false)
+
+// 加载公告详情
+const loadAnnouncementDetail = async () => {
+  // 如果是新增模式，不需要加载详情
+  if (!isEditMode.value) {
+    return
   }
-])
+
+  try {
+    const data = await getAnnouncementDetail({
+      roomId: globalStore.currentSessionRoomId,
+      announcementId: route.params.id as string
+    })
+
+    // 填充表单数据
+    announcementContent.value = data.content
+    top.value = data.top || false
+    console.log('announcementContent ', announcementContent)
+  } catch (error) {
+    console.error('加载公告详情失败:', error)
+  }
+}
+
+// 处理取消
+const handleCancel = () => {
+  router.back()
+}
+
+// 处理提交
+const handleSubmit = async () => {
+  // 简单验证
+  if (!announcementContent.value.trim()) {
+    window.$message?.error('请输入公告内容')
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    if (isEditMode.value) {
+      // 编辑模式
+      const announcementData = {
+        id: route.params.id as string,
+        roomId: (route.query.roomId as string) || globalStore.currentSessionRoomId,
+        content: announcementContent.value,
+        top: top.value
+      }
+
+      await editAnnouncement(announcementData)
+      window.$message?.success('公告修改成功')
+      router.push({
+        path: `/mobile/chatRoom/notice/detail/${announcementData.id}`
+      })
+    } else {
+      // 新增模式
+      const announcementData = {
+        roomId: (route.query.roomId as string) || globalStore.currentSessionRoomId,
+        content: announcementContent.value,
+        top: top.value
+      }
+
+      await pushAnnouncement(announcementData)
+      window.$message?.success('公告发布成功')
+      router.back()
+    }
+  } catch (error) {
+    console.error('保存公告失败:', error)
+    window.$message?.error('保存公告失败，请重试')
+  } finally {
+    submitting.value = false
+  }
+}
+
+onMounted(() => {
+  loadAnnouncementDetail()
+})
 </script>
 
-<style scoped></style>
+<style scoped>
+:deep(.n-card > .n-card__action) {
+  padding: 0 !important;
+}
+
+/* 上传图片组件样式优化 */
+.upload-image-container {
+  width: 100%;
+}
+
+.upload-image-container :deep(.n-upload) {
+  width: 100%;
+}
+
+.upload-image-container :deep(.n-upload-trigger) {
+  width: 100px;
+  height: 100px;
+}
+
+.upload-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  background-color: #fafafa;
+  cursor: not-allowed;
+}
+
+.upload-image-container :deep(.n-upload-file-list) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 100px);
+  gap: 10px;
+}
+</style>

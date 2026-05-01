@@ -36,7 +36,7 @@ export const useMockMessage = () => {
       },
       message: {
         id: uniqueId,
-        roomId: globalStore.currentSession!.roomId,
+        roomId: globalStore.currentSessionRoomId,
         sendTime: Number(currentTimeStamp),
         type: type,
         body,
@@ -49,7 +49,7 @@ export const useMockMessage = () => {
         },
         status: MessageStatusEnum.PENDING
       },
-      sendTime: String(currentTimeStamp),
+      sendTime: currentTimeStamp,
       loading: true
     }
   }

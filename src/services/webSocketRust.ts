@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { error, info, warn } from '@tauri-apps/plugin-log'
 import { useMitt } from '@/hooks/useMitt'
 import { WsResponseMessageType } from '@/services/wsType'
+import { useContactStore } from '@/stores/contacts'
 
 /// WebSocket 连接状态
 export enum ConnectionState {
@@ -26,6 +27,7 @@ export interface WebSocketEvent {
   type: 'ConnectionStateChanged' | 'MessageReceived' | 'HeartbeatStatusChanged' | 'Error'
   state?: ConnectionState
   isReconnection?: boolean
+  is_reconnection?: boolean
   message?: any
   health?: ConnectionHealth
   details?: Record<string, any>
@@ -104,21 +106,8 @@ class RustWebSocketClient {
   async initConnect(): Promise<void> {
     try {
       const clientId = localStorage.getItem('clientId')
-      const savedProxy = localStorage.getItem('proxySettings')
-
-      let serverUrl = import.meta.env.VITE_WEBSOCKET_URL
-
-      // 处理代理设置
-      if (savedProxy) {
-        const settings = JSON.parse(savedProxy)
-        const suffix = settings.wsIp + ':' + settings.wsPort + '/websocket/' + settings.wsSuffix
-        if (settings.wsType === 'ws' || settings.wsType === 'wss') {
-          serverUrl = settings.wsType + '://' + suffix
-        }
-      }
 
       const params = {
-        serverUrl,
         clientId: clientId || ''
       }
 
@@ -126,9 +115,6 @@ class RustWebSocketClient {
 
       await invoke('ws_init_connection', { params })
 
-      // await this.setupEventListener()
-
-      // this.isInitialized = true
       info('[RustWS] WebSocket 连接初始化成功')
     } catch (err) {
       error(`[RustWS] 连接初始化失败: ${err}`)
@@ -259,21 +245,7 @@ class RustWebSocketClient {
    * 监听 Rust 端发送的具体业务消息事件
    */
   public async setupBusinessMessageListeners(): Promise<void> {
-    // 登录相关事件
-    this.listenerController.add(
-      await listen('ws-login-qr-code', (event: any) => {
-        info('获取二维码')
-        useMitt.emit(WsResponseMessageType.LOGIN_QR_CODE, event.payload)
-      })
-    )
-
-    this.listenerController.add(
-      await listen('ws-waiting-authorize', () => {
-        info('等待授权')
-        useMitt.emit(WsResponseMessageType.WAITING_AUTHORIZE)
-      })
-    )
-
+    const contactStore = useContactStore()
     this.listenerController.add(
       await listen('ws-login-success', (event: any) => {
         info('登录成功')
@@ -285,7 +257,6 @@ class RustWebSocketClient {
     const listenerIndex = this.listenerController.size
     this.listenerController.add(
       await listen('ws-receive-message', (event: any) => {
-        console.log('[测试]收到消息：', event)
         info(`[ws]收到消息[监听器${listenerIndex}]: ${JSON.stringify(event.payload)}`)
         // debugger
         useMitt.emit(WsResponseMessageType.RECEIVE_MESSAGE, event.payload)
@@ -315,9 +286,9 @@ class RustWebSocketClient {
     )
 
     this.listenerController.add(
-      await listen('ws-offline', () => {
-        info('下线')
-        useMitt.emit(WsResponseMessageType.OFFLINE)
+      await listen('ws-offline', (event: any) => {
+        info(`下线: ${JSON.stringify(event.payload)}`)
+        useMitt.emit(WsResponseMessageType.OFFLINE, event.payload)
       })
     )
 
@@ -333,6 +304,19 @@ class RustWebSocketClient {
       await listen('ws-request-new-apply', (event: any) => {
         info('好友申请')
         useMitt.emit(WsResponseMessageType.REQUEST_NEW_FRIEND, event.payload)
+      })
+    )
+
+    this.listenerController.add(
+      await listen('ws-group-set-admin-success', (event: any) => {
+        useMitt.emit(WsResponseMessageType.GROUP_SET_ADMIN_SUCCESS, event.payload)
+      })
+    )
+
+    this.listenerController.add(
+      await listen('ws-request-notify-event', (event: any) => {
+        info(`通知事件: ${JSON.stringify(event.payload)}`)
+        useMitt.emit(WsResponseMessageType.NOTIFY_EVENT, event.payload)
       })
     )
 
@@ -467,6 +451,28 @@ class RustWebSocketClient {
     this.listenerController.add(
       await listen('ws-unknown-message', (event: any) => {
         info(`接收到未处理类型的消息: ${JSON.stringify(event.payload)}`)
+      })
+    )
+
+    this.listenerController.add(
+      await listen('ws-delete-friend', (event: any) => {
+        info(`删除好友: ${JSON.stringify(event.payload)}`)
+        contactStore.deleteContact(event.payload)
+      })
+    )
+
+    // 朋友圈相关事件
+    this.listenerController.add(
+      await listen('ws-feed-send-msg', (event: any) => {
+        info(`收到朋友圈消息: ${JSON.stringify(event.payload)}`)
+        useMitt.emit(WsResponseMessageType.FEED_SEND_MSG, event.payload)
+      })
+    )
+
+    this.listenerController.add(
+      await listen('ws-feed-notify', (event: any) => {
+        info(`收到朋友圈通知: ${JSON.stringify(event.payload)}`)
+        useMitt.emit(WsResponseMessageType.FEED_NOTIFY, event.payload)
       })
     )
   }

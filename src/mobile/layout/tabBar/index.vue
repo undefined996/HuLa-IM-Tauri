@@ -1,27 +1,32 @@
 <template>
-  <nav class="tab-bar">
-    <div class="flex justify-around items-end h-full">
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        :style="{ height: tabHeight }"
-        class="tab-item flex flex-col flex-1 items-center no-underline relative"
-        :class="route.path === item.path ? 'color-[--tab-bar-icon-color] is-active' : 'text-#000'">
+  <n-divider class="p-0! m-0!" />
+  <div class="tab-bar flex justify-around items-end pt-3">
+    <RouterLink
+      v-for="item in navItems"
+      :key="item.path"
+      :to="item.path"
+      class="tab-item flex flex-col flex-1 items-center no-underline relative"
+      :class="route.path === item.path ? 'color-[--tab-bar-icon-color]' : 'text-#000 dark:text-white/80'">
+      <n-badge
+        class="flex flex-col w-55% flex-1 relative items-center"
+        :offset="[-6, 6]"
+        color="#c14053"
+        :value="getUnReadCount(item.label)"
+        :max="99">
         <svg class="w-22px h-22px">
           <use :href="`#${route.path === item.path ? item.actionIcon : item.icon}`"></use>
         </svg>
         <span class="text-xs mt-1">{{ item.label }}</span>
-      </RouterLink>
-    </div>
-  </nav>
+      </n-badge>
+    </RouterLink>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { useMobileStore } from '@/stores/mobile'
-import { isAndroid, isIOS } from '@/utils/PlatformConstants'
-
-const mobileStore = useMobileStore()
+import { useFeedStore } from '@/stores/feed'
+import { useGlobalStore } from '@/stores/global'
+import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 
 type NavItem = {
   label: string
@@ -30,79 +35,58 @@ type NavItem = {
   actionIcon: string
 }
 
+const { t } = useI18n()
 const route = useRoute()
+const feedStore = useFeedStore()
+const { unreadCount: feedUnreadCount } = storeToRefs(feedStore)
+const globalStore = useGlobalStore()
+
+const getUnReadCount = (label: string) => {
+  if (label === '消息') {
+    return globalStore.unReadMark.newMsgUnreadCount
+  }
+  if (label === t('mobile_tabbar.items.contacts')) {
+    return globalStore.unReadMark.newFriendUnreadCount + globalStore.unReadMark.newGroupUnreadCount
+  }
+  if (label === '社区') {
+    return feedUnreadCount.value
+  }
+  return 0
+
+  // 其他未读计数暂时关闭
+}
+
 const navItems: NavItem[] = [
   {
-    label: '消息',
+    label: t('mobile_tabbar.items.messages'),
     path: '/mobile/message',
     icon: 'message',
     actionIcon: 'message-action'
   },
   {
-    label: '联系人',
+    label: t('mobile_tabbar.items.contacts'),
     path: '/mobile/friends',
     icon: 'avatar',
     actionIcon: 'avatar-action'
   },
   {
-    label: '社区',
+    label: t('mobile_tabbar.items.community'),
     path: '/mobile/community',
     icon: 'fire',
     actionIcon: 'fire-action'
   },
   {
-    label: '我的',
+    label: t('mobile_tabbar.items.me'),
     path: '/mobile/my',
     icon: 'wode',
     actionIcon: 'wode-action'
   }
 ]
-
-const customHeight = ref(50)
-
-if (isAndroid()) {
-  customHeight.value = mobileStore.safeArea.bottom
-} else if (isIOS()) {
-  customHeight.value = mobileStore.safeArea.bottom + 20
-}
-
-const tabHeight = computed(() => customHeight + 'px')
 </script>
 
 <style scoped lang="scss">
 .tab-bar {
-  @apply z-998 w-full bg-#fefefe90 backdrop-blur-md min-h-50px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.tab-item {
-  position: relative;
-
-  svg {
-    @apply w-22px h-22px;
-    position: relative;
-  }
-
-  &::after {
-    content: '';
-    @apply absolute bottom-8px left-1/2 w-44px h-26px opacity-0 blur-md pointer-events-none;
-    z-index: -1;
-    transform: translateX(-50%);
-    transition:
-      opacity 0.3s ease-in-out,
-      filter 0.3s ease-in-out;
-    will-change: opacity, filter;
-  }
-
-  &.is-active::after {
-    @apply opacity-100 rounded-full;
-    background: rgba(19, 152, 127, 0.46);
-    filter: blur(12px);
-    -webkit-filter: blur(12px);
-  }
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 </style>

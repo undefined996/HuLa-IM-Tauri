@@ -1,10 +1,12 @@
-import { BaseDirectory, create, exists, mkdir, readFile, remove } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, create, exists, mkdir, readFile } from '@tauri-apps/plugin-fs'
 import { startRecording, stopRecording } from 'tauri-plugin-mic-recorder-api'
 import { useUserStore } from '@/stores/user'
 import { calculateCompressionRatio, compressAudioToMp3, getAudioInfo } from '@/utils/AudioCompression'
 import { getImageCache } from '@/utils/PathUtil.ts'
+import { isMobile } from '@/utils/PlatformConstants'
 import { UploadSceneEnum } from '../enums'
 import { useUpload } from './useUpload'
+import { removeTempFile } from '@/utils/TempFileManager'
 
 // 导入worker计时器
 let timerWorker: Worker | null = null
@@ -155,12 +157,7 @@ export const useVoiceRecordRust = (options: VoiceRecordRustOptions = {}) => {
         })
 
         // 删除原始的wav文件，释放磁盘空间
-        try {
-          await remove(audioPath)
-          console.log('已删除原始录音文件:', audioPath)
-        } catch (deleteError) {
-          console.warn('删除原始录音文件失败:', deleteError)
-        }
+        await removeTempFile(audioPath, { reason: '删除原始录音文件失败' })
       }
     } catch (error) {
       console.error('停止录音或压缩失败:', error)
@@ -247,16 +244,17 @@ export const useVoiceRecordRust = (options: VoiceRecordRustOptions = {}) => {
       const fullPath = cachePath + fileHashName
 
       // 确保目录存在
-      const dirExists = await exists(cachePath, { baseDir: BaseDirectory.AppCache })
+      const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+      const dirExists = await exists(cachePath, { baseDir })
       if (!dirExists) {
-        await mkdir(cachePath, { baseDir: BaseDirectory.AppCache, recursive: true })
+        await mkdir(cachePath, { baseDir, recursive: true })
       }
 
       // 将Blob转换为ArrayBuffer
       const arrayBuffer = await audioBlob.arrayBuffer()
 
       // 保存到本地文件
-      const file = await create(fullPath, { baseDir: BaseDirectory.AppCache })
+      const file = await create(fullPath, { baseDir })
       await file.write(new Uint8Array(arrayBuffer))
       await file.close()
 

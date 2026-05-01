@@ -2,8 +2,8 @@
   <n-config-provider
     :theme-overrides="themes.content === ThemeEnum.DARK ? darkThemeOverrides : lightThemeOverrides"
     :theme="globalTheme"
-    :locale="zhCN"
-    :date-locale="dateZhCN">
+    :locale="currentNaiveLocale"
+    :date-locale="currentNaiveDateLocale">
     <n-loading-bar-provider>
       <n-dialog-provider>
         <n-notification-provider :max="notificMax">
@@ -21,7 +21,18 @@
 
 <script setup lang="ts">
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { darkTheme, dateZhCN, type GlobalThemeOverrides, lightTheme, zhCN } from 'naive-ui'
+import {
+  darkTheme,
+  dateEnUS,
+  dateZhCN,
+  enUS,
+  type GlobalThemeOverrides,
+  type NDateLocale,
+  type NLocale,
+  lightTheme,
+  zhCN
+} from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 import { ThemeEnum } from '@/enums'
 import { useSettingStore } from '@/stores/setting.ts'
 
@@ -32,37 +43,99 @@ const { notificMax, messageMax } = defineProps<{
 defineOptions({ name: 'NaiveProvider' })
 const settingStore = useSettingStore()
 const { themes } = storeToRefs(settingStore)
+const { locale } = useI18n()
+
+type NaiveLocalePack = {
+  locale: NLocale
+  dateLocale: NDateLocale
+}
+
+const naiveLocaleMap: Record<string, NaiveLocalePack> = {
+  'zh-CN': { locale: zhCN, dateLocale: dateZhCN },
+  zh: { locale: zhCN, dateLocale: dateZhCN },
+  'en-US': { locale: enUS, dateLocale: dateEnUS },
+  en: { locale: enUS, dateLocale: dateEnUS }
+}
+
+const defaultNaiveLocalePack = naiveLocaleMap['zh-CN']
+const resolveNaiveLocale = (lang: string): NaiveLocalePack => naiveLocaleMap[lang] ?? defaultNaiveLocalePack
+const currentNaiveLocale = computed(() => resolveNaiveLocale(locale.value).locale)
+const currentNaiveDateLocale = computed(() => resolveNaiveLocale(locale.value).dateLocale)
 /**监听深色主题颜色变化*/
-const globalTheme = ref<any>(themes.value.content)
+const globalTheme = ref<any>(themes.value.content === ThemeEnum.DARK ? darkTheme : lightTheme)
 const prefers = matchMedia('(prefers-color-scheme: dark)')
 // 定义不需要显示消息提示的窗口
 const noMessageWindows = ['tray', 'notify', 'capture', 'update', 'checkupdate']
 
-/** 跟随系统主题模式切换主题 */
-const followOS = () => {
-  globalTheme.value = prefers.matches ? darkTheme : lightTheme
-  document.documentElement.dataset.theme = prefers.matches ? ThemeEnum.DARK : ThemeEnum.LIGHT
-  themes.value.content = prefers.matches ? ThemeEnum.DARK : ThemeEnum.LIGHT
+const isValidContent = (theme?: string): theme is ThemeEnum => theme === ThemeEnum.DARK || theme === ThemeEnum.LIGHT
+
+const applyThemeContent = (theme: ThemeEnum) => {
+  globalTheme.value = theme === ThemeEnum.DARK ? darkTheme : lightTheme
+  document.documentElement.dataset.theme = theme
+  console.log(globalTheme.value)
 }
 
-watchEffect(() => {
-  if (themes.value.pattern === ThemeEnum.OS) {
-    followOS()
-    themes.value.pattern = ThemeEnum.OS
-    prefers.addEventListener('change', followOS)
-  } else {
-    // 判断content是否是深色还是浅色
-    document.documentElement.dataset.theme = themes.value.content || ThemeEnum.LIGHT
-    globalTheme.value = themes.value.content === ThemeEnum.DARK ? darkTheme : lightTheme
-    prefers.removeEventListener('change', followOS)
-  }
+const syncOsTheme = () => {
+  if (themes.value.pattern !== ThemeEnum.OS) return
+  settingStore.syncOsTheme()
+}
+
+const handlePrefersChange = () => {
+  syncOsTheme()
+}
+
+let prefersListenerAttached = false
+const attachPrefersListener = () => {
+  if (prefersListenerAttached) return
+  prefers.addEventListener('change', handlePrefersChange)
+  prefersListenerAttached = true
+}
+
+const detachPrefersListener = () => {
+  if (!prefersListenerAttached) return
+  prefers.removeEventListener('change', handlePrefersChange)
+  prefersListenerAttached = false
+}
+
+watch(
+  () => themes.value.pattern,
+  (pattern) => {
+    if (pattern === ThemeEnum.OS) {
+      syncOsTheme()
+      attachPrefersListener()
+      return
+    }
+    detachPrefersListener()
+    settingStore.normalizeThemeState()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => themes.value.content,
+  (content) => {
+    if (!isValidContent(content)) {
+      settingStore.normalizeThemeState()
+      return
+    }
+    applyThemeContent(content)
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  detachPrefersListener()
 })
 
 const commonTheme: GlobalThemeOverrides = {
+  Badge: {
+    color: '#c14053'
+  },
   Input: {
     borderRadius: '10px',
     borderHover: '0',
-    border: '0',
+    // TODO: 不清楚为什么去掉边框
+    // border: '0',
     borderDisabled: '0',
     borderFocus: '0',
     boxShadowFocus: '0'
@@ -131,6 +204,9 @@ const commonTheme: GlobalThemeOverrides = {
   Steps: {
     indicatorBorderColorProcess: '#13987f',
     indicatorColorProcess: '#52aea3'
+  },
+  LoadingBar: {
+    colorLoading: '#13987f'
   }
 }
 

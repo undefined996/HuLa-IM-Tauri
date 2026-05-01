@@ -1,104 +1,207 @@
 <template>
-  <div id="layout" class="flex size-full min-w-310px bg-[--right-bg-color]">
-    <Suspense>
-      <template #default>
-        <div class="flex size-full">
-          <!-- 使用keep-alive包裹异步组件 -->
-          <keep-alive>
-            <AsyncLeft />
-          </keep-alive>
-          <keep-alive>
-            <AsyncCenter />
-          </keep-alive>
-          <keep-alive>
-            <AsyncRight v-if="!shrinkStatus" />
-          </keep-alive>
+  <div
+    id="layout"
+    class="relative flex min-w-310px bg-[--right-bg-color] h-full"
+    :class="{ 'is-dragging-files': isDraggingFiles }">
+    <div class="flex flex-1 min-h-0">
+      <!-- 使用keep-alive包裹异步组件 -->
+      <keep-alive>
+        <AsyncLeft />
+      </keep-alive>
+      <keep-alive>
+        <AsyncCenter />
+      </keep-alive>
+      <keep-alive>
+        <AsyncRight v-if="!shrinkStatus" />
+      </keep-alive>
+    </div>
+    <div v-if="overlayVisible" class="absolute inset-0 z-10 flex items-center justify-center bg-[--right-bg-color]">
+      <LoadingSpinner :percentage="loadingPercentage" :loading-text="loadingText" />
+    </div>
+
+    <transition name="drag-upload">
+      <div
+        v-if="isDraggingFiles"
+        class="pointer-events-none absolute inset-0 z-999 flex flex-col items-center justify-center bg-black/30 text-center text-#fff">
+        <div class="rounded-16px border border-white/60 bg-white/15 px-40px py-20px backdrop-blur-md">
+          <p class="text-18px font-semibold tracking-wide">{{ t('home.file_drop.title') }}</p>
+          <p class="mt-6px text-13px text-white/80">{{ t('home.file_drop.desc') }}</p>
         </div>
-      </template>
-      <template #fallback>
-        <div class="flex items-center justify-center size-full">
-          <LoadingSpinner :percentage="loadingPercentage" :loading-text="loadingText" />
-        </div>
-      </template>
-    </Suspense>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { LogicalSize } from '@tauri-apps/api/dpi'
-import { emitTo, listen } from '@tauri-apps/api/event'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { info } from '@tauri-apps/plugin-log'
+import { useI18n } from 'vue-i18n'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import { ChangeTypeEnum, MittEnum, ModalEnum, NotificationTypeEnum, OnlineEnum, TauriCommand } from '@/enums'
 import { useCheckUpdate } from '@/hooks/useCheckUpdate'
+import { useLogin } from '@/hooks/useLogin'
 import { useMitt } from '@/hooks/useMitt.ts'
-import type { MarkItemType, MessageType, RevokedMsgType, UserItem } from '@/services/types.ts'
 import rustWebSocketClient from '@/services/webSocketRust'
-import {
-  type LoginSuccessResType,
-  type OnStatusChangeType,
-  WsResponseMessageType,
-  type WsTokenExpire
-} from '@/services/wsType.ts'
-import { useChatStore } from '@/stores/chat'
-import { useConfigStore } from '@/stores/config'
 import { useContactStore } from '@/stores/contacts.ts'
 import { useGlobalStore } from '@/stores/global.ts'
-import { useGroupStore } from '@/stores/group'
-import { useUserStore } from '@/stores/user'
-import { audioManager } from '@/utils/AudioManager'
-import { isWindows } from '@/utils/PlatformConstants'
+import { isMobile, isWindows } from '@/utils/PlatformConstants'
+import { MittEnum, MsgEnum, NotificationTypeEnum, TauriCommand } from '@/enums'
 import { clearListener, initListener, readCountQueue } from '@/utils/ReadCountQueue'
+import { emitTo, listen } from '@tauri-apps/api/event'
+import type { UnlistenFn } from '@tauri-apps/api/event'
+import { UserAttentionType } from '@tauri-apps/api/window'
+import type { MessageType } from '@/services/types.ts'
+import { WsResponseMessageType } from '@/services/wsType.ts'
+import { useChatStore } from '@/stores/chat'
+import { useFileStore } from '@/stores/file'
+import { useUserStore } from '@/stores/user'
+import { useSettingStore } from '@/stores/setting.ts'
+import { useInitialSyncStore } from '@/stores/initialSync.ts'
 import { invokeSilently } from '@/utils/TauriInvokeHandler'
-import { useLogin } from '../hooks/useLogin'
+import { useRoute } from 'vue-router'
+import { audioManager } from '@/utils/AudioManager'
+import { useOverlayController } from '@/hooks/useOverlayController'
+import { useGroupStore } from '@/stores/group'
+import { RoomTypeEnum } from '@/enums'
+import { getFilesMeta } from '@/utils/PathUtil'
+import FileUtil from '@/utils/FileUtil'
+import type { FilesMeta } from '@/services/types'
 
+const { t } = useI18n()
+const route = useRoute()
+const userStore = useUserStore()
+const chatStore = useChatStore()
+const groupStore = useGroupStore()
+const fileStore = useFileStore()
+const settingStore = useSettingStore()
+// 负责记录哪些账号已经完成过首次同步的全局 store，避免多账号串数据
+const initialSyncStore = useInitialSyncStore()
+const userUid = computed(() => userStore.userInfo?.uid ?? '')
+const hasCachedSessions = computed(() => chatStore.sessionList.length > 0)
 const appWindow = WebviewWindow.getCurrent()
 const loadingPercentage = ref(10)
-const loadingText = ref('正在加载应用...')
+const loadingText = ref(t('home.loading.app'))
+const { resetLoginState, logout, init } = useLogin()
+// 是否需要阻塞首屏并做初始化同步
+const requiresInitialSync = ref(true)
+const shouldBlockInitialRender = computed(() => requiresInitialSync.value && !hasCachedSessions.value)
+const { overlayVisible, markAsyncLoaded } = useOverlayController({
+  isInitialSync: shouldBlockInitialRender,
+  progress: loadingPercentage,
+  asyncTotal: 3,
+  minDisplayMs: 600
+})
+
+let initPromise: Promise<void> | null = null
+// 只有首次登录需要延迟异步组件的加载，后续重新登录直接渲染
+const maybeDelayForInitialRender = async () => {
+  if (!shouldBlockInitialRender.value) {
+    return
+  }
+  await new Promise((resolve) => setTimeout(resolve, 600))
+}
+
+// 根据当前 uid 判断是否需要阻塞首屏并重新同步（依赖持久化的初始化完成名单）
+const syncInitialSyncState = () => {
+  if (!userUid.value || typeof window === 'undefined') {
+    requiresInitialSync.value = true
+    return
+  }
+  requiresInitialSync.value = !initialSyncStore.isSynced(userUid.value)
+}
+
+watch(
+  () => userUid.value,
+  () => {
+    syncInitialSyncState()
+  },
+  { immediate: true }
+)
+
+// 初始化同步成功后标记当前 uid，后续启动直接走增量
+const markInitialSyncCompleted = () => {
+  if (!userUid.value || typeof window === 'undefined') {
+    requiresInitialSync.value = false
+    return
+  }
+  initialSyncStore.markSynced(userUid.value)
+  requiresInitialSync.value = false
+}
+
+const runInitWithMode = (block: boolean) => {
+  // 共同的初始化流程
+  const p = init({ isInitialSync: block }).then(() => {
+    markInitialSyncCompleted()
+  })
+
+  if (block) {
+    // 首次完整同步：阻塞并抛出错误
+    return p.catch((error) => {
+      console.error('[layout] 首次同步数据失败:', error)
+      throw error
+    })
+  } else {
+    // 增量同步：后台执行，错误只打日志
+    p.catch((error) => {
+      console.error('[layout] 增量数据同步失败:', error)
+    })
+    return p
+  }
+}
+
+// 确保初始化流程只触发一次
+const ensureInitStarted = (blockInit: boolean) => {
+  if (!initPromise) {
+    initPromise = runInitWithMode(blockInit)
+  }
+  return initPromise
+}
 
 // 修改异步组件的加载配置
 const AsyncLeft = defineAsyncComponent({
   loader: async () => {
-    loadingText.value = '正在加载左侧面板...'
+    const blockInit = shouldBlockInitialRender.value
+    const initTask = ensureInitStarted(blockInit)
+    await maybeDelayForInitialRender()
+    loadingText.value = t('home.loading.left_panel')
     const comp = await import('./left/index.vue')
     loadingPercentage.value = 33
+    if (blockInit) {
+      await initTask
+    }
+    markAsyncLoaded()
     return comp
-  },
-  delay: 600,
-  timeout: 3000
+  }
 })
 
 const AsyncCenter = defineAsyncComponent({
   loader: async () => {
+    const blockInit = shouldBlockInitialRender.value
+    const initTask = ensureInitStarted(blockInit)
     await import('./left/index.vue')
-    loadingText.value = '正在加载中间面板...'
+    loadingText.value = t('home.loading.data')
     const comp = await import('./center/index.vue')
-
-    // 加载所有会话
-    await chatStore.getSessionList(true)
-    // 设置全局会话为第一个
-    globalStore.currentSessionRoomId = chatStore.sessionList[0].roomId
-
-    // 加载所有群的成员数据
-    const groupSessions = chatStore.getGroupSessions()
-    await Promise.all([
-      ...groupSessions.map((session) => groupStore.getGroupUserList(session.roomId, true)),
-      groupStore.setGroupDetails(),
-      chatStore.setAllSessionMsgList(1)
-    ])
-
     loadingPercentage.value = 66
+    if (blockInit) {
+      await initTask
+    }
+    markAsyncLoaded()
     return comp
   }
 })
 
 const AsyncRight = defineAsyncComponent({
   loader: async () => {
+    const blockInit = shouldBlockInitialRender.value
+    const initTask = ensureInitStarted(blockInit)
+    await maybeDelayForInitialRender()
     await import('./center/index.vue')
-    loadingText.value = '正在加载右侧面板...'
+    loadingText.value = t('home.loading.right_panel')
     const comp = await import('./right/index.vue')
     loadingPercentage.value = 100
+    if (blockInit) {
+      await initTask
+    }
+    markAsyncLoaded()
 
     // 在组件加载完成后，使用nextTick等待DOM更新
     nextTick(() => {
@@ -107,30 +210,15 @@ const AsyncRight = defineAsyncComponent({
     })
 
     return comp
-  },
-  delay: 600,
-  timeout: 3000
+  }
 })
 
 const globalStore = useGlobalStore()
 const contactStore = useContactStore()
-const groupStore = useGroupStore()
-const userStore = useUserStore()
-const chatStore = useChatStore()
-const configStore = useConfigStore()
 const { checkUpdate, CHECK_UPDATE_TIME } = useCheckUpdate()
-const userUid = computed(() => userStore.userInfo!.uid)
 const shrinkStatus = ref(false)
-
-// 播放消息音效
-const playMessageSound = async () => {
-  try {
-    const audio = new Audio('/sound/message.mp3')
-    await audioManager.play(audio, 'message-notification')
-  } catch (error) {
-    console.warn('播放消息音效失败:', error)
-  }
-}
+const isDraggingFiles = ref(false)
+const tauriFileDropUnlisteners: UnlistenFn[] = []
 
 // 导入Web Worker
 const timerWorker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url))
@@ -179,99 +267,103 @@ useMitt.on(MittEnum.SHRINK_WINDOW, (event: boolean) => {
   shrinkStatus.value = event
 })
 
-useMitt.on(WsResponseMessageType.LOGIN_SUCCESS, async (data: LoginSuccessResType) => {
-  const { ...rest } = data
-  // 自己更新自己上线
-  await groupStore.updateUserStatus({
-    activeStatus: OnlineEnum.ONLINE,
-    avatar: rest.avatar,
-    account: rest.account,
-    lastOptTime: Date.now(),
-    name: rest.name,
-    uid: rest.uid
+// 播放消息音效
+const playMessageSound = async () => {
+  // 检查是否开启了消息提示音
+  if (!settingStore.notification?.messageSound) {
+    return
+  }
+
+  try {
+    const audio = new Audio('/sound/message.mp3')
+    const volume = settingStore.notification?.volume ?? 80
+    audio.volume = Math.min(1, Math.max(0, volume / 100))
+    await audioManager.play(audio, 'message-notification')
+  } catch (error) {
+    console.warn('播放消息音效失败:', error)
+  }
+}
+
+/**
+ * 从消息中提取文件信息并添加到 file store
+ */
+const addFileToStore = (data: MessageType) => {
+  const { message } = data
+  const { type, body, roomId, id } = message
+
+  // 只处理图片和视频类型
+  if (type !== MsgEnum.IMAGE && type !== MsgEnum.VIDEO) {
+    return
+  }
+
+  // 提取文件信息
+  const fileUrl = body.url
+  if (!fileUrl) {
+    return
+  }
+
+  // 从 URL 中提取文件名
+  let fileName = ''
+  try {
+    const urlObj = new URL(fileUrl)
+    const pathname = urlObj.pathname
+    fileName = pathname.substring(pathname.lastIndexOf('/') + 1)
+  } catch (e) {
+    // 如果不是有效的 URL，直接使用消息 ID 作为文件名
+    fileName = `${id}.${type === MsgEnum.IMAGE ? 'jpg' : 'mp4'}`
+  }
+
+  // 从文件名中提取后缀
+  const suffix = fileName.includes('.')
+    ? fileName.substring(fileName.lastIndexOf('.') + 1)
+    : type === MsgEnum.IMAGE
+      ? 'jpg'
+      : 'mp4'
+
+  // 确定 MIME 类型
+  let mimeType = ''
+  if (type === MsgEnum.IMAGE) {
+    mimeType = `image/${suffix === 'jpg' ? 'jpeg' : suffix}`
+  } else if (type === MsgEnum.VIDEO) {
+    mimeType = `video/${suffix}`
+  }
+
+  // 添加到 file store
+  fileStore.addFile({
+    id,
+    roomId,
+    fileName,
+    type: type === MsgEnum.IMAGE ? 'image' : 'video',
+    url: fileUrl,
+    suffix,
+    mimeType
   })
-})
+}
 
-useMitt.on(WsResponseMessageType.ROOM_DISSOLUTION, async (roomId: string) => {
-  console.log('收到群解散通知', roomId)
-  // 移除群聊的会话
-  chatStore.removeSession(roomId)
-  // 移除群聊的详情
-  groupStore.removeGroupDetail(roomId)
-  // 如果当前会话为解散的群聊，切换到第一个会话
-  if (globalStore.currentSession?.roomId === roomId) {
-    globalStore.currentSessionRoomId = chatStore.sessionList[0].roomId
-  }
-})
-
-useMitt.on(WsResponseMessageType.USER_STATE_CHANGE, async (data: { uid: string; userStateId: string }) => {
-  console.log('收到用户状态改变', data)
-  groupStore.updateUserItem(data.uid, {
-    userStateId: data.userStateId
-  })
-})
-useMitt.on(WsResponseMessageType.OFFLINE, async () => {
-  console.log('收到用户下线通知')
-})
-useMitt.on(WsResponseMessageType.ONLINE, async (onStatusChangeType: OnStatusChangeType) => {
-  console.log('收到用户上线通知')
-  if (onStatusChangeType && onStatusChangeType.onlineNum) {
-    groupStore.countInfo!.onlineNum = onStatusChangeType.onlineNum
-  }
-  if (onStatusChangeType && onStatusChangeType.member) {
-    await groupStore.updateUserStatus(onStatusChangeType.member)
-    await groupStore.refreshGroupMembers()
-  }
-})
-useMitt.on(WsResponseMessageType.TOKEN_EXPIRED, async (wsTokenExpire: WsTokenExpire) => {
-  if (Number(userUid.value) === Number(wsTokenExpire.uid) && userStore.userInfo!.client === wsTokenExpire.client) {
-    console.log('收到用户token过期通知', wsTokenExpire)
-    // 聚焦主窗口
-    const home = await WebviewWindow.getByLabel('home')
-    await home?.setFocus()
-    useMitt.emit(MittEnum.LEFT_MODAL_SHOW, {
-      type: ModalEnum.REMOTE_LOGIN,
-      props: {
-        ip: wsTokenExpire.ip
-      }
-    })
-  }
-})
-useMitt.on(WsResponseMessageType.INVALID_USER, (param: { uid: string }) => {
-  console.log('无效用户')
-  const data = param
-  // 消息列表删掉拉黑的发言
-  chatStore.filterUser(data.uid)
-  // 群成员列表删掉拉黑的用户
-  groupStore.removeUserItem(data.uid)
-})
-useMitt.on(WsResponseMessageType.MSG_MARK_ITEM, async (data: { markList: MarkItemType[] }) => {
-  console.log('收到消息标记更新:', data)
-
-  // 确保data.markList是一个数组再传递给updateMarkCount
-  if (data && data.markList && Array.isArray(data.markList)) {
-    await chatStore.updateMarkCount(data.markList)
-  } else if (data && !Array.isArray(data)) {
-    // 兼容处理：如果直接收到了单个MarkItemType对象
-    await chatStore.updateMarkCount([data as unknown as MarkItemType])
-  }
-})
-useMitt.on(WsResponseMessageType.MSG_RECALL, (data: RevokedMsgType) => {
-  chatStore.updateRecallMsg(data)
-})
-useMitt.on(WsResponseMessageType.MY_ROOM_INFO_CHANGE, (data: { myName: string; roomId: string; uid: string }) => {
-  // 更新用户在群聊中的昵称
-  groupStore.updateUserItem(data.uid, { myName: data.myName }, data.roomId)
-})
 useMitt.on(WsResponseMessageType.RECEIVE_MESSAGE, async (data: MessageType) => {
-  chatStore.pushMsg(data)
+  if (chatStore.checkMsgExist(data.message.roomId, data.message.id)) {
+    return
+  }
+
+  chatStore.pushMsg(data, {
+    // 只有当用户在消息页面且正在查看这个会话时才算 isActiveChatView
+    isActiveChatView: route.path === '/message' && globalStore.currentSessionRoomId === data.message.roomId,
+    activeRoomId: globalStore.currentSessionRoomId || ''
+  })
+
   data.message.sendTime = new Date(data.message.sendTime).getTime()
   await invokeSilently(TauriCommand.SAVE_MSG, {
     data
   })
 
+  // 如果是图片或视频消息，添加到 file store（仅移动端需要）
+  if (isMobile()) {
+    addFileToStore(data)
+  }
+
+  const currentUid = userUid.value
   // 不是自己发的消息才通知
-  if (data.fromUser.uid !== userUid.value) {
+  if (!currentUid || data.fromUser.uid !== currentUid) {
     // 获取该消息的会话信息
     const session = chatStore.sessionList.find((s) => s.roomId === data.message.roomId)
 
@@ -289,6 +381,11 @@ useMitt.on(WsResponseMessageType.RECEIVE_MESSAGE, async (data: MessageType) => {
 
           // 如果窗口不可见、被最小化或未聚焦，则播放音效
           shouldPlaySound = !isVisible || isMinimized || !isFocused
+
+          // 在Windows系统下，如果窗口最小化或未聚焦时请求用户注意
+          if (isWindows() && (isMinimized || !isFocused)) {
+            await home.requestUserAttention(UserAttentionType.Critical)
+          }
         } catch (error) {
           console.warn('检查窗口状态失败:', error)
           // 如果检查失败，默认播放音效
@@ -315,118 +412,70 @@ useMitt.on(WsResponseMessageType.RECEIVE_MESSAGE, async (data: MessageType) => {
     }
   }
 
-  await globalStore.updateGlobalUnreadCount()
-})
-useMitt.on(
-  WsResponseMessageType.REQUEST_NEW_FRIEND,
-  async (data: { uid: number; unReadCount4Friend: number; unReadCount4Group: number }) => {
-    console.log('收到好友申请')
-    // 更新未读数
-    globalStore.unReadMark.newFriendUnreadCount = data.unReadCount4Friend || 0
-    globalStore.unReadMark.newGroupUnreadCount = data.unReadCount4Group || 0
-
-    // 刷新好友申请列表
-    await contactStore.getApplyPage(true)
-  }
-)
-useMitt.on(
-  WsResponseMessageType.WS_MEMBER_CHANGE,
-  async (param: {
-    roomId: string
-    changeType: ChangeTypeEnum
-    userList: UserItem[]
-    totalNum: number
-    onlineNum: number
-  }) => {
-    info('监听到群成员变更消息')
-    const isRemoveAction = param.changeType === ChangeTypeEnum.REMOVE || param.changeType === ChangeTypeEnum.EXIT_GROUP
-    if (isRemoveAction) {
-      await handleMemberRemove(param.userList, param.roomId)
-    } else {
-      await handleMemberAdd(param.userList, param.roomId)
-    }
-
-    groupStore.addGroupDetail(param.roomId)
-    // 更新群内的总人数
-    groupStore.updateGroupNumber(param.roomId, param.totalNum, param.onlineNum)
-  }
-)
-
-// 处理群成员添加
-const handleMemberAdd = async (userList: UserItem[], roomId: string) => {
-  for (const user of userList) {
-    if (isSelfUser(user.uid)) {
-      await handleSelfAdd(roomId)
-    } else {
-      await handleOtherMemberAdd(user, roomId)
-    }
-  }
-}
-
-// 处理自己加入群聊
-const handleSelfAdd = async (roomId: string) => {
-  info('本人加入群聊，加载该群聊的会话数据')
-  await chatStore.addSession(roomId)
-}
-
-// 处理其他成员加入群聊
-const handleOtherMemberAdd = async (user: UserItem, roomId: string) => {
-  info('群成员加入群聊，添加群成员数据')
-  groupStore.addUserItem(user, roomId)
-}
-
-// 处理群成员移除
-const handleMemberRemove = async (userList: UserItem[], roomId: string) => {
-  for (const user of userList) {
-    if (isSelfUser(user.uid)) {
-      await handleSelfRemove(roomId)
-    } else {
-      await handleOtherMemberRemove(user.uid, roomId)
-    }
-  }
-}
-
-// 检查是否为当前用户
-const isSelfUser = (uid: string): boolean => {
-  return uid === userStore.userInfo!.uid
-}
-
-// 处理自己被移除
-const handleSelfRemove = async (roomId: string) => {
-  info('本人退出群聊，移除会话数据')
-
-  // 移除会话和群成员数据
-  chatStore.removeSession(roomId)
-  groupStore.removeAllUsers(roomId)
-
-  // 如果当前会话就是被移除的群聊，切换到其他会话
-  if (globalStore.currentSession?.roomId === roomId) {
-    globalStore.updateCurrentSessionRoomId(chatStore.sessionList[0].roomId)
-  }
-}
-
-// 处理其他成员被移除
-const handleOtherMemberRemove = async (uid: string, roomId: string) => {
-  info('群成员退出群聊，移除群内的成员数据')
-  groupStore.removeUserItem(uid, roomId)
-}
-
-useMitt.on(WsResponseMessageType.REQUEST_APPROVAL_FRIEND, async () => {
-  // 刷新好友列表以获取最新状态
-  await contactStore.getContactList(true)
-})
-useMitt.on(WsResponseMessageType.ROOM_INFO_CHANGE, async (data: { roomId: string; name: string; avatar: string }) => {
-  // 根据roomId修改对应房间中的群名称和群头像
-  const { roomId, name, avatar } = data
-
-  // 更新chatStore中的会话信息
-  chatStore.updateSession(roomId, {
-    name,
-    avatar
-  })
+  globalStore.updateGlobalUnreadCount()
 })
 
-const { resetLoginState, logout } = useLogin()
+const cleanupNativeFileDropListeners = () => {
+  while (tauriFileDropUnlisteners.length > 0) {
+    const unlisten = tauriFileDropUnlisteners.pop()
+    unlisten?.()
+  }
+}
+
+const buildPathUploadFiles = async (paths: string[]) => {
+  if (!paths?.length) return []
+  try {
+    const filesMeta = (await getFilesMeta<FilesMeta>(paths)) ?? []
+    return await FileUtil.map2PathUploadFile(paths, filesMeta)
+  } catch (error) {
+    console.error('[layout] 解析拖拽文件元数据失败:', error)
+    window.$message?.error?.('解析拖拽文件失败')
+    return []
+  }
+}
+
+const handleNativeFileDrop = async (paths: string[]) => {
+  if (!paths?.length) return
+  try {
+    const pathFiles = await buildPathUploadFiles(paths)
+    if (pathFiles.length > 0) {
+      useMitt.emit(MittEnum.GLOBAL_FILES_DROP, pathFiles)
+    } else {
+      window.$message?.error?.('无法识别拖拽的文件')
+    }
+  } catch (error) {
+    console.error('[layout] 处理原生拖拽文件失败:', error)
+  } finally {
+    isDraggingFiles.value = false
+  }
+}
+
+const setupNativeFileDropListeners = async () => {
+  try {
+    const unlisten = await appWindow.onDragDropEvent((event) => {
+      // 只有选中会话时才响应拖拽事件
+      if (!globalStore.currentSessionRoomId) return
+
+      if (event.payload.type === 'enter') {
+        const paths = event.payload.paths || []
+        if (paths.length > 0) {
+          isDraggingFiles.value = true
+        }
+      } else if (event.payload.type === 'over') {
+        isDraggingFiles.value = true
+      } else if (event.payload.type === 'drop') {
+        const paths = event.payload.paths || []
+        handleNativeFileDrop(paths)
+      } else if (event.payload.type === 'leave') {
+        isDraggingFiles.value = false
+      }
+    })
+    tauriFileDropUnlisteners.push(unlisten)
+  } catch (error) {
+    console.error('[layout] 注册原生文件拖拽监听失败:', error)
+  }
+}
+
 listen('relogin', async () => {
   info('收到重新登录事件')
   await resetLoginState()
@@ -434,17 +483,27 @@ listen('relogin', async () => {
 })
 
 onBeforeMount(async () => {
-  // 默认执行一次
-  await contactStore.getContactList(true)
   // 获取最新的未读数
   await contactStore.getApplyUnReadCount()
+  // 刷新好友申请列表
+  await contactStore.getApplyPage('friend', true)
+  // 刷新好友列表
+  await contactStore.getContactList(true)
+
+  // 页面刷新时，如果用户已登录且有当前会话，刷新群成员列表以获取最新的在线状态
+  if (userStore.userInfo?.uid && globalStore.currentSessionRoomId) {
+    const currentSession = globalStore.currentSession
+    if (currentSession?.type === RoomTypeEnum.GROUP) {
+      try {
+        await groupStore.getGroupUserList(globalStore.currentSessionRoomId, true)
+      } catch (error) {
+        console.error('[layout] 页面初始化：刷新群成员列表失败', error)
+      }
+    }
+  }
 })
 
 onMounted(async () => {
-  // 初始化配置
-  if (!localStorage.getItem('config')) {
-    await configStore.initConfig()
-  }
   timerWorker.postMessage({
     type: 'startTimer',
     msgId: 'checkUpdate',
@@ -456,17 +515,38 @@ onMounted(async () => {
   if (homeWindow) {
     // 设置业务消息监听器
     await rustWebSocketClient.setupBusinessMessageListeners()
-    // 恢复大小
-    if (globalStore.homeWindowState.width && globalStore.homeWindowState.height) {
-      await homeWindow.setSize(new LogicalSize(globalStore.homeWindowState.width, globalStore.homeWindowState.height))
+
+    // 监听窗口聚焦事件，聚焦时停止tray闪烁
+    if (isWindows()) {
+      homeWindow.listen('tauri://focus', async () => {
+        globalStore.setTipVisible(false)
+        try {
+          await emitTo('tray', 'home_focus', {})
+          await emitTo('notify', 'home_focus', {})
+        } catch (error) {
+          console.warn('[layout] 向其他窗口广播聚焦事件失败:', error)
+        }
+      })
+
+      homeWindow.listen('tauri://blur', async () => {
+        try {
+          await emitTo('tray', 'home_blur', {})
+          await emitTo('notify', 'home_blur', {})
+        } catch (error) {
+          console.warn('[layout] 向其他窗口广播失焦事件失败:', error)
+        }
+      })
     }
     // 居中
     await homeWindow.center()
     await homeWindow.show()
   }
+
+  await setupNativeFileDropListeners()
 })
 
 onUnmounted(() => {
+  cleanupNativeFileDropListeners()
   clearListener()
   // 清除Web Worker计时器
   timerWorker.postMessage({
@@ -476,3 +556,16 @@ onUnmounted(() => {
   timerWorker.terminate()
 })
 </script>
+
+<style scoped>
+.drag-upload-enter-active,
+.drag-upload-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.drag-upload-enter-from,
+.drag-upload-leave-to {
+  opacity: 0;
+  transform: none;
+}
+</style>

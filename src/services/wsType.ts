@@ -1,13 +1,9 @@
-import type { UserInfoType, UserItem } from '@/services/types.ts'
+import type { UserInfoType } from '@/services/types.ts'
 
 // 1.登录返回二维码 2.用户扫描成功等待授权 3.用户登录成功返回用户信息 4.收到消息 5.上下线推送 6.前端token失效
 export enum WsResponseMessageType {
   /** 无网络连接 */
   NO_INTERNET = 'noInternet',
-  /** 登录返回二维码 */
-  LOGIN_QR_CODE = 'loginQrCode',
-  /** 用户扫描成功等待授权 */
-  WAITING_AUTHORIZE = 'waitingAuthorize',
   /** 用户登录成功返回用户信息 */
   LOGIN_SUCCESS = 'loginSuccess',
   /** 收到消息 */
@@ -24,33 +20,34 @@ export enum WsResponseMessageType {
   MSG_RECALL = 'msgRecall',
   /** 新好友申请 */
   REQUEST_NEW_FRIEND = 'requestNewFriend',
+  /** 群成员变动 */
   WS_MEMBER_CHANGE = 'ws-member-change',
+  /** 设置群管理员 */
+  GROUP_SET_ADMIN_SUCCESS = 'groupSetAdmin',
   /** 下线通知 */
   OFFLINE = 'offline',
   /** 同意好友请求 */
   REQUEST_APPROVAL_FRIEND = 'requestApprovalFriend',
+  /** 通知事件 */
+  NOTIFY_EVENT = 'notifyEvent',
   /** 用户状态改变 */
   USER_STATE_CHANGE = 'userStateChange',
   /** 群主修改群聊信息 */
   ROOM_INFO_CHANGE = 'roomInfoChange',
   /** 自己修改我在群里的信息 */
   MY_ROOM_INFO_CHANGE = 'myRoomInfoChange',
-  /** 群通知消息 */
-  ROOM_GROUP_MSG = 'roomGroupMsg',
-  /** 群公告消息 */
-  ROOM_GROUP_NOTICE_MSG = 'roomGroupNoticeMsg',
-  /** 群公告已读 */
-  ROOM_GROUP_NOTICE_READ_MSG = 'roomGroupNoticeReadMsg',
   /** 群解散 */
   ROOM_DISSOLUTION = 'roomDissolution',
-  /** 编辑群公告 */
-  ROOM_EDIT_GROUP_NOTICE_MSG = 'roomEditGroupNoticeMsg',
   /** 加入视频会议 */
   JoinVideo = 'JoinVideo',
+  /** 群公告消息 */
+  ROOM_GROUP_NOTICE_MSG = 'roomGroupNoticeMsg',
+  /** 编辑群公告 */
+  ROOM_EDIT_GROUP_NOTICE_MSG = 'roomEditGroupNoticeMsg',
+  /** 群公告已读 */
+  ROOM_GROUP_NOTICE_READ_MSG = 'roomGroupNoticeReadMsg',
   /** 发起视频通话请求 */
   VideoCallRequest = 'VideoCallRequest',
-  /** 开始呼叫 */
-  StartSignaling = 'StartSignaling',
   /** 通话已接通 */
   CallAccepted = 'CallAccepted',
   /** 呼叫被拒绝 */
@@ -77,7 +74,18 @@ export enum WsResponseMessageType {
   WEBRTC_SIGNAL = 'WEBRTC_SIGNAL',
   /** 全局静音 */
   AllMuted = 'AllMuted',
-  CANCEL = 'CANCEL'
+  CANCEL = 'CANCEL',
+  /** 朋友圈消息推送 */
+  FEED_SEND_MSG = 'feedSendMsg',
+  /** 朋友圈通知（点赞/评论，通过 comment 字段判断） */
+  FEED_NOTIFY = 'feedNotify'
+}
+
+export enum NoticeTypeEnum {
+  /** 设置群管理员 */
+  GROUP_SET_ADMIN = 8,
+  /** 取消群管理员 */
+  GROUP_RECALL_ADMIN = 9
 }
 
 /**
@@ -127,8 +135,11 @@ export type LoginSuccessResType = Pick<UserInfoType, 'avatar' | 'name' | 'uid' |
 
 /** 用户在线状态改变 */
 export type OnStatusChangeType = {
-  member: Omit<UserItem, 'name' | 'avatar'>
+  uid: string
+  type: number
+  roomId: string
   onlineNum: number
+  lastOptTime: number
 }
 
 /** token过期 */

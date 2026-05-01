@@ -1,31 +1,25 @@
 <template>
-  <AutoFixHeightPage :show-footer="false">
+  <MobileScaffold :show-footer="false">
     <template #header>
-      <HeaderBar
-        :isOfficial="false"
-        class="bg-white"
-        style="border-bottom: 1px solid; border-color: #dfdfdf"
-        :hidden-right="true"
-        room-name="设置" />
+      <HeaderBar border :isOfficial="false" :hidden-right="true" :room-name="t('mobile_setting.title')" />
     </template>
 
-    <template #container="{ height }">
-      <img src="@/assets/mobile/chat-home/background.webp" class="w-100% relative top-0 z-1" alt="hula" />
-      <div :style="{ height: height + 'px' }" class="z-2 flex flex-col absolute overflow-auto min-h-70vh w-full">
+    <template #container>
+      <div class="flex flex-col overflow-auto h-full">
         <div class="flex flex-col p-20px gap-20px">
           <!-- 设置项 -->
           <div
             v-for="item in settings"
             :key="item.key"
-            class="flex justify-between items-center bg-white p-12px rounded-lg shadow-sm">
+            class="flex justify-between items-center bg-card text-card-foreground ring-1 p-12px rounded-lg shadow-sm">
             <div class="text-base">{{ item.label }}</div>
             <div>
               <!-- 根据 type 渲染对应组件 -->
               <n-switch v-if="item.type === 'switch'" v-model:value="item.value" />
-              <n-input v-else-if="item.type === 'input'" v-model="item.value" placeholder="请输入" class="w-40" />
+              <n-input v-else-if="item.type === 'input'" v-model:value="item.value" placeholder="请输入" class="w-40" />
               <n-select
                 v-else-if="item.type === 'select'"
-                v-model="item.value"
+                v-model:value="item.value"
                 :options="item.options"
                 placeholder="请选择"
                 class="w-40" />
@@ -34,89 +28,151 @@
 
           <!-- 退出登录按钮 -->
           <div class="mt-auto flex justify-center mb-20px">
-            <n-button type="error" @click="handleLogout">退出登录</n-button>
+            <n-button type="error" @click="handleLogout" :disabled="isLoggingOut" :loading="isLoggingOut">
+              {{ t('mobile_setting.button.logout') }}
+            </n-button>
           </div>
         </div>
       </div>
     </template>
-  </AutoFixHeightPage>
+  </MobileScaffold>
 </template>
 
 <script setup lang="ts">
-import { emit } from '@tauri-apps/api/event'
 import { info } from '@tauri-apps/plugin-log'
-import { NInput, NSelect, NSwitch } from 'naive-ui'
-import { EventEnum, TauriCommand } from '@/enums'
-import router from '@/router'
+import { ThemeEnum } from '@/enums'
 import { useGlobalStore } from '@/stores/global'
-import { invokeSilently } from '@/utils/TauriInvokeHandler'
+import { useSettingStore } from '@/stores/setting.ts'
+import { useUserStore } from '@/stores/user'
+import { useLogin } from '@/hooks/useLogin'
+import { showDialog } from 'vant'
+import * as ImRequestUtils from '@/utils/ImRequestUtils'
+import router from '@/router'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const globalStore = useGlobalStore()
+const { isTrayMenuShow } = storeToRefs(globalStore)
+const settingStore = useSettingStore()
+const userStore = useUserStore()
 
 // 定义设置项
 const settings = reactive([
   {
     key: 'notifications',
-    label: '消息通知',
+    label: computed(() => t('mobile_setting.silent_label')),
     type: 'switch',
-    value: true
+    value: computed({
+      get: () => true,
+      set: () => {
+        /* 更新通知设置 */
+      }
+    })
   },
   {
     key: 'username',
-    label: '昵称',
+    label: computed(() => t('mobile_setting.nickname')),
     type: 'input',
-    value: ''
+    value: computed({
+      get: () => userStore.userInfo?.name || '',
+      set: () => {}
+    })
   },
   {
     key: 'theme',
-    label: '界面主题',
+    label: computed(() => t('mobile_setting.theme')),
     type: 'select',
-    value: 'light',
+    value: computed({
+      get: () => settingStore.themes.content,
+      set: (val) => settingStore.toggleTheme(val)
+    }),
     options: [
-      { label: '浅色', value: 'light' },
-      { label: '深色', value: 'dark' }
+      { label: computed(() => t('mobile_setting.themes.light')), value: ThemeEnum.LIGHT },
+      { label: computed(() => t('mobile_setting.themes.dark')), value: ThemeEnum.DARK }
     ]
   },
   {
     key: 'language',
-    label: '应用语言',
+    label: computed(() => t('mobile_setting.language')),
     type: 'select',
-    value: 'zh',
+    value: computed({
+      get: () => settingStore.page.lang,
+      set: (v) => {
+        settingStore.page.lang = v
+      }
+    }),
     options: [
-      { label: '中文', value: 'zh' },
-      { label: 'English', value: 'en' },
-      { label: '日本語', value: 'ja' }
+      {
+        label: 'Automatic',
+        value: 'AUTO'
+      },
+      {
+        label: '简体中文',
+        value: 'zh-CN'
+      },
+      {
+        label: 'English',
+        value: 'en'
+      }
     ]
   }
 ])
-const globalStore = useGlobalStore()
-const { isTrayMenuShow } = storeToRefs(globalStore)
-const dialog = useDialog()
+
+const { logout, resetLoginState } = useLogin()
+
+// 登出处理状态标志
+const isLoggingOut = ref(false)
+
 // 退出登录逻辑
 async function handleLogout() {
-  dialog.error({
-    title: '提示',
-    content: '确定要退出登录吗？',
-    positiveText: '确定',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      info('登出账号')
-      isTrayMenuShow.value = false
-      try {
-        // ws 退出连接
-        await invokeSilently('ws_disconnect')
-        await invokeSilently(TauriCommand.REMOVE_TOKENS)
-        await invokeSilently(TauriCommand.UPDATE_USER_LAST_OPT_TIME)
-        // 发送登出事件
+  // 防止重复点击
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
 
-        await emit(EventEnum.LOGOUT)
-        router.push('/mobile/login')
-      } catch (error) {
-        console.error('创建登录窗口失败:', error)
-      }
-    },
-    onNegativeClick: () => {
-      console.log('用户点击了取消')
-    }
+  let logoutSuccess = false
+
+  showDialog({
+    title: '退出登录',
+    message: '确定要退出登录吗？',
+    showCancelButton: true,
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
   })
+    .then(async () => {
+      try {
+        await ImRequestUtils.logout({ autoLogin: true })
+        logoutSuccess = true
+      } catch (error) {
+        console.error('服务器登出失败：', error)
+      }
+
+      // 无论服务器登出是否成功，都执行本地状态清理
+      try {
+        // 2. 重置登录状态
+        await resetLoginState()
+        // 3. 最后调用登出方法(这会创建登录窗口或发送登出事件)
+        await logout()
+
+        settingStore.toggleLogin(false, false)
+        info('登出账号')
+        isTrayMenuShow.value = false
+
+        if (logoutSuccess) {
+          window.$message.success('登出成功')
+        }
+        await router.push('/mobile/login')
+      } catch (localError) {
+        console.error('本地登出清理失败：', localError)
+        window.$message.error('本地登出清理失败，请重启应用')
+      }
+    })
+    .catch(() => {
+      info('用户点击取消')
+    })
+    .finally(() => {
+      // 无论成功还是失败，都重置标志
+      isLoggingOut.value = false
+    })
 }
 
 // 你可以根据需要导出或操作 settings 数据

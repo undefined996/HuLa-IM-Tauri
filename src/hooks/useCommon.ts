@@ -1,5 +1,5 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { BaseDirectory, create, exists, mkdir } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, create, exists, mkdir, readFile } from '@tauri-apps/plugin-fs'
 import { info } from '@tauri-apps/plugin-log'
 import GraphemeSplitter from 'grapheme-splitter'
 import type { Ref } from 'vue'
@@ -12,8 +12,11 @@ import { useGlobalStore } from '@/stores/global.ts'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
 import { removeTag } from '@/utils/Formatting'
+import { SUPPORTED_IMAGE_EXTENSIONS, getFileExtension } from '@/utils/FileType'
 import { getSessionDetailWithFriends } from '@/utils/ImRequestUtils'
 import { getImageCache } from '@/utils/PathUtil.ts'
+import { isPathUploadFile, type UploadFile } from '@/utils/FileType'
+import { isMobile } from '@/utils/PlatformConstants'
 import { invokeWithErrorHandler } from '../utils/TauriInvokeHandler'
 
 export interface SelectionRange {
@@ -23,42 +26,6 @@ export interface SelectionRange {
 const domParser = new DOMParser()
 
 const REPLY_NODE_ID = 'replyDiv'
-
-const saveCacheFile = async (file: any, subFolder: string): Promise<string> => {
-  const { userUid } = useCommon()
-  // TODO: 这里需要获取到需要发送的图片、文件的本地地址，如果不是本地地址，就需要先下载到本地cache文件夹里面
-  const fileName = file.name === null ? 'test.png' : file.name
-  const tempPath = getImageCache(subFolder, userUid.value!)
-  const fullPath = tempPath + fileName
-
-  console.log(`💾 开始保存缓存文件: ${fullPath}, 原始大小: ${file.size} bytes`)
-
-  return new Promise((resolve, reject) => {
-    const cacheReader = new FileReader()
-    cacheReader.onload = async (e: any) => {
-      try {
-        const isExists = await exists(tempPath, { baseDir: BaseDirectory.AppCache })
-        if (!isExists) {
-          await mkdir(tempPath, { baseDir: BaseDirectory.AppCache, recursive: true })
-        }
-        const tempFile = await create(fullPath, { baseDir: BaseDirectory.AppCache })
-        await tempFile.write(e.target.result)
-        await tempFile.close()
-
-        console.log(`✅ 缓存文件保存成功: ${fullPath}, 写入大小: ${e.target.result.byteLength} bytes`)
-        resolve(fullPath)
-      } catch (error) {
-        reject(error)
-      }
-    }
-
-    cacheReader.onerror = (error) => {
-      reject(error)
-    }
-
-    cacheReader.readAsArrayBuffer(file)
-  })
-}
 
 /**
  * 返回dom指定id的文本
@@ -72,7 +39,6 @@ export const parseInnerText = (dom: string, id: string): string | undefined => {
 
 /** 常用工具类 */
 export const useCommon = () => {
-  const route = useRoute()
   const globalStore = useGlobalStore()
   const chatStore = useChatStore()
   const userStore = useUserStore()
@@ -87,6 +53,41 @@ export const useCommon = () => {
     key: 0,
     imgCount: 0
   })
+
+  const saveCacheFile = async (file: File, subFolder: string): Promise<string> => {
+    const fileName = file.name ?? 'test.png'
+    const tempPath = getImageCache(subFolder, userUid.value!)
+    const fullPath = `${tempPath}${fileName}`
+
+    console.log(`cache file start: ${fullPath}, size: ${file.size} bytes`)
+
+    return new Promise((resolve, reject) => {
+      const cacheReader = new FileReader()
+      cacheReader.onload = async (e: any) => {
+        try {
+          const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.AppCache
+          const isExists = await exists(tempPath, { baseDir })
+          if (!isExists) {
+            await mkdir(tempPath, { baseDir, recursive: true })
+          }
+          const tempFile = await create(fullPath, { baseDir })
+          await tempFile.write(e.target.result)
+          await tempFile.close()
+
+          console.log(`cache file saved: ${fullPath}, written: ${e.target.result.byteLength} bytes`)
+          resolve(fullPath)
+        } catch (error) {
+          reject(error)
+        }
+      }
+
+      cacheReader.onerror = (error) => {
+        reject(error)
+      }
+
+      cacheReader.readAsArrayBuffer(file)
+    })
+  }
 
   /**
    * 判断 URL 是否安全
@@ -219,6 +220,9 @@ export const useCommon = () => {
 
     // 将节点插入范围最前面添加节点
     if (type === MsgEnum.AIT) {
+      // 为@节点保存展示名字和uid，后续提取atUidList时直接依赖结构化数据，避免误判
+      const mentionText = typeof dom === 'object' && dom !== null ? dom.name || dom.text || dom.label || '' : dom || ''
+      const mentionUid = typeof dom === 'object' && dom !== null ? dom.uid : undefined
       // 创建一个span标签节点
       const spanNode = document.createElement('span')
       spanNode.id = 'aitSpan' // 设置id为aitSpan
@@ -227,7 +231,10 @@ export const useCommon = () => {
       spanNode.classList.add('select-none')
       spanNode.classList.add('cursor-default')
       spanNode.style.userSelect = 'text' // 允许全选选中
-      spanNode.appendChild(document.createTextNode(`@${dom}`))
+      if (mentionUid) {
+        spanNode.dataset.aitUid = String(mentionUid)
+      }
+      spanNode.appendChild(document.createTextNode(`@${mentionText}`))
       // 将span标签插入到光标位置
       range?.insertNode(spanNode)
       // 将光标折叠到Range的末尾(true表示折叠到Range的开始位置,false表示折叠到Range的末尾)
@@ -370,11 +377,12 @@ export const useCommon = () => {
       const author = dom.name
       // 创建一个img标签节点作为头像
       const imgNode = document.createElement('img')
-      if (isSafeUrl(dom.avatar)) {
-        imgNode.src = dom.avatar
+      const avatarUrl = AvatarUtils.getAvatarUrl(dom.avatar)
+      if (isSafeUrl(avatarUrl)) {
+        imgNode.src = avatarUrl
       } else {
         // 设置为默认头像或空
-        imgNode.src = 'avatar/001.png'
+        imgNode.src = '/avatar/001.png'
       }
       imgNode.style.cssText = `
       width: 20px;
@@ -506,6 +514,9 @@ export const useCommon = () => {
       cursor: default;
       outline: none; /* 移除focus时的轮廓 */
       `
+    if (isMobile()) {
+      replyNode.style.cssText += `max-width: 170px;`
+    }
     // 把dom中的value值作为回复信息的作者，dom中的content作为回复信息的内容
     const author = dom.accountName + '：'
     let content = dom.content
@@ -788,7 +799,7 @@ export const useCommon = () => {
    * @param dom 输入框dom
    * @param showFileModal 显示文件弹窗的回调函数
    */
-  const handlePaste = async (e: any, dom: HTMLElement, showFileModal?: (files: File[]) => void) => {
+  const handlePaste = async (e: any, dom: HTMLElement, showFileModal?: (files: UploadFile[]) => void) => {
     e.preventDefault()
     if (e.clipboardData.files.length > 0) {
       // 使用通用文件处理函数
@@ -815,7 +826,7 @@ export const useCommon = () => {
   const openMsgSession = async (uid: string, type: number = 2) => {
     // 获取home窗口实例
     const label = WebviewWindow.getCurrent().label
-    if (route.name !== '/message' && label === 'home') {
+    if (router.currentRoute.value.name !== '/message' && label === 'home') {
       router.push('/message')
     }
 
@@ -827,7 +838,6 @@ export const useCommon = () => {
     } catch (_error) {
       window.$message.error('显示会话失败')
     }
-    globalStore.updateCurrentSessionRoomId(res.roomId)
 
     // 先检查会话是否已存在
     const existingSession = chatStore.getSession(res.roomId)
@@ -837,6 +847,7 @@ export const useCommon = () => {
       // 如果会话不存在，需要重新获取会话列表，但保持当前选中的会话
       await chatStore.getSessionList(true)
     }
+    globalStore.updateCurrentSessionRoomId(res.roomId)
 
     // 发送消息定位
     useMitt.emit(MittEnum.LOCATE_SESSION, { roomId: res.roomId })
@@ -852,9 +863,9 @@ export const useCommon = () => {
    * @param resetCallback 重置回调函数（可选）
    */
   const processFiles = async (
-    files: File[],
+    files: UploadFile[],
     dom: HTMLElement,
-    showFileModal?: (files: File[]) => void,
+    showFileModal?: (files: UploadFile[]) => void,
     resetCallback?: () => void
   ) => {
     if (!files) return
@@ -866,31 +877,37 @@ export const useCommon = () => {
     }
 
     // 分类文件：图片 or 其他文件
-    const imageFiles: File[] = []
-    const otherFiles: File[] = []
+    const imageFiles: UploadFile[] = []
+    const otherFiles: UploadFile[] = []
 
     for (const file of files) {
       // 检查文件大小
       const fileSizeInMB = file.size / 1024 / 1024
-      if (fileSizeInMB > 100) {
-        window.$message.warning(`文件 ${file.name} 超过100MB`)
+      if (fileSizeInMB > 500) {
+        window.$message.warning(`文件 ${file.name} 超过500MB`)
         continue
       }
 
-      const fileType = file.type
+      const mimeType = file.type || ''
+      const extension = getFileExtension(file.name)
+      const isImage =
+        (mimeType.startsWith('image/') || SUPPORTED_IMAGE_EXTENSIONS.includes(extension as any)) &&
+        extension !== 'svg' &&
+        !mimeType.includes('svg')
 
-      // 加上includes用于保底判断文件类型不是mime时的处理逻辑
-      if (fileType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(fileType)) {
-        imageFiles.push(file)
-      } else {
-        // 视频和其他文件通过弹窗处理
-        otherFiles.push(file)
-      }
+      if (isImage) imageFiles.push(file)
+      else otherFiles.push(file)
     }
 
     // 处理图片文件（直接插入输入框）
     for (const file of imageFiles) {
-      await imgPaste(file, dom)
+      if (isPathUploadFile(file)) {
+        const fileData = await readFile(file.path)
+        const fileObj = new File([fileData], file.name, { type: file.type })
+        await imgPaste(fileObj, dom)
+      } else {
+        await imgPaste(file, dom)
+      }
     }
 
     // 处理其他文件（显示弹窗）

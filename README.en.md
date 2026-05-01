@@ -1,12 +1,15 @@
 
 <p align="center">
-  <img width="350px" height="150px" src="src/assets/logo/hula.png"/>
+  <img width="350px" height="150px" src="public/hula.png"/>
 </p>
 
 <p align="center">An instant messaging system built with Tauri, Vite 7, Vue 3, and TypeScript</p>
 
 <!-- 🌟 Featured -->
 <div align="center">
+  <a href="https://trendshift.io/repositories/15187" target="_blank">
+    <img src="https://trendshift.io/api/badge/repositories/15187" alt="HuLaSpark%2FHuLa | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
+  </a>
   <a href="https://hellogithub.com/repository/743b101346c54f6cb5c20eed2edbaa40" target="_blank">
     <img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=743b101346c54f6cb5c20eed2edbaa40&claim_uid=WsQaY6SlnL7qxG3&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" />
   </a>
@@ -14,9 +17,7 @@
 
 <br>
 
-<!-- Project Statistics & Certification -->
 <div align="center">
-  <h3>📊 Project Statistics</h3>
   <p>
     <a href="https://gitee.com/HulaSpark/HuLa/stargazers">
       <img src="https://gitee.com/HulaSpark/HuLa/badge/star.svg?theme=gvp" alt="Gitee Stars">
@@ -27,10 +28,15 @@
     <a href="https://gitcode.com/HuLaSpark/HuLa">
       <img src="https://gitcode.com/HuLaSpark/HuLa/star/badge.svg" alt="GitCode Stars">
     </a>
+    <a href="https://gitcode.com/HuLaSpark/HuLa">
+      <img src="https://atomgit.com/HuLaSpark/HuLa/star/2025top.svg" alt="2025 Top 100 Open Source Projects">
+    </a>
   </p>
+</div>
 
-  <!-- 🔖 Project Certification -->
-  <h3>🔖 Project Certification</h3>
+<br>
+
+<div align="center">
   <p>
     <a href="https://deepwiki.com/HuLaSpark/HuLa">
       <img src="https://deepwiki.com/badge.svg" alt="DeepWiki">
@@ -41,15 +47,18 @@
     <a href="https://www.bestpractices.dev/en/projects/9692">
       <img src="https://bestpractices.coreinfrastructure.org/projects/9692/badge" alt="CII Best Practices">
     </a>
+    <a href="https://hulaspark.com">
+      <img src="public/hulaspark-badge.svg" alt="HuLaSpark">
+    </a>
+    <a href="https://discord.gg/WhSkvhNEeE">
+      <img src="https://img.shields.io/badge/-Discord-5865F2?logo=discord&logoColor=white&labelColor=555555" alt="Discord">
+    </a>
   </p>
 </div>
 
 <br>
 
-<!-- 🛠️ Tech Stack -->
 <div align="center">
-  <h3>🛠️ Tech Stack</h3>
-
   <p>
     <img src="https://img.shields.io/badge/Vue3-35495E?logo=vue.js&logoColor=4FC08D">
     <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=fff">
@@ -94,10 +103,11 @@
 | Platform | Supported Versions |
 |----------|-------------------|
 | Windows | Windows 10, Windows 11 |
-| macOS | macOS 10.5+ |
+| macOS | macOS 10.5+ Mac26 has supported |
 | Linux | Ubuntu 22.0+ |
-| iOS/iPadOS | iOS 9.0+, iPadOS 9.0+ |
-| Android | Android 8.0+ |
+| iOS | iOS 9.0+ (iOS26 Real machine is supported. Tauri does not support Intel chips running on ios26 emulators) |
+| Android | Android 12+ (SDK30+) |
+| Web | ⚠️Not currently supported (custom removal required) |
 
 ## 📝 Project Introduction
 
@@ -117,66 +127,58 @@ HuLa is an instant messaging system built with Tauri, Vite 7, Vue 3, and TypeScr
 </div>
 
 <!-- Main Interface -->
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="preview/img.png" alt="Main Interface" width="400" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 8px;">
-      <br><em>💬 Main Chat Interface</em>
-    </td>
-    <td align="center">
-      <img src="preview/img_1.png" alt="Chat Interface" width="400" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 8px;">
-      <br><em>🗨️ Chat Conversation Interface</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="preview/img_2.png" alt="Contact Interface" width="400" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 8px;">
-      <br><em>😊 Emoji Selection</em>
-    </td>
-    <td align="center">
-      <img src="preview/img_3.png" alt="Settings Interface" width="400" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 8px;">
-      <br><em>⚙️ System Settings</em>
-    </td>
-  </tr>
-</table>
-
-<br>
-
-<!-- Feature Showcase -->
 <div align="center">
-  <h4>🌟 Feature Highlights</h4>
+  <h4>PC interface display, there are other functions not in the introduction screenshot, please download your own experience</h4>
 </div>
 
-<table align="center">
-  <tr>
-    <td align="center">
-      <img src="preview/img_4.png" alt="Message Features" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
-      <br><em>📱 Diverse Messaging</em>
-    </td>
-    <td align="center">
-      <img src="preview/img_5.png" alt="Theme Switching" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
-      <br><em>🎨 Status Toggle</em>
-    </td>
-    <td align="center">
-      <img src="preview/img_6.png" alt="Emojis" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
-      <br><em>📷 Image Viewer</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="preview/img_7.png" alt="Group Management" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
-      <br><em>👥 Group Management</em>
-    </td>
-    <td align="center">
-      <img src="preview/img_8.png" alt="Personal Settings" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
-      <br><em>🤖 ChatBot Plugin Features</em>
-    </td>
-    <td align="center">
-      <img src="preview/img_9.png" alt="File Transfer" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
-      <br><em>🤖 ChatBot Settings Page</em>
-    </td>
-  </tr>
-</table>
+<div align="center">
+  <img src="preview/img2-1.webp" alt="img2-1" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-2.webp" alt="img2-2" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-3.webp" alt="img2-3" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-4.webp" alt="img2-4" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-5.webp" alt="img2-5" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-6.webp" alt="img2-6" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-7.webp" alt="img2-7" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-8.webp" alt="img2-8" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-9.webp" alt="img2-9" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-10.webp" alt="img2-10" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-11.webp" alt="img2-11" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-12.webp" alt="img2-12" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-13.webp" alt="img2-13" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-14.webp" alt="img2-14" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img2-15.webp" alt="img2-15" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+</div>
+
+<br/>
+
+<div align="center">
+  <img src="preview/img.png" alt="img-main" width="280" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img_1.png" alt="img-conversation" width="280" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img_2.png" alt="img-contacts" width="280" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img_3.png" alt="img-settings" width="280" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img_4.png" alt="Message Features" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
+  <img src="preview/img_5.png" alt="Theme Switching" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
+  <img src="preview/img_6.png" alt="Emojis" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
+  <img src="preview/img_7.png" alt="Group Management" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
+  <img src="preview/img_8.png" alt="Personal Settings" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
+  <img src="preview/img_9.png" alt="File Transfer" width="280" style="border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 6px;">
+</div>
+
+<div align="center">
+  <h4>Mobile interface display</h4>
+</div>
+
+<div align="center">
+  <img src="preview/img3-1.webp" alt="img3-1" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img3-2.webp" alt="img3-2" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img3-3.webp" alt="img3-3" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img3-4.webp" alt="img3-4" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img3-5.webp" alt="img3-5" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img3-6.webp" alt="img3-6" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+  <img src="preview/img3-7.webp" alt="img3-6" width="220" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 8px;">
+</div>
+
+<br>
 
 ## ✨ Features
 
@@ -203,6 +205,7 @@ HuLa is an instant messaging system built with Tauri, Vite 7, Vue 3, and TypeScr
 | 🖱️ | Message Right-click Menu | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 🔗 | Link Preview Cards | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 👍 | Message Like Interaction | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 📔 | Chat History Management | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 
 ### 🤝 Social Management
 | Feature | Description | Status |
@@ -213,10 +216,11 @@ HuLa is an instant messaging system built with Tauri, Vite 7, Vue 3, and TypeScr
 | 🟢 | Friend Online Status | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 🎖️ | Friend Badge System | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 🚫 | Block & Do Not Disturb | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
-| 📤 | Message Forwarding | ![In Progress](https://img.shields.io/badge/🐣-In_Progress-ee9f20?style=flat&labelColor=fef7e6&color=ee9f20) |
+| 📤 | Message Forwarding | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 📋 | Group Announcements | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 🏷️ | Nickname & Remark Management | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
-
+| 📍 | Get and Send Location | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 🔥 | Scan code to log in and join the group | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 ### 🎨 User Experience
 | Feature | Description | Status |
 |---------|-------------|--------|
@@ -231,26 +235,57 @@ HuLa is an instant messaging system built with Tauri, Vite 7, Vue 3, and TypeScr
 | 🔔 | System Tray Notifications | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 📷 | Image Viewer | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | ✂️ | Screenshot Feature | ![In Progress](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 🎙️ | Voice Calling | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 🎥 | Video Calling | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| ⌨️ | Global Shortcut Control | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 📺 | Dedicated Media Viewer | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 📁 | File Upload (Qiniu Cloud) | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 | 🔄 | Auto-update System | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 🌍 | i18n support | ![In Progress](https://img.shields.io/badge/98%25-In%20Progress-f0ad4e?style=flat&labelColor=faf3e6&color=f0ad4e) |
 
 ### 🌐 Cross-platform Support
 | Feature | Description | Status |
 |---------|-------------|--------|
 | 💻 | Windows/macOS/Linux | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
-| 📱 | iOS/Android Adaptation | ![In Progress](https://img.shields.io/badge/🐣-In_Progress-ee9f20?style=flat&labelColor=fef7e6&color=ee9f20) |
-
+| 📱 | iOS/Android Adaptation | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
 ### 🤖 AI Integration
 | Feature | Description | Status |
 |---------|-------------|--------|
-| 🧠 | AI Chat Assistant | ![In Progress](https://img.shields.io/badge/🐣-In_Progress-ee9f20?style=flat&labelColor=fef7e6&color=ee9f20) |
-| 🔌 | Multi-platform AI Support | ![In Progress](https://img.shields.io/badge/🐣-In_Progress-ee9f20?style=flat&labelColor=fef7e6&color=ee9f20) |
+| 🧠 | AI Chat Assistant | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+| 🔌 | Multi-platform AI Support | ![Completed](https://img.shields.io/badge/✅-Completed-008080?style=flat&labelColor=e6f7f7&color=008080) |
+
+## App Upgrade Sponsor
+
+<a href="https://www.toolsetlink.com">
+  <img height="54" alt="UpgradeLink" src="https://github.com/user-attachments/assets/6b84fb0f-3f1d-44b5-9932-2298bc999d8d" />
+</a>
 
 ## 👏 Thanks to all Contributors!
 
-<a href="https://github.com/HuLaSpark/HuLa/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HuLaSpark/HuLa" />
+<a href="https://openomy.com/HuLaSpark/HuLa" target="_blank" style="display: block; width: 100%;" align="center">
+  <img src="https://openomy.com/svg?repo=HuLaSpark/HuLa&chart=bubble&latestMonth=12" target="_blank" alt="Contribution Leaderboard" style="display: block; width: 100%;" />
 </a>
+
+<br/>
+
+<a href="https://openomy.com/HuLaSpark/HuLa" target="_blank" style="display: block; width: 100%;" align="center">
+  <img src="https://openomy.com/svg?repo=HuLaSpark/HuLa&chart=list&latestMonth=12" target="_blank" alt="Contribution Leaderboard" style="display: block; width: 100%;" />
+</a>
+
+<br/>
+
+<a href="https://openomy.com/HuLaSpark/HuLa" target="_blank" style="display: block; width: 100%;" align="center">
+  <img src="https://openomy.com/svg?repo=HuLaSpark/HuLa&chart=podium&latestMonth=12" target="_blank" alt="Contribution Leaderboard" style="display: block; width: 100%;" />
+</a>
+
+<!-- <a href="https://github.com/HuLaSpark/HuLa/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=HuLaSpark/HuLa" />
+</a> -->
+
+<br/>
+
+> [!NOTE]
+> Special thanks to [@dennis9486](https://github.com/dennis9486) for delivering the initial screenshot feature implementation located at `src/components/common/Screenshot.vue`, which laid the groundwork for the desktop capture experience.
 
 ## 📥 Installation & Running
 
@@ -328,11 +363,13 @@ Execute **pnpm run commit** to invoke _git commit_ interaction, complete informa
   <h3>🤝 HuLa Community Discussion Group</h3>
   <p><em>Join developers and users for discussions, get the latest news and technical support</em></p>
 
-  <div>
-    <img src="preview/wx.png" width="220" height="260" alt="WeChat Group QR Code">
-  </div>
+  <p><em>Use the HuLa mobile app to scan the Issues group QR code below and share feedback anytime.</em></p>
 
-  <p><strong>📱 Scan to Join WeChat Discussion Group</strong></p>
+  <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+    <img src="preview/wx.png" width="260" height="340" alt="WeChat Group QR Code">
+    <img src="preview/qq.jpg" width="260" height="340" alt="QQ Group QR Code">
+    <img src="preview/HuLa-QR.png" width="315" height="315" alt="HuLa Issues Group QR Code">
+  </div>
 </div>
 
 ## 🙏 Thanks to Sponsors
@@ -342,16 +379,27 @@ Execute **pnpm run commit** to invoke _git commit_ interaction, complete informa
   <p><em>Thanks to the following friends for their generous support of the HuLa project!</em></p>
 </div>
 
+### 💎 Diamond Sponsors (￥1000+)
+| 💝 Date | 👤 Sponsor | 💰 Amount | 🏷️ Platform |
+|---------|----------|--------|---------|
+| 2025-09-12 | **翟可** | `¥1688` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
+
 ### 🏆 Gold Sponsors ($15+)
 | 💝 Date | 👤 Sponsor | 💰 Amount | 🏷️ Platform |
 |---------|----------|--------|---------|
+| 2025-12-13 | **M（PiDAOLab）** | `¥500` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
+| 2025-11-12 | **星** | `¥500` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-09-03 | **烛火** | `¥500` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-09-05 | **Orion** | `¥200` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
+| 2025-10-24 | **唐勇（伏威）** | `¥400` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-08-26 | **唐勇** | `¥200` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-04-25 | **上官俊斌** | `¥200` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-05-27 | **临安居士** | `¥188` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-04-20 | **姜兴(Simon)** | `¥188` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-02-17 | **禾硕** | `¥168` | ![Alipay](https://img.shields.io/badge/Alipay-1677FF?style=flat&logo=alipay&logoColor=white) |
+| 2025-10-16 | **xx豪** | `¥101` | ![Alipay](https://img.shields.io/badge/Alipay-1677FF?style=flat&logo=alipay&logoColor=white) |
+| 2025-12-25 | **三愿** | `¥100` | ![WeChat](https://img.shields.io/badge/微信赞赏-07C160?style=flat&logo=wechat&logoColor=white) |
+| 2025-10-15 | **兵** | `¥100` | ![WeChat](https://img.shields.io/badge/微信赞赏-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-08-13 | **zhongjing** | `¥100` | ![WeChat](https://img.shields.io/badge/微信赞赏-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-07-15 | **粉兔** | `¥100` | ![WeChat](https://img.shields.io/badge/微信赞赏-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-02-8 | **Boom....** | `¥100` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
@@ -359,17 +407,22 @@ Execute **pnpm run commit** to invoke _git commit_ interaction, complete informa
 ### 🥈 Silver Sponsors ($8-14)
 | 💝 Date | 👤 Sponsor | 💰 Amount | 🏷️ Platform |
 |---------|----------|--------|---------|
+| 2025-11-29 | **Sven** | `¥66` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-06-26 | **m udDy🐖** | `¥88` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-05-09 | **犹豫，就会败北。** | `¥88` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-04-01 | **墨** | `¥88.88` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-02-8 | **邓伟** | `¥88` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
-| 2025-02-7 | **dennis** | `¥80` | ![Gitee](https://img.shields.io/badge/Gitee-C71D23?style=flat&logo=gitee&logoColor=white) |
+| 2025-02-7 | **dennis** | `¥40` | ![Gitee](https://img.shields.io/badge/Gitee-C71D23?style=flat&logo=gitee&logoColor=white) |
+| 2025-11-5 | **匿名用户** | `¥66` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-02-6 | **小二** | `¥62` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-05-15 | **孤鸿影** | `¥56` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
+| 2026-01-14 | **赵赫** | `¥50` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
+| 2026-01-05 | **Dumbness** | `¥50` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 
 ### 🥉 Bronze Sponsors ($3-7)
 | 💝 Date | 👤 Sponsor | 💰 Amount | 🏷️ Platform |
 |---------|----------|--------|---------|
+| 2025-08-12 | **云鹏** | `¥20` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-08-12 | ***持** | `¥20` | ![Alipay](https://img.shields.io/badge/支付宝赞赏-1677FF?style=flat&logo=alipay&logoColor=white) |
 | 2025-06-03 | **洪流** | `¥20` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |
 | 2025-05-27 | **刘启成** | `¥20` | ![WeChat](https://img.shields.io/badge/WeChat-07C160?style=flat&logo=wechat&logoColor=white) |

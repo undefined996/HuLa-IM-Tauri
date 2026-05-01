@@ -1,11 +1,12 @@
-import { join, resourceDir } from '@tauri-apps/api/path'
+import { appDataDir, join, resourceDir } from '@tauri-apps/api/path'
 import { BaseDirectory, exists, writeFile } from '@tauri-apps/plugin-fs'
+import { sumBy } from 'es-toolkit'
 import { defineStore } from 'pinia'
 import { StoresEnum } from '@/enums'
 import type { FilesMeta } from '@/services/types'
-import { useGlobalStore } from '@/stores/global'
 import { useUserStore } from '@/stores/user'
-import { getFilesMeta, getUserAbsoluteVideosDir, getUserVideosDir } from '@/utils/PathUtil'
+import { getFilesMeta } from '@/utils/PathUtil'
+import { isMobile } from '../utils/PlatformConstants'
 
 export interface FileDownloadStatus {
   /** 文件是否已下载 */
@@ -30,10 +31,9 @@ export const useFileDownloadStore = defineStore(
   StoresEnum.FILE_DOWNLOAD,
   () => {
     const userStore = useUserStore()
-    const globalStore = useGlobalStore()
 
     // 存储文件下载状态的Map，key为文件URL，value为下载状态
-    const downloadStatusMap = ref<Map<string, FileDownloadStatus>>(new Map())
+    const downloadStatusMap = ref<Record<string, FileDownloadStatus>>({})
 
     /**
      * 获取文件下载状态
@@ -41,7 +41,7 @@ export const useFileDownloadStore = defineStore(
      */
     const getFileStatus = (fileUrl: string): FileDownloadStatus => {
       return (
-        downloadStatusMap.value.get(fileUrl) || {
+        downloadStatusMap.value[fileUrl] || {
           isDownloaded: false,
           status: 'pending'
         }
@@ -56,7 +56,7 @@ export const useFileDownloadStore = defineStore(
     const updateFileStatus = (fileUrl: string, status: Partial<FileDownloadStatus>) => {
       const currentStatus = getFileStatus(fileUrl)
       const newStatus = { ...currentStatus, ...status }
-      downloadStatusMap.value.set(fileUrl, newStatus)
+      downloadStatusMap.value[fileUrl] = newStatus
     }
 
     /**
@@ -70,7 +70,7 @@ export const useFileDownloadStore = defineStore(
       exists?: boolean
     }) => {
       console.log('触发状态刷新：', options)
-      const fileStatus = downloadStatusMap.value.get(options.fileUrl)
+      const fileStatus = downloadStatusMap.value[options.fileUrl]
 
       const resetStatus = () => {
         if (fileStatus) {
@@ -94,7 +94,7 @@ export const useFileDownloadStore = defineStore(
         }
       }
 
-      const resourceDirPath = await getUserAbsoluteVideosDir(options.userId, options.roomId)
+      const resourceDirPath = await userStore.getUserRoomAbsoluteDir()
       const absolutePath = await join(resourceDirPath, options.fileName)
 
       // 如果直接知道文件不存在，那就直接刷新，如果不知道则再做处理
@@ -155,20 +155,16 @@ export const useFileDownloadStore = defineStore(
      */
     const checkFileExists = async (fileUrl: string, fileName: string): Promise<boolean> => {
       try {
-        const userUid = userStore.userInfo!.uid
-        const roomId = globalStore.currentSession!.roomId
-
-        if (!userUid || !roomId) return false
-
-        const downloadsDir = await getUserVideosDir(userUid.toString(), roomId.toString())
+        const downloadsDir = await userStore.getUserRoomDir()
         const filePath = await join(downloadsDir, fileName)
 
-        const fileExists = await exists(filePath, { baseDir: BaseDirectory.Resource })
+        const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.Resource
+        const fileExists = await exists(filePath, { baseDir })
 
         if (fileExists) {
           // 文件存在，构建绝对路径并更新状态
-          const resourceDirPath = await resourceDir()
-          const absolutePath = await join(resourceDirPath, filePath)
+          const baseDirPath = isMobile() ? await appDataDir() : await resourceDir()
+          const absolutePath = await join(baseDirPath, filePath)
 
           // 保持原生路径格式用于文件操作，规范化路径用于显示
           const normalizedPath = absolutePath.replace(/\\/g, '/')
@@ -190,6 +186,19 @@ export const useFileDownloadStore = defineStore(
       }
     }
 
+    const finalizeSuccessfulWrite = (fileUrl: string, _fileName: string, absolutePath: string, localPath: string) => {
+      const normalizedPath = absolutePath.replace(/\\/g, '/')
+      updateFileStatus(fileUrl, {
+        isDownloaded: true,
+        localPath,
+        absolutePath,
+        nativePath: absolutePath,
+        displayPath: normalizedPath,
+        status: 'completed',
+        progress: 100
+      })
+    }
+
     /**
      * 下载文件
      * @param fileUrl 文件URL
@@ -197,13 +206,6 @@ export const useFileDownloadStore = defineStore(
      */
     const downloadFile = async (fileUrl: string, fileName: string): Promise<string | null> => {
       try {
-        const userUid = userStore.userInfo!.uid
-        const roomId = globalStore.currentSession!.roomId
-
-        if (!userUid || !roomId) {
-          throw new Error('用户或房间信息不完整')
-        }
-
         // 检查文件是否已存在
         const isExists = await checkFileExists(fileUrl, fileName)
         if (isExists) {
@@ -218,7 +220,7 @@ export const useFileDownloadStore = defineStore(
         })
 
         // 获取下载目录
-        const downloadsDir = await getUserVideosDir(userUid.toString(), roomId.toString())
+        const downloadsDir = await userStore.getUserRoomDir()
         const filePath = await join(downloadsDir, fileName)
 
         // 下载文件
@@ -256,7 +258,7 @@ export const useFileDownloadStore = defineStore(
         }
 
         // 合并所有数据块
-        const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+        const totalLength = sumBy(chunks, (chunk) => chunk.length)
         const fileData = new Uint8Array(totalLength)
         let offset = 0
 
@@ -266,27 +268,14 @@ export const useFileDownloadStore = defineStore(
         }
 
         // 写入文件
-        await writeFile(filePath, fileData, { baseDir: BaseDirectory.Resource })
+        const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.Resource
+        await writeFile(filePath, fileData, { baseDir })
 
         // 构建绝对路径
-        const resourceDirPath = await resourceDir()
-        const absolutePath = await join(resourceDirPath, filePath)
+        const baseDirPath = isMobile() ? await appDataDir() : await resourceDir()
+        const absolutePath = await join(baseDirPath, filePath)
 
-        // 保持原生路径格式用于文件操作，规范化路径用于显示
-        const normalizedPath = absolutePath.replace(/\\/g, '/')
-
-        // 更新状态为完成
-        updateFileStatus(fileUrl, {
-          isDownloaded: true,
-          localPath: filePath,
-          absolutePath: absolutePath, // 使用原生路径格式
-          nativePath: absolutePath, // 保存原生路径
-          displayPath: normalizedPath, // 保存显示路径
-          status: 'completed',
-          progress: 100
-        })
-
-        console.log(`文件下载成功: ${normalizedPath}`)
+        finalizeSuccessfulWrite(fileUrl, fileName, absolutePath, filePath)
         return absolutePath // 返回原生路径格式
       } catch (error) {
         console.error('文件下载失败:', error)
@@ -298,6 +287,35 @@ export const useFileDownloadStore = defineStore(
         })
 
         window.$message?.error(`文件下载失败: ${error instanceof Error ? error.message : '未知错误'}`)
+        return null
+      }
+    }
+
+    /**
+     * 将 worker 下载的字节数据写入到本地文件
+     * @param fileUrl 文件URL（作为状态映射 key）
+     * @param fileName 文件名
+     * @param data 文件数据
+     */
+    const saveFileFromBytes = async (fileUrl: string, fileName: string, data: Uint8Array): Promise<string | null> => {
+      try {
+        const downloadsDir = await userStore.getUserRoomDir()
+        const filePath = await join(downloadsDir, fileName)
+        const baseDir = isMobile() ? BaseDirectory.AppData : BaseDirectory.Resource
+
+        await writeFile(filePath, data, { baseDir })
+
+        const baseDirPath = isMobile() ? await appDataDir() : await resourceDir()
+        const absolutePath = await join(baseDirPath, filePath)
+
+        finalizeSuccessfulWrite(fileUrl, fileName, absolutePath, filePath)
+        return absolutePath
+      } catch (error) {
+        console.error('保存文件失败:', error)
+        updateFileStatus(fileUrl, {
+          status: 'failed',
+          error: error instanceof Error ? error.message : '保存失败'
+        })
         return null
       }
     }
@@ -318,7 +336,7 @@ export const useFileDownloadStore = defineStore(
      * 清理下载状态
      */
     const clearDownloadStatus = () => {
-      downloadStatusMap.value.clear()
+      downloadStatusMap.value = {}
     }
 
     /**
@@ -326,7 +344,7 @@ export const useFileDownloadStore = defineStore(
      * @param fileUrl 文件URL
      */
     const removeFileStatus = (fileUrl: string) => {
-      downloadStatusMap.value.delete(fileUrl)
+      delete downloadStatusMap.value[fileUrl]
     }
 
     /**
@@ -340,11 +358,11 @@ export const useFileDownloadStore = defineStore(
     }
 
     return {
-      downloadStatusMap: readonly(downloadStatusMap),
       getFileStatus,
       updateFileStatus,
       checkFileExists,
       downloadFile,
+      saveFileFromBytes,
       getLocalPath,
       clearDownloadStatus,
       removeFileStatus,

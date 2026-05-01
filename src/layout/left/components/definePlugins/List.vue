@@ -7,7 +7,7 @@
       max-height="280px"
       style-id="plugins-hover-classes">
       <template #item="{ item: plugin, index }">
-        <n-flex align="center" justify="space-between" class="p-[10px_20px] mt-10px">
+        <n-flex align="center" justify="space-between" class="p-[10px_20px]">
           <n-flex :size="14" align="center">
             <n-flex align="center" justify="center" class="size-48px rounded-50% bg-#7676760f">
               <Transition mode="out-in">
@@ -39,13 +39,13 @@
                 <n-flex
                   v-if="plugin.state === PluginEnum.UNINSTALLING"
                   class="relative rounded-22px bg-#f6dfe3 size-fit p-[4px_8px]">
-                  <p class="text-(12px #c14053 center)">卸载中</p>
+                  <p class="text-(12px #c14053 center)">{{ t('home.plugins.status.uninstalling') }}</p>
                 </n-flex>
 
                 <n-flex
                   v-else-if="plugin.state === PluginEnum.BUILTIN"
                   class="relative rounded-22px bg-#e3e3e3 size-fit p-[4px_8px]">
-                  <p class="text-(12px #777 center)">已内置</p>
+                  <p class="text-(12px #777 center)">{{ t('home.plugins.status.builtin') }}</p>
                 </n-flex>
 
                 <n-flex v-else class="relative rounded-22px bg-#e0e9fc size-fit p-[4px_8px]">
@@ -82,7 +82,9 @@
                 <p class="absolute-center text-(12px #4C77BD)">{{ plugin.progress }}%</p>
               </div>
 
-              <p v-else class="text-(12px [--chat-text-color] center) w-full">安装</p>
+              <p v-else class="text-(12px [--chat-text-color] center) w-full">
+                {{ t('home.plugins.actions.install') }}
+              </p>
             </n-flex>
           </n-flex>
 
@@ -107,15 +109,15 @@
               <div class="menu-list">
                 <div v-if="!plugin.isAdd" @click="handleAdd(plugin)" class="menu-item">
                   <svg class="color-#4C77BD"><use href="#add"></use></svg>
-                  <p class="text-#4C77BD">固定侧边栏</p>
+                  <p class="text-#4C77BD">{{ t('home.plugins.actions.pin') }}</p>
                 </div>
                 <div v-else @click="handleDelete(plugin)" class="menu-item">
                   <svg class="color-#c14053"><use href="#reduce"></use></svg>
-                  <p class="text-#c14053">取消固定</p>
+                  <p class="text-#c14053">{{ t('home.plugins.actions.unpin') }}</p>
                 </div>
                 <div @click="handleUnload(plugin)" class="menu-item">
                   <svg><use href="#delete"></use></svg>
-                  <p>卸载</p>
+                  <p>{{ t('home.plugins.actions.uninstall') }}</p>
                 </div>
               </div>
             </div>
@@ -127,19 +129,37 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { emitTo } from '@tauri-apps/api/event'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { cloneDeep } from 'es-toolkit'
+import { storeToRefs } from 'pinia'
 import FloatBlockList from '@/components/common/FloatBlockList.vue'
 import { PluginEnum } from '@/enums'
-import { pluginsList } from '@/layout/left/config.tsx'
+import { usePluginsList } from '@/layout/left/config.tsx'
 import { usePluginsStore } from '@/stores/plugins.ts'
 
+const { t } = useI18n()
 const appWindow = WebviewWindow.getCurrent()
 const pluginsStore = usePluginsStore()
+const pluginsList = usePluginsList()
 const { plugins } = storeToRefs(pluginsStore)
 const isCurrently = ref(-1)
 const allPlugins = ref([] as STO.Plugins<PluginEnum>[])
-const pluginsLists = ref<STO.Plugins<PluginEnum>[]>(JSON.parse(JSON.stringify(pluginsList.value)))
+const pluginsLists = ref<STO.Plugins<PluginEnum>[]>(cloneDeep(pluginsList.value))
+
+// 同步插件状态
+const syncPlugins = (list: STO.Plugins<PluginEnum>[]) =>
+  list.map((item: STO.Plugins<PluginEnum>) => {
+    const matched = plugins.value.find((z: STO.Plugins<PluginEnum>) => z.url === item.url)
+    return matched
+      ? {
+          ...item,
+          state: matched.state,
+          isAdd: matched.isAdd
+        }
+      : item
+  })
 
 const handleState = (plugin: STO.Plugins<PluginEnum>) => {
   if (plugin.state === PluginEnum.INSTALLED) return
@@ -167,7 +187,7 @@ const handleUnload = (plugin: STO.Plugins<PluginEnum>) => {
 }
 
 const handleDelete = (p: STO.Plugins<PluginEnum>) => {
-  const plugin = plugins.value.find((i) => i.title === p.title)
+  const plugin = plugins.value.find((i) => i.url === p.url)
   if (plugin) {
     setTimeout(() => {
       pluginsStore.updatePlugin({ ...plugin, isAdd: false })
@@ -178,7 +198,7 @@ const handleDelete = (p: STO.Plugins<PluginEnum>) => {
 }
 
 const handleAdd = (p: STO.Plugins<PluginEnum>) => {
-  const plugin = plugins.value.find((i) => i.title === p.title)
+  const plugin = plugins.value.find((i) => i.url === p.url)
   if (plugin) {
     setTimeout(() => {
       pluginsStore.updatePlugin({ ...plugin, isAdd: true })
@@ -195,17 +215,17 @@ const closeMenu = (event: Event) => {
   }
 }
 
+watch(
+  pluginsList,
+  (latest) => {
+    pluginsLists.value = cloneDeep(latest)
+    allPlugins.value = syncPlugins(pluginsLists.value)
+  },
+  { immediate: false }
+)
+
 onMounted(() => {
-  allPlugins.value = pluginsLists.value.map((i) => {
-    const p = plugins.value.find((z) => z.title === i.title)
-    return p
-      ? {
-          ...i,
-          state: p.state,
-          isAdd: p.isAdd
-        }
-      : i
-  })
+  allPlugins.value = syncPlugins(pluginsLists.value)
   window.addEventListener('click', closeMenu, true)
 })
 

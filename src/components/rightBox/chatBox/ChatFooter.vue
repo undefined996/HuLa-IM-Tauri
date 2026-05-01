@@ -1,23 +1,30 @@
 <template>
   <!-- 底部栏 -->
-  <main class="border-t-(1px solid [--right-chat-footer-line-color]) relative" :style="{ height: `${footerHeight}px` }">
-    <!-- 拖拽手柄 -->
-    <div class="resize-handle" :class="{ dragging: isDragging }" @mousedown="startDrag">
-      <div class="resize-indicator"></div>
-    </div>
+  <main
+    :class="[isMobile() ? 'flex-col w-full' : 'border-t-(1px solid [--right-chat-footer-line-color])']"
+    class="h-full flex flex-col relative">
     <!-- 添加遮罩层 -->
     <div
       v-if="isSingleChat && !isFriend"
+      :style="{ height: `${footerHeight}px` }"
       class="absolute inset-0 z-997 backdrop-blur-md cursor-default flex-center select-none pointer-events-auto light:bg-[rgba(255,255,255,0.1)] dark:bg-[rgba(33,33,33,0.1)]">
       <n-flex align="center" justify="center" class="pb-60px">
-        <svg class="size-24px"><use href="#cloudError"></use></svg>
-        <span class="text-(14px [--chat-text-color])">你们当前已经不是好友关系</span>
+        <svg class="size-24px">
+          <use href="#cloudError"></use>
+        </svg>
+        <span class="text-(14px [--chat-text-color])">{{ t('editor.relation.not_friends') }}</span>
       </n-flex>
     </div>
 
-    <div class="size-full relative color-[--icon-color] flex flex-col">
+    <ChatMsgMultiChoose v-if="chatStore.isMsgMultiChoose" />
+
+    <div v-if="!chatStore.isMsgMultiChoose" class="color-[--icon-color] flex flex-col flex-1 min-h-0">
       <!-- 输入框顶部选项栏 -->
-      <n-flex align="center" justify="space-between" class="p-[10px_22px_5px] select-none flex-shrink-0">
+      <n-flex
+        v-if="!isMobile()"
+        align="center"
+        justify="space-between"
+        class="p-[10px_22px_5px] select-none flex-shrink-0">
         <n-flex align="center" :size="0" class="input-options">
           <!-- emoji表情 -->
           <n-popover
@@ -25,6 +32,7 @@
             trigger="click"
             :show-arrow="false"
             placement="top-start"
+            :disabled="chatStore.isMsgMultiChoose"
             style="
               padding: 0;
               background: var(--bg-emoji);
@@ -44,7 +52,9 @@
                 :disabled="emojiShow || recentEmojis.length < 4"
                 placement="top">
                 <template #trigger>
-                  <svg class="mr-18px"><use href="#smiling-face"></use></svg>
+                  <svg class="mr-18px">
+                    <use href="#smiling-face"></use>
+                  </svg>
                 </template>
                 <div v-if="recentEmojis.length > 0" class="p-4px">
                   <div class="text-xs text-gray-500 mb-4px">最近使用</div>
@@ -53,8 +63,13 @@
                       v-for="(emoji, index) in recentEmojis"
                       :key="index"
                       class="emoji-item cursor-pointer flex-center"
-                      @click="emojiHandle(emoji, checkIsUrl(emoji) ? 'emoji-url' : 'emoji')">
-                      <img v-if="checkIsUrl(emoji)" :src="emoji" class="size-24px" />
+                      @click="
+                        emojiHandle(
+                          checkIsUrl(emoji) ? { renderUrl: resolveRecentRenderUrl(emoji), serverUrl: emoji } : emoji,
+                          checkIsUrl(emoji) ? 'emoji-url' : 'emoji'
+                        )
+                      ">
+                      <img v-if="checkIsUrl(emoji)" :src="resolveRecentRenderUrl(emoji)" class="size-24px" />
                       <span v-else class="text-18px">{{ emoji }}</span>
                     </div>
                   </div>
@@ -65,7 +80,9 @@
           </n-popover>
 
           <div class="flex-center gap-2px mr-12px">
-            <svg @click="handleScreenshot()"><use href="#screenshot"></use></svg>
+            <svg @click="handleScreenshot()">
+              <use href="#screenshot"></use>
+            </svg>
             <n-popover
               style="
                 padding: 0;
@@ -79,7 +96,9 @@
               :show-arrow="false"
               placement="top">
               <template #trigger>
-                <svg class="dropdown-arrow" style="width: 14px; height: 14px"><use href="#down"></use></svg>
+                <svg class="dropdown-arrow" style="width: 14px; height: 14px">
+                  <use href="#down"></use>
+                </svg>
               </template>
 
               <div class="footer-item">
@@ -89,8 +108,10 @@
                   align="center"
                   justify="space-between">
                   <n-flex align="center" :size="6">
-                    <svg class="size-14px"><use href="#screenshot"></use></svg>
-                    <p>截图</p>
+                    <svg class="size-14px">
+                      <use href="#screenshot"></use>
+                    </svg>
+                    <p>{{ t('editor.screenshot') }}</p>
                   </n-flex>
                   <p class="text-(12px #909090)">{{ settingStore.shortcuts.screenshot }}</p>
                 </n-flex>
@@ -101,7 +122,7 @@
                   justify="space-between"
                   @click="isConceal = !isConceal">
                   <n-checkbox v-model:checked="isConceal" @click.stop />
-                  <p class="text-(12px --chat-text-color)">截图时隐藏当前窗口</p>
+                  <p class="text-(12px --chat-text-color)">{{ t('editor.screenshot_hide_curr_window') }}</p>
                 </n-flex>
               </div>
             </n-popover>
@@ -110,11 +131,15 @@
           <n-popover trigger="hover" :show-arrow="false" placement="bottom">
             <template #trigger>
               <div class="flex-center gap-2px mr-12px">
-                <svg @click="handleFileOpen"><use href="#file2"></use></svg>
-                <svg style="width: 14px; height: 14px"><use href="#down"></use></svg>
+                <svg @click="handleFileOpen">
+                  <use href="#file2"></use>
+                </svg>
+                <svg style="width: 14px; height: 14px">
+                  <use href="#down"></use>
+                </svg>
               </div>
             </template>
-            <span>文件</span>
+            <span>{{ t('editor.file') }}</span>
           </n-popover>
           <n-popover trigger="hover" :show-arrow="false" placement="bottom">
             <template #trigger>
@@ -122,63 +147,125 @@
                 <use href="#photo"></use>
               </svg>
             </template>
-            <span>图片</span>
+            <span>{{ t('editor.image') }}</span>
           </n-popover>
           <n-popover trigger="hover" :show-arrow="false" placement="bottom">
             <template #trigger>
-              <svg @click="handleVoiceRecord" class="mr-18px"><use href="#voice"></use></svg>
+              <svg @click="handleVoiceRecord" class="mr-18px">
+                <use href="#voice"></use>
+              </svg>
             </template>
-            <span>语音信息</span>
+            <span>{{ t('editor.voice') }}</span>
+          </n-popover>
+          <n-popover v-if="!isMac()" trigger="hover" :show-arrow="false" placement="bottom">
+            <template #trigger>
+              <svg @click="showLocationModal = true" class="mr-18px">
+                <use href="#local"></use>
+              </svg>
+            </template>
+            <span>{{ t('editor.location') }}</span>
           </n-popover>
         </n-flex>
 
         <n-popover trigger="hover" :show-arrow="false" placement="bottom">
           <template #trigger>
-            <svg class="w-22px h-22px cursor-pointer outline-none"><use href="#history"></use></svg>
+            <svg class="w-22px h-22px cursor-pointer outline-none" @click="openChatHistory">
+              <use href="#history"></use>
+            </svg>
           </template>
-          <span>聊天记录</span>
+          <span>{{ t('editor.chat_history') }}</span>
         </n-popover>
       </n-flex>
 
       <!-- 输入框区域 -->
-      <div class="flex-1 pl-20px flex flex-col relative">
-        <MsgInput ref="MsgInputRef" :height="inputAreaHeight" />
+      <div :class="[isMobile() ? '' : 'pl-20px ']" class="flex flex-1 min-h-0">
+        <MsgInput
+          ref="MsgInputRef"
+          @clickMore="handleMoreClick"
+          @clickEmoji="handleEmojiClick"
+          @clickVoice="handleVoiceClick"
+          @customFocus="handleCustomFocus"
+          @send="handleSend" />
       </div>
     </div>
+
+    <!-- 位置选择弹窗 -->
+    <LocationModal
+      v-model:visible="showLocationModal"
+      @location-selected="handleLocationSelected"
+      @cancel="showLocationModal = false" />
+
+    <!-- 移动端输入框点击icon弹起的面板 -->
+    <Transition v-if="isMobile()" name="panel-slide">
+      <div v-show="isPanelVisible" class="panel-container panel-container--fixed">
+        <Transition name="panel-content" mode="out-in">
+          <div v-if="mobilePanelState === MobilePanelStateEnum.EMOJI" key="emoji" class="panel-content">
+            <Emoticon @emojiHandle="emojiHandle" :all="false" />
+          </div>
+          <div v-else-if="mobilePanelState === MobilePanelStateEnum.VOICE" key="voice" class="panel-content">
+            <VoicePanel @cancel="handleMobileVoiceCancel" @send="handleMobileVoiceSend" />
+          </div>
+          <div v-else-if="mobilePanelState === MobilePanelStateEnum.MORE" key="more" class="panel-content">
+            <More @sendFiles="handleMoreSendFiles" />
+          </div>
+        </Transition>
+      </div>
+    </Transition>
   </main>
 </template>
 
 <script setup lang="ts">
-import { join } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
-import { copyFile, readFile } from '@tauri-apps/plugin-fs'
-import { FOOTER_HEIGHT, MAX_FOOTER_HEIGHT, MIN_FOOTER_HEIGHT, TOOLBAR_HEIGHT } from '@/common/constants'
-import { MittEnum, MsgEnum, RoomTypeEnum } from '@/enums'
+import { readFile } from '@tauri-apps/plugin-fs'
+import { FOOTER_HEIGHT, MAX_FOOTER_HEIGHT, MIN_FOOTER_HEIGHT } from '@/common/constants'
+import LocationModal from '@/components/rightBox/location/LocationModal.vue'
+import { MittEnum, MobilePanelStateEnum, MsgEnum, RoomTypeEnum } from '@/enums'
 import { useChatLayoutGlobal } from '@/hooks/useChatLayout'
 import { type SelectionRange, useCommon } from '@/hooks/useCommon.ts'
 import { useGlobalShortcut } from '@/hooks/useGlobalShortcut.ts'
 import { useMitt } from '@/hooks/useMitt'
-import type { ContactItem, FilesMeta, SessionItem } from '@/services/types'
+import { useWindow } from '@/hooks/useWindow'
+import type { FriendItem, SessionItem } from '@/services/types'
+import { useChatStore } from '@/stores/chat'
 import { useContactStore } from '@/stores/contacts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useHistoryStore } from '@/stores/history'
 import { useSettingStore } from '@/stores/setting'
-import { useUserStore } from '@/stores/user'
+import { useEmojiStore } from '@/stores/emoji'
+import FileUtil from '@/utils/FileUtil'
 import { extractFileName, getMimeTypeFromExtension } from '@/utils/Formatting'
-import { getFilesMeta, getUserAbsoluteVideosDir } from '@/utils/PathUtil'
+import { isMac, isMobile } from '@/utils/PlatformConstants'
+import { useDebounceFn } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
 
-const { detailId } = defineProps<{
-  detailId: SessionItem['detailId']
-}>()
+const { t } = useI18n()
+// 移动端组件条件导入
+const More = isMobile() ? defineAsyncComponent(() => import('@/mobile/components/chat-room/panel/More.vue')) : void 0
+const VoicePanel = isMobile()
+  ? defineAsyncComponent(() => import('@/mobile/components/chat-room/panel/VoicePanel.vue'))
+  : void 0
+
+const props = withDefaults(
+  defineProps<{
+    detailId?: SessionItem['detailId']
+  }>(),
+  {
+    detailId: ''
+  }
+)
+const detailId = computed(() => props.detailId || '')
 const globalStore = useGlobalStore()
 const contactStore = useContactStore()
 const historyStore = useHistoryStore()
+const chatStore = useChatStore()
 const settingStore = useSettingStore()
+const emojiStore = useEmojiStore()
 const { handleScreenshot } = useGlobalShortcut()
 const MsgInputRef = ref()
 const msgInputDom = ref<HTMLInputElement | null>(null)
 const emojiShow = ref(false)
 const recentlyTip = ref(false)
+const showLocationModal = ref(false)
 const isConceal = computed({
   get: () => settingStore.screenshot.isConceal,
   set: (value: boolean) => settingStore.setScreenshotConceal(value)
@@ -187,17 +274,12 @@ const recentEmojis = computed(() => {
   return historyStore.emoji.slice(0, 15)
 })
 const { insertNodeAtRange, triggerInputEvent, processFiles, imgPaste } = useCommon()
-const userStore = useUserStore()
 
 // 使用全局布局状态
 const { footerHeight, setFooterHeight } = useChatLayoutGlobal()
 
-// 拖拽调整高度相关
-const isDragging = ref(false)
-const startY = ref(0)
-const startHeight = ref(0)
-// 性能优化相关
-let rafId: number | null = null
+// 使用窗口管理
+const { createWebviewWindow } = useWindow()
 
 // 容器高度响应式状态
 const containerHeight = ref(600) // 默认高度
@@ -211,11 +293,6 @@ const maxHeight = computed(() => {
 // 动态计算当前最小高度（根据录音模式状态）
 const currentMinHeight = computed(() => {
   return MsgInputRef.value?.isVoiceMode ? FOOTER_HEIGHT : MIN_FOOTER_HEIGHT
-})
-
-// 输入框区域高度计算（总高度减去顶部选项栏高度）
-const inputAreaHeight = computed(() => {
-  return Math.max(footerHeight.value - TOOLBAR_HEIGHT)
 })
 
 // 监听maxHeight变化，确保footerHeight不超过最大值（即时响应）
@@ -246,71 +323,12 @@ watch(
   }
 )
 
-// ResizeObserver实例
-let resizeObserver: ResizeObserver | null = null
 // 高效的尺寸变化监听
 const observeContainerResize = () => {
   const chatContainer = document.querySelector('.h-full') || document.querySelector('[data-chat-container]')
   if (!chatContainer) return
-
-  // 创建ResizeObserver实例
-  resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      // 使用contentRect获取更精确的尺寸
-      const newHeight = entry.contentRect.height || entry.target.clientHeight
-      if (newHeight !== containerHeight.value) {
-        containerHeight.value = newHeight
-      }
-    }
-  })
-
-  // 开始观察容器尺寸变化
-  resizeObserver.observe(chatContainer)
-
   // 设置初始高度
   containerHeight.value = (chatContainer as HTMLElement).clientHeight
-}
-
-const startDrag = (e: MouseEvent) => {
-  isDragging.value = true
-  startY.value = e.clientY
-  startHeight.value = footerHeight.value
-
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', endDrag)
-  document.body.style.userSelect = 'none'
-  document.body.classList.add('dragging-resize')
-  e.preventDefault()
-}
-
-const onDrag = (e: MouseEvent) => {
-  if (!isDragging.value) return
-  // 立即取消之前的帧，避免延迟
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-  }
-
-  rafId = requestAnimationFrame(() => {
-    const deltaY = startY.value - e.clientY
-    // 使用计算属性获取当前最小高度
-    const newHeight = Math.min(Math.max(startHeight.value + deltaY, currentMinHeight.value), maxHeight.value)
-    setFooterHeight(newHeight)
-    rafId = null
-  })
-}
-
-const endDrag = () => {
-  isDragging.value = false
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', endDrag)
-  document.body.style.userSelect = ''
-  document.body.classList.remove('dragging-resize')
-
-  // 清理性能优化相关状态
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
 }
 
 /**
@@ -325,6 +343,12 @@ const checkIsUrl = (str: string) => {
   }
 }
 
+// 最近使用的表情包在顶层快捷栏也优先使用本地渲染
+const resolveRecentRenderUrl = (url: string) => {
+  const matched = emojiStore.emojiList.find((item) => item.expressionUrl === url)
+  return matched?.localUrl || url
+}
+
 // 判断是否为单聊
 const isSingleChat = computed(() => {
   return globalStore.currentSession?.type === RoomTypeEnum.SINGLE
@@ -333,7 +357,9 @@ const isSingleChat = computed(() => {
 /** 是否是好友关系 */
 const isFriend = computed(() => {
   if (!isSingleChat.value) return true
-  return contactStore.contactsList.some((contact: ContactItem) => contact.uid === detailId)
+  const target = detailId.value
+  if (!target) return false
+  return contactStore.contactsList.some((contact: FriendItem) => contact.uid === target)
 })
 
 // 监听emojiShow的变化，当emojiShow为true时关闭recentlyTip
@@ -345,51 +371,10 @@ watch(emojiShow, (newValue) => {
 
 // 文件选择（不限制类型）
 const handleFileOpen = async () => {
-  // 获取文件路径列表
-  const selected = await open({
-    multiple: true
-    // 不设置filters，允许选择所有文件类型
-  })
-
-  if (selected && Array.isArray(selected)) {
-    const filesMeta = await getFilesMeta<FilesMeta>(selected)
-
-    const copyUploadFile = async () => {
-      console.log('复制上传文件')
-      const currentChatRoomId = globalStore.currentSession!.roomId // 这个id可能为群id可能为用户uid，所以不能只用用户uid
-      const currentUserUid = userStore.userInfo!.uid as string
-
-      const userResourceDir = await getUserAbsoluteVideosDir(currentUserUid, currentChatRoomId)
-
-      for (const filePathStr of selected) {
-        const fileMeta = filesMeta.find((f) => f.path === filePathStr)
-        if (fileMeta) {
-          copyFile(filePathStr, await join(userResourceDir, fileMeta.name))
-        }
-      }
-    }
-
-    await copyUploadFile()
-
-    // 获取选中文件的类型
-
-    const files = await Promise.all(
-      selected.map(async (path) => {
-        const fileData = await readFile(path)
-        const fileName = extractFileName(path)
-        const blob = new Blob([new Uint8Array(fileData)])
-
-        // 找到对应路径的文件，并且获取其类型
-        const fileMeta = filesMeta.find((f) => f.path === path)
-        const fileType = fileMeta?.mime_type || fileMeta?.file_type
-
-        // 最后手动传入blob中，因为blob无法自动判断文件类型
-        return new File([blob], fileName, { type: fileType })
-      })
-    )
-    // 使用processFiles方法进行文件类型验证
-    await processFiles(files, MsgInputRef.value.messageInputDom, MsgInputRef.value?.showFileModal)
-  }
+  const filesData = await FileUtil.openAndCopyFile()
+  if (!filesData) return
+  // 使用processFiles方法进行文件类型验证
+  await processFiles(filesData.files, MsgInputRef.value.messageInputDom, MsgInputRef.value?.showFileModal)
 }
 
 // 图片选择（只能选择图片类型）
@@ -424,43 +409,78 @@ const handleImageOpen = async () => {
   }
 }
 
+// 使用 VueUse 的防抖函数处理表情包发送（300ms 防抖）
+type EmojiUrlPayload = { renderUrl: string; serverUrl: string }
+
+const sendEmojiWithDebounce = useDebounceFn((payload: EmojiUrlPayload) => {
+  try {
+    // 不等待发送完成，立即返回（避免卡顿）
+    MsgInputRef.value?.sendEmojiDirect(payload.serverUrl).catch((error: unknown) => {
+      console.error('[ChatFooter] 发送表情包失败:', error)
+      window.$message?.error?.('发送表情包失败')
+    })
+
+    // 添加到最近使用表情列表
+    updateRecentEmojis(payload.serverUrl)
+  } catch (error) {
+    console.error('[ChatFooter] 发送表情包失败:', error)
+    window.$message?.error?.('发送表情包失败')
+  }
+}, 200)
+
 /**
  * 选择表情，并把表情插入输入框
  * @param item 选择的表情
  * @param type 表情类型，'emoji' 为普通表情，'emoji-url' 为表情包URL
  */
-const emojiHandle = (item: string, type: 'emoji' | 'emoji-url' = 'emoji') => {
+const emojiHandle = async (item: string | EmojiUrlPayload, type: 'emoji' | 'emoji-url' = 'emoji') => {
   emojiShow.value = false
 
   const inp = msgInputDom.value
-  if (!inp) return
+  if (!inp) {
+    return
+  }
 
+  const isEmojiUrlPayload = (value: any): value is EmojiUrlPayload =>
+    value && typeof value === 'object' && typeof value.serverUrl === 'string'
+
+  // 移动端且是表情包URL时，使用防抖发送（发送服务端URL）
+  if (isMobile() && type === 'emoji-url') {
+    const payload: EmojiUrlPayload = isEmojiUrlPayload(item)
+      ? item
+      : { renderUrl: typeof item === 'string' ? item : '', serverUrl: typeof item === 'string' ? item : '' }
+    sendEmojiWithDebounce(payload)
+    return
+  }
+
+  // 桌面端或普通emoji，插入到输入框
   // 确保输入框有焦点
   MsgInputRef.value?.focus()
 
-  // 检查是否为 URL
-  const isUrl = (str: string) => {
+  // 尝试获取最后的编辑范围
+  let lastEditRange: SelectionRange | null = MsgInputRef.value?.getLastEditRange()
+
+  // 验证选区是否在输入框内
+  const isRangeInInput = (range: Range | null): boolean => {
+    if (!range || !inp) return false
     try {
-      new URL(str)
-      return true
+      return inp.contains(range.commonAncestorContainer)
     } catch {
       return false
     }
   }
 
-  // 尝试获取最后的编辑范围
-  let lastEditRange: SelectionRange | null = MsgInputRef.value?.getLastEditRange()
-
-  // 如果没有最后的编辑范围，尝试获取当前选区
-  if (!lastEditRange) {
+  // 如果没有有效的编辑范围，或选区不在输入框内，创建一个新的范围
+  if (!lastEditRange || !isRangeInInput(lastEditRange.range)) {
     const selection = window.getSelection()
-    if (selection && selection.rangeCount > 0) {
+    if (selection && selection.rangeCount > 0 && isRangeInInput(selection.getRangeAt(0))) {
+      // 只有当前选区在输入框内时才使用
       lastEditRange = {
         range: selection.getRangeAt(0),
         selection
       }
     } else {
-      // 如果没有选区，创建一个新的范围到最后
+      // 创建一个新的范围到输入框末尾
       const range = document.createRange()
       range.selectNodeContents(inp)
       range.collapse(false)
@@ -479,74 +499,36 @@ const emojiHandle = (item: string, type: 'emoji' | 'emoji-url' = 'emoji') => {
   }
 
   // 根据内容类型插入不同的节点
-  if (isUrl(item)) {
+  if (type === 'emoji-url') {
+    const payload: EmojiUrlPayload = isEmojiUrlPayload(item)
+      ? item
+      : { renderUrl: typeof item === 'string' ? item : '', serverUrl: typeof item === 'string' ? item : '' }
+    const renderUrl = payload.renderUrl || payload.serverUrl
+    const serverUrl = payload.serverUrl || payload.renderUrl
+    if (!renderUrl) return
     // 如果是URL，创建图片元素并插入
     const imgElement = document.createElement('img')
-    imgElement.src = item
+    imgElement.src = renderUrl
     imgElement.style.maxWidth = '80px'
     imgElement.style.maxHeight = '80px'
     // 设置数据类型，区分是普通图片还是表情包
-    imgElement.dataset.type = type === 'emoji-url' ? 'emoji' : 'image'
-
-    // 获取回复框
-    const replyDiv = document.getElementById('replyDiv')
-
-    // 如果有回复框，确保表情插入在回复框之后
-    if (replyDiv && inp) {
-      // 创建一个范围，定位到回复框之后
-      const range = document.createRange()
-      range.setStartAfter(replyDiv)
-      range.collapse(true)
-
-      // 插入表情到回复框后面
-      range.insertNode(imgElement)
-
-      // 移动光标到表情后面
-      const newRange = document.createRange()
-      newRange.setStartAfter(imgElement)
-      newRange.collapse(true)
-      selection?.removeAllRanges()
-      selection?.addRange(newRange)
-    } else {
-      // 没有回复框，按原来方式插入
-      lastEditRange.range.insertNode(imgElement)
-
-      // 移动光标到图片后面
-      const range = document.createRange()
-      range.setStartAfter(imgElement)
-      range.collapse(true)
-      selection?.removeAllRanges()
-      selection?.addRange(range)
+    imgElement.dataset.type = 'emoji'
+    if (serverUrl) {
+      imgElement.dataset.serverUrl = serverUrl
     }
+
+    // 在用户光标位置插入表情包
+    lastEditRange.range.insertNode(imgElement)
+
+    // 移动光标到图片后面
+    const range = document.createRange()
+    range.setStartAfter(imgElement)
+    range.collapse(true)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
   } else {
-    // 如果是普通表情，作为文本插入
-    // 获取回复框
-    // const replyDiv = document.getElementById('replyDiv')
-
-    // // 如果有回复框，确保表情插入在回复框之后
-    // if (replyDiv && inp) {
-    // 创建一个范围，定位到回复框之后
-    //   const range = document.createRange()
-    //   range.setStartAfter(replyDiv)
-    //   range.collapse(true)
-
-    //   // 插入文本到回复框后面
-    //   const textNode = document.createTextNode(item)
-    //   range.insertNode(textNode)
-
-    //   // 移动光标到文本后面
-    //   const newRange = document.createRange()
-    //   newRange.setStartAfter(textNode)
-    //   newRange.collapse(true)
-    //   selection?.removeAllRanges()
-    //   selection?.addRange(newRange)
-
-    //   // 触发输入事件
-    //   triggerInputEvent(inp)
-    // } else {
-    // 没有回复框，按原来方式插入
-    insertNodeAtRange(MsgEnum.TEXT, item, inp, lastEditRange)
-    // }
+    const emojiText = typeof item === 'string' ? item : ''
+    insertNodeAtRange(MsgEnum.TEXT, emojiText, inp, lastEditRange)
   }
 
   // 记录新的选区位置
@@ -559,7 +541,14 @@ const emojiHandle = (item: string, type: 'emoji' | 'emoji-url' = 'emoji') => {
   MsgInputRef.value?.focus()
 
   // 添加到最近使用表情列表
-  updateRecentEmojis(item)
+  if (type === 'emoji-url') {
+    const payload: EmojiUrlPayload = isEmojiUrlPayload(item)
+      ? item
+      : { renderUrl: typeof item === 'string' ? item : '', serverUrl: typeof item === 'string' ? item : '' }
+    updateRecentEmojis(payload.serverUrl || payload.renderUrl)
+  } else {
+    updateRecentEmojis(typeof item === 'string' ? item : '')
+  }
 }
 
 /**
@@ -581,7 +570,137 @@ const handleVoiceRecord = () => {
   useMitt.emit(MittEnum.VOICE_RECORD_TOGGLE)
 }
 
+// 处理位置选择
+const handleLocationSelected = async (locationData: any) => {
+  try {
+    await MsgInputRef.value.handleLocationSelected(locationData)
+    showLocationModal.value = false
+  } catch (error) {
+    console.error('发送位置消息失败:', error)
+  }
+}
+
+// 打开聊天记录窗口
+const openChatHistory = async () => {
+  const currentRoomId = globalStore.currentSessionRoomId
+
+  // 创建聊天记录窗口
+  await createWebviewWindow('聊天记录', 'chat-history', 800, 600, undefined, true, 600, 400, false, false, {
+    roomId: currentRoomId
+  })
+}
+
+/**
+ *
+ * 移动端代码（开始）
+ *
+ *
+ */
+
+// 移动端面板状态 - 从 MsgInput 同步过来
+const mobilePanelState = ref<MobilePanelStateEnum>(MobilePanelStateEnum.NONE)
+
+// 计算面板是否可见
+const isPanelVisible = computed(() => {
+  return (
+    mobilePanelState.value === MobilePanelStateEnum.EMOJI ||
+    mobilePanelState.value === MobilePanelStateEnum.VOICE ||
+    mobilePanelState.value === MobilePanelStateEnum.MORE
+  )
+})
+
+/** 点击更多按钮 */
+const handleMoreClick = (value: { panelState: MobilePanelStateEnum }) => {
+  mobilePanelState.value = value.panelState
+}
+
+/** 点击表情按钮 */
+const handleEmojiClick = (value: { panelState: MobilePanelStateEnum }) => {
+  mobilePanelState.value = value.panelState
+}
+
+/** 点击语音按钮 */
+const handleVoiceClick = (value: { panelState: MobilePanelStateEnum }) => {
+  mobilePanelState.value = value.panelState
+}
+
+/** 自定义聚焦事件 */
+const handleCustomFocus = (value: { panelState: MobilePanelStateEnum }) => {
+  // 如果是聚焦状态，关闭面板
+  if (value.panelState === MobilePanelStateEnum.FOCUS) {
+    mobilePanelState.value = MobilePanelStateEnum.NONE
+  } else {
+    mobilePanelState.value = value.panelState
+  }
+}
+
+/** 取消语音录制 */
+const handleMobileVoiceCancel = () => {
+  useMitt.emit(MittEnum.MOBILE_CLOSE_PANEL)
+  // 重置状态
+  mobilePanelState.value = MobilePanelStateEnum.NONE
+}
+
+/** 发送语音消息 */
+const handleMobileVoiceSend = async (voiceData: any) => {
+  try {
+    await MsgInputRef.value?.sendVoiceDirect(voiceData)
+  } catch (error) {
+    console.error('发送语音失败', error)
+  }
+  // 发送后关闭面板
+  handleMobileVoiceCancel()
+}
+
+const handleMoreSendFiles = async (files: File[]) => {
+  if (!files || files.length === 0) return
+  try {
+    await MsgInputRef.value?.sendFilesDirect(files)
+  } catch (error) {
+    console.error('移动端发送文件失败:', error)
+    window.$message?.error?.('发送文件失败')
+  }
+}
+
+/** 处理发送事件 */
+const handleSend = () => {
+  // 发送后不关闭面板，保持当前状态
+  // mobilePanelState.value = MobilePanelStateEnum.NONE
+}
+
+/**
+ * 监听移动端关闭面板事件
+ */
+const listenMobilePanelHandler = () => {
+  mobilePanelState.value = MobilePanelStateEnum.NONE
+}
+
+/**
+ * 监听移动端关闭面板事件
+ */
+const listenMobileClosePanel = () => {
+  useMitt.on(MittEnum.MOBILE_CLOSE_PANEL, listenMobilePanelHandler)
+}
+
+/**
+ * 移除移动端关闭面板事件
+ */
+const removeMobileClosePanel = () => {
+  useMitt.off(MittEnum.MOBILE_CLOSE_PANEL, listenMobilePanelHandler)
+}
+
+/**
+ *
+ * 移动端代码（结束）
+ *
+ */
+
 onMounted(async () => {
+  if (isMobile()) {
+    // 监听移动端关闭面板事件
+    listenMobileClosePanel()
+  }
+
   await nextTick()
   // 启动高效的容器尺寸监听
   observeContainerResize()
@@ -592,23 +711,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  // 清理拖拽相关监听器
-  if (isDragging.value) {
-    document.removeEventListener('mousemove', onDrag)
-    document.removeEventListener('mouseup', endDrag)
-    document.body.style.userSelect = ''
-  }
-
-  // 清理性能优化相关
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
-
-  // 清理ResizeObserver
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-    resizeObserver = null
+  if (isMobile()) {
+    // 移除移动端关闭面板事件
+    removeMobileClosePanel()
   }
 })
 </script>
@@ -619,6 +724,7 @@ onUnmounted(() => {
     width: 22px;
     height: 22px;
     cursor: pointer;
+
     &:hover {
       color: #13987f;
     }
@@ -626,42 +732,9 @@ onUnmounted(() => {
 
   .dropdown-arrow {
     transition: transform 0.3s ease;
+
     &:hover {
       transform: rotate(180deg);
-    }
-  }
-}
-
-.resize-handle {
-  position: absolute;
-  top: -8px;
-  left: 0;
-  right: 0;
-  height: 16px;
-  cursor: ns-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 998;
-
-  &:hover {
-    .resize-indicator {
-      opacity: 0.8;
-      transform: scaleY(1.2);
-    }
-  }
-
-  &.dragging {
-    .resize-indicator {
-      opacity: 1;
-      transform: scaleY(1.2);
-      background: #13987f80;
-
-      &::before,
-      &::after {
-        opacity: 1;
-        background: #13987f80;
-      }
     }
   }
 }
@@ -704,10 +777,13 @@ onUnmounted(() => {
 
 .footer-item {
   @apply flex-col-y-center gap-4px px-6px py-8px min-w-160px box-border size-fit select-none;
+
   .group {
     @apply px-4px py-6px rounded-4px;
+
     &:hover {
       background-color: var(--emoji-hover);
+
       svg {
         animation: twinkle 0.3s ease-in-out;
       }
@@ -717,5 +793,67 @@ onUnmounted(() => {
 
 :deep(.n-input .n-input-wrapper) {
   padding: 0;
+}
+
+// 移动端样式（下面都是）
+
+/* 面板容器样式 */
+.panel-container {
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--bg-emoji, #f5f5f5);
+  display: flex;
+  flex-direction: column;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.panel-container--fixed {
+  height: 18rem;
+}
+
+/* 使用 transform 实现高性能动画 - 从下往上滑出 */
+.panel-slide-enter-active,
+.panel-slide-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: bottom;
+}
+
+.panel-slide-enter-from {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.panel-slide-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.panel-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.panel-slide-leave-to {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.panel-content-enter-active,
+.panel-content-leave-active {
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.panel-content-enter-from,
+.panel-content-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.panel-content-enter-to,
+.panel-content-leave-from {
+  opacity: 1;
+  transform: translateY(0);
 }
 </style>

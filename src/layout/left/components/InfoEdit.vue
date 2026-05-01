@@ -11,7 +11,9 @@
           </svg>
         </div>
 
-        <n-flex class="text-(14px [--text-color]) select-none pt-6px" justify="center">编辑资料</n-flex>
+        <n-flex class="text-(14px [--text-color]) select-none pt-6px" justify="center">
+          {{ t('home.profile_edit.title') }}
+        </n-flex>
 
         <svg
           v-if="isWindows()"
@@ -29,18 +31,18 @@
               <div class="avatar-wrapper relative" @click="openAvatarCropper">
                 <n-avatar :size="80" :src="AvatarUtils.getAvatarUrl(editInfo.content.avatar!)" round />
                 <div class="avatar-hover absolute size-full rounded-50% flex-center">
-                  <span class="text-12px color-white">更换头像</span>
+                  <span class="text-12px color-#606060">{{ t('home.profile_edit.avatar.change') }}</span>
                 </div>
               </div>
             </template>
             <p class="text-12px text-[--chat-text-color] w-280px leading-5 p-4px">
-              建议大小180 * 180像素，支持JPG、PNG、WEBP等格式，图片需小于500kb
+              {{ t('home.profile_edit.avatar.tips') }}
             </p>
           </n-popover>
         </n-flex>
         <!-- 当前佩戴的徽章 -->
         <n-flex v-if="currentBadge" align="center" justify="center">
-          <span class="text-(14px #707070)">当前佩戴的徽章:</span>
+          <span class="text-(14px #707070)">{{ t('home.profile_edit.badge.current') }}</span>
           <n-popover trigger="hover">
             <template #trigger>
               <img :src="currentBadge?.img" alt="" class="size-22px" />
@@ -66,15 +68,17 @@
               autoCorrect="off"
               autoCapitalize="off"
               :allow-input="noSideSpace"
-              placeholder="请输入你的昵称"
+              :placeholder="t('home.profile_edit.form.nickname.placeholder')"
               show-count
               type="text">
               <template #prefix>
-                <span class="pr-6px text-#909090">昵称</span>
+                <span class="pr-6px text-#909090">{{ t('home.profile_edit.form.nickname.label') }}</span>
               </template>
             </n-input>
           </template>
-          <span>剩余改名次数: {{ editInfo.content.modifyNameChance || 0 }}</span>
+          <span>
+            {{ t('home.profile_edit.form.nickname.remaining', { count: editInfo.content.modifyNameChance || 0 }) }}
+          </span>
         </n-popover>
 
         <!-- 徽章列表  -->
@@ -97,7 +101,7 @@
                     v-if="item.wearing === IsYesEnum.NO"
                     color="#13987f"
                     @click="toggleWarningBadge(item)">
-                    佩戴
+                    {{ t('home.profile_edit.badge.wear') }}
                   </n-button>
                 </template>
                 <n-popover trigger="hover">
@@ -118,8 +122,8 @@
           style="color: #fff"
           :disabled="editInfo.content.name === localUserInfo.name"
           color="#13987f"
-          @click="saveEditInfo(localUserInfo)">
-          保存
+          @click="saveEditInfo(localUserInfo as ModifyUserInfoType)">
+          {{ t('home.profile_edit.actions.save') }}
         </n-button>
       </n-flex>
     </div>
@@ -135,7 +139,7 @@
 </template>
 <script setup lang="ts">
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import dayjs from 'dayjs'
+import { useI18n } from 'vue-i18n'
 import AvatarCropper from '@/components/common/AvatarCropper.vue'
 import { IsYesEnum, MittEnum } from '@/enums'
 import { useAvatarUpload } from '@/hooks/useAvatarUpload'
@@ -143,16 +147,16 @@ import { useCommon } from '@/hooks/useCommon.ts'
 import { useMitt } from '@/hooks/useMitt.ts'
 import { useTauriListener } from '@/hooks/useTauriListener'
 import { leftHook } from '@/layout/left/hook.ts'
-import type { UserInfoType } from '@/services/types'
+import type { ModifyUserInfoType } from '@/services/types'
 import { useLoginHistoriesStore } from '@/stores/loginHistory'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
-import { formatTimestamp, isDiffNow } from '@/utils/ComputedTime.ts'
 import { getBadgeList, uploadAvatar } from '@/utils/ImRequestUtils'
 import { isMac, isWindows } from '@/utils/PlatformConstants'
 
 const appWindow = WebviewWindow.getCurrent()
-const localUserInfo = ref<Partial<UserInfoType>>({})
+const { t } = useI18n()
+const localUserInfo = ref<Partial<ModifyUserInfoType>>({})
 const userStore = useUserStore()
 const { addListener } = useTauriListener()
 const loginHistoriesStore = useLoginHistoriesStore()
@@ -164,11 +168,12 @@ const {
   localImageUrl,
   showCropper,
   cropperRef,
+  openAvatarCropper,
   handleFileChange,
   handleCrop: onCrop
 } = useAvatarUpload({
   onSuccess: async (downloadUrl) => {
-    // 调用更新头像的API
+    // 调用更新头像的API TODO 这里准备删除
     await uploadAvatar({ avatar: downloadUrl })
     // 更新编辑信息
     editInfo.value.content.avatar = downloadUrl
@@ -180,7 +185,7 @@ const {
     loginHistoriesStore.loginHistories.filter((item) => item.uid === userStore.userInfo!.uid)[0].avatar = downloadUrl
     // 更新缓存里面的用户信息
     updateCurrentUserCache('avatar', downloadUrl)
-    window.$message.success('头像更新成功')
+    window.$message.success(t('home.profile_edit.toast.avatar_update_success'))
   }
 })
 
@@ -191,20 +196,6 @@ const handleCrop = async (cropBlob: Blob) => {
 
 /** 不允许输入空格 */
 const noSideSpace = (value: string) => !value.startsWith(' ') && !value.endsWith(' ')
-
-const openAvatarCropper = () => {
-  const lastUpdateTime = userStore.userInfo!.avatarUpdateTime
-  // 计算30天的毫秒数
-  if (lastUpdateTime && !isDiffNow({ time: lastUpdateTime, unit: 'day', diff: 30 })) {
-    // 计算下次可更新时间
-    const nextUpdateTime = dayjs(lastUpdateTime).add(30, 'day')
-    const formattedDate = formatTimestamp(nextUpdateTime.valueOf(), true)
-    window.$message.warning(`下一次更换头像的时间：${formattedDate}`)
-    return
-  }
-
-  fileInput.value?.click()
-}
 
 const openEditInfo = () => {
   editInfo.value.show = true
@@ -259,6 +250,10 @@ onMounted(async () => {
     -webkit-backdrop-filter: blur(4px);
     top: 0;
     left: 0;
+
+    span {
+      text-align: center;
+    }
   }
 
   &:hover .avatar-hover {

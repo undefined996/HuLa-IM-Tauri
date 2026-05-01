@@ -1,51 +1,86 @@
-import { emit } from '@tauri-apps/api/event'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { EventEnum, MittEnum, NotificationTypeEnum, RoomTypeEnum, SessionOperateEnum } from '@/enums'
+import { MittEnum, NotificationTypeEnum, RoomTypeEnum, SessionOperateEnum, UserType } from '@/enums'
 import { useMitt } from '@/hooks/useMitt.ts'
 import type { SessionItem } from '@/services/types.ts'
 import { useChatStore } from '@/stores/chat.ts'
 import { useContactStore } from '@/stores/contacts.ts'
 import { useGlobalStore } from '@/stores/global.ts'
 import { useSettingStore } from '@/stores/setting.ts'
-import { exitGroup, markMsgRead, notification, setSessionTop, shield } from '@/utils/ImRequestUtils'
+import { useGroupStore } from '@/stores/group'
+import { useUserStore } from '@/stores/user'
+import { exitGroup, notification, setSessionTop, shield } from '@/utils/ImRequestUtils'
 import { invokeWithErrorHandler } from '../utils/TauriInvokeHandler'
-import { useTauriListener } from './useTauriListener'
+import { useI18n } from 'vue-i18n'
 
 const msgBoxShow = ref(false)
-/** 独立窗口的集合 */
-const aloneWin = ref(new Set())
 const shrinkStatus = ref(false)
-const itemRef = ref<SessionItem>()
+
+// 模块级别注册事件监听，避免 hook 被多次调用时重复注册
+let isShrinkListenerRegistered = false
+const registerShrinkListener = () => {
+  if (isShrinkListenerRegistered) return
+  isShrinkListenerRegistered = true
+  useMitt.on(MittEnum.SHRINK_WINDOW, async (event: any) => {
+    shrinkStatus.value = event as boolean
+  })
+}
+
 export const useMessage = () => {
-  const route = useRoute()
-  const { addListener } = useTauriListener()
+  const { t } = useI18n()
   const globalStore = useGlobalStore()
   const chatStore = useChatStore()
   const settingStore = useSettingStore()
   const { chat } = storeToRefs(settingStore)
   const contactStore = useContactStore()
-  /** 监听独立窗口关闭事件 */
-  watchEffect(() => {
-    useMitt.on(MittEnum.SHRINK_WINDOW, async (event: any) => {
-      shrinkStatus.value = event as boolean
-    })
-  })
+  const groupStore = useGroupStore()
+  const userStore = useUserStore()
+  const BOT_ALLOWED_MENU_INDEXES = new Set([0, 1, 2, 3])
 
-  /** 处理点击选中消息 */
+  // 确保监听器只注册一次
+  registerShrinkListener()
+
+  /**
+   * 处理点击选中消息
+   * 如果本地缓存中找不到自己，说明尚未同步服务端数据，此时强制刷新群成员信息。
+   */
+  const ensureGroupMembersSynced = async (roomId: string, sessionType: RoomTypeEnum) => {
+    if (sessionType !== RoomTypeEnum.GROUP) return
+
+    const currentUid = userStore.userInfo?.uid
+    if (!currentUid) return
+
+    const memberList = groupStore.getUserListByRoomId(roomId)
+    const alreadyHasCurrentUser = memberList.some((member) => member.uid === currentUid)
+
+    if (!alreadyHasCurrentUser) {
+      await groupStore.getGroupUserList(roomId, true)
+    }
+  }
+
   const handleMsgClick = async (item: SessionItem) => {
     msgBoxShow.value = true
     // 更新当前会话信息
-    globalStore.updateCurrentSessionRoomId(item.roomId)
-    await chatStore.changeRoom()
+    const roomId = item.roomId
+    console.log('[handleMsgClick] 点击会话:', roomId, 'UI未读数:', item.unreadCount)
 
-    // 只有在消息页面且有未读消息时，才标记为已读
-    if ((route.path === '/message' || route.path === '/mobile/message') && item.unreadCount > 0) {
-      markMsgRead(item.roomId || '1').then(async () => {
-        chatStore.markSessionRead(item.roomId || '1')
-        // 更新全局未读计数
-        await globalStore.updateGlobalUnreadCount()
-      })
+    globalStore.updateCurrentSessionRoomId(roomId)
+
+    chatStore.getSession(roomId)
+    chatStore.markSessionRead(roomId)
+
+    // 再根据是否存在自身成员做一次兜底刷新，防止批量切换账号后看到旧数据
+    try {
+      await ensureGroupMembersSynced(roomId, item.type)
+    } catch (error) {
+      console.error('[useMessage] 同步群成员失败:', error)
     }
+  }
+
+  /**
+   * 预加载聊天室
+   * @param roomId
+   */
+  const preloadChatRoom = (roomId: string = '1') => {
+    globalStore.updateCurrentSessionRoomId(roomId)
   }
 
   /**
@@ -57,7 +92,7 @@ export const useMessage = () => {
     const currentIndex = currentSessions.findIndex((session) => session.roomId === roomId)
 
     // 检查是否是当前选中的会话
-    const isCurrentSession = roomId === globalStore.currentSession!.roomId
+    const isCurrentSession = roomId === globalStore.currentSessionRoomId
 
     chatStore.removeSession(roomId)
     // TODO: 使用隐藏会话接口
@@ -74,7 +109,10 @@ export const useMessage = () => {
 
     // 选择下一个或上一个会话
     const nextIndex = Math.min(currentIndex, updatedSessions.length - 1)
-    handleMsgClick(updatedSessions[nextIndex])
+    const nextSession = updatedSessions[nextIndex]
+    if (nextSession) {
+      await handleMsgClick(nextSession)
+    }
   }
 
   /** 处理双击事件 */
@@ -85,39 +123,43 @@ export const useMessage = () => {
 
   const menuList = ref<OPT.RightMenu[]>([
     {
-      label: (item: SessionItem) => (item.top ? '取消置顶' : '置顶'),
+      label: (item: SessionItem) => (item.top ? t('menu.unpin') : t('menu.pin')),
       icon: (item: SessionItem) => (item.top ? 'to-bottom' : 'to-top'),
       click: (item: SessionItem) => {
         setSessionTop({ roomId: item.roomId, top: !item.top })
           .then(() => {
             // 更新本地会话状态
             chatStore.updateSession(item.roomId, { top: !item.top })
-            window.$message.success(item.top ? '已取消置顶' : '已置顶')
+            window.$message.success(
+              item.top ? t('message.message_menu.unpin_success') : t('message.message_menu.pin_success')
+            )
           })
           .catch(() => {
-            window.$message.error(item.top ? '取消置顶失败' : '置顶失败')
+            window.$message.error(item.top ? t('message.message_menu.unpin_fail') : t('message.message_menu.pin_fail'))
           })
       }
     },
     {
-      label: '复制账号',
+      label: () => t('menu.copy_account'),
       icon: 'copy',
       click: (item: any) => {
         navigator.clipboard.writeText(item.account)
-        window.$message.success(`复制成功 ${item.account}`)
+        window.$message.success(t('message.message_menu.copy_success', { account: item.account }))
       }
     },
     {
-      label: '标记未读',
+      label: () => t('menu.mark_unread'),
       icon: 'message-unread'
     },
     {
       label: (item: SessionItem) => {
         if (item.type === RoomTypeEnum.GROUP) {
-          return '群消息设置'
+          return t('menu.group_message_setting')
         }
 
-        return item.muteNotification === NotificationTypeEnum.RECEPTION ? '设置免打扰' : '取消免打扰'
+        return item.muteNotification === NotificationTypeEnum.RECEPTION
+          ? t('menu.set_do_not_disturb')
+          : t('menu.unset_do_not_disturb')
       },
       icon: (item: SessionItem) => {
         if (item.type === RoomTypeEnum.GROUP) {
@@ -130,7 +172,7 @@ export const useMessage = () => {
 
         return [
           {
-            label: '允许消息提醒',
+            label: () => t('menu.allow_notifications'),
             icon: !item.shield && item.muteNotification === NotificationTypeEnum.RECEPTION ? 'check-small' : '',
             click: async () => {
               // 如果当前是屏蔽状态，需要先取消屏蔽
@@ -145,7 +187,7 @@ export const useMessage = () => {
             }
           },
           {
-            label: '接收消息但不提醒',
+            label: () => t('menu.receive_silently'),
             icon: !item.shield && item.muteNotification === NotificationTypeEnum.NOT_DISTURB ? 'check-small' : '',
             click: async () => {
               // 如果当前是屏蔽状态，需要先取消屏蔽
@@ -160,7 +202,7 @@ export const useMessage = () => {
             }
           },
           {
-            label: '屏蔽群消息',
+            label: () => t('menu.block_group_messages'),
             icon: item.shield ? 'check-small' : '',
             click: async () => {
               await shield({
@@ -173,7 +215,9 @@ export const useMessage = () => {
                 shield: !item.shield
               })
 
-              window.$message.success(item.shield ? '已取消屏蔽' : '已屏蔽消息')
+              window.$message.success(
+                item.shield ? t('message.message_menu.unshield_success') : t('message.message_menu.shield_success')
+              )
             }
           }
         ]
@@ -193,7 +237,7 @@ export const useMessage = () => {
 
   const specialMenuList = ref<OPT.RightMenu[]>([
     {
-      label: (item: SessionItem) => (item.shield ? '取消屏蔽消息' : '屏蔽此人消息'),
+      label: (item: SessionItem) => (item.shield ? t('menu.unblock_user_messages') : t('menu.block_user_messages')),
       icon: (item: SessionItem) => (item.shield ? 'message-success' : 'people-unknown'),
       click: async (item: SessionItem) => {
         await shield({
@@ -206,13 +250,15 @@ export const useMessage = () => {
           shield: !item.shield
         })
 
-        window.$message.success(item.shield ? '已取消屏蔽' : '已屏蔽消息')
+        window.$message.success(
+          item.shield ? t('message.message_menu.unshield_success') : t('message.message_menu.shield_success')
+        )
       },
       // 只在单聊时显示
       visible: (item: SessionItem) => item.type === RoomTypeEnum.SINGLE
     },
     {
-      label: '从消息列表中移除',
+      label: () => t('menu.remove_from_list'),
       icon: 'delete',
       click: async (item: SessionItem) => {
         await handleMsgDelete(item.roomId)
@@ -220,9 +266,9 @@ export const useMessage = () => {
     },
     {
       label: (item: SessionItem) => {
-        if (item.type === RoomTypeEnum.SINGLE) return '删除好友'
-        if (item.operate === SessionOperateEnum.DISSOLUTION_GROUP) return '解散群聊'
-        return '退出群聊'
+        if (item.type === RoomTypeEnum.SINGLE) return t('menu.delete_friend')
+        if (item.operate === SessionOperateEnum.DISSOLUTION_GROUP) return t('menu.dissolve_group')
+        return t('menu.leave_group')
       },
       icon: (item: SessionItem) => {
         if (item.type === RoomTypeEnum.SINGLE) return 'forbid'
@@ -230,18 +276,21 @@ export const useMessage = () => {
         return 'logout'
       },
       click: async (item: SessionItem) => {
+        console.log('删除好友或退出群聊执行')
         // 单聊：删除好友
         if (item.type === RoomTypeEnum.SINGLE) {
-          await contactStore.onDeleteContact(item.id)
+          await contactStore.onDeleteFriend(item.detailId)
           await handleMsgDelete(item.roomId)
-          window.$message.success('已删除好友')
+          window.$message.success(t('message.message_menu.delete_friend_success'))
           return
         }
 
         // 群聊：检查是否是频道
         if (item.roomId === '1') {
           window.$message.warning(
-            item.operate === SessionOperateEnum.DISSOLUTION_GROUP ? '无法解散频道' : '无法退出频道'
+            item.operate === SessionOperateEnum.DISSOLUTION_GROUP
+              ? t('message.message_menu.cannot_dissolve_channel')
+              : t('message.message_menu.cannot_quit_channel')
           )
           return
         }
@@ -249,7 +298,11 @@ export const useMessage = () => {
         // 群聊：解散或退出
         await exitGroup({ roomId: item.roomId })
         await handleMsgDelete(item.roomId)
-        window.$message.success(item.operate === SessionOperateEnum.DISSOLUTION_GROUP ? '已解散群聊' : '已退出群聊')
+        window.$message.success(
+          item.operate === SessionOperateEnum.DISSOLUTION_GROUP
+            ? t('message.message_menu.dissolve_group_success')
+            : t('message.message_menu.quit_group_success')
+        )
       },
       visible: (item: SessionItem) => {
         // 单聊：只在operate为DELETE_FRIEND时显示
@@ -287,10 +340,10 @@ export const useMessage = () => {
     let message = ''
     switch (newType) {
       case NotificationTypeEnum.RECEPTION:
-        message = '已允许消息提醒'
+        message = t('message.message_menu.notification_allowed')
         break
       case NotificationTypeEnum.NOT_DISTURB:
-        message = '已设置接收消息但不提醒'
+        message = t('message.message_menu.notification_silent')
         // 设置免打扰时也需要更新全局未读数，因为该会话的未读数将不再计入
         chatStore.updateTotalUnreadCount()
         break
@@ -298,27 +351,29 @@ export const useMessage = () => {
     window.$message.success(message)
   }
 
-  onMounted(async () => {
-    const appWindow = WebviewWindow.getCurrent()
-    await addListener(
-      appWindow.listen(EventEnum.ALONE, () => {
-        emit(EventEnum.ALONE + itemRef.value?.roomId, itemRef.value)
-        if (aloneWin.value.has(EventEnum.ALONE + itemRef.value?.roomId)) return
-        aloneWin.value.add(EventEnum.ALONE + itemRef.value?.roomId)
-      }),
-      EventEnum.ALONE
-    )
-    addListener(
-      appWindow.listen(EventEnum.WIN_CLOSE, (e) => {
-        aloneWin.value.delete(e.payload)
-      }),
-      EventEnum.WIN_CLOSE
-    )
-  })
+  const visibleMenu = (item: SessionItem) => {
+    if (item.account === UserType.BOT) {
+      return menuList.value.filter((_, index) => BOT_ALLOWED_MENU_INDEXES.has(index))
+    }
+    return menuList.value
+  }
 
-  onBeforeUnmount(() => {
-    useMitt.off(MittEnum.SHRINK_WINDOW, () => {})
-  })
+  const visibleSpecialMenu = (item: SessionItem) => {
+    if (item.account === UserType.BOT) {
+      return []
+    }
+    return specialMenuList.value
+  }
 
-  return { msgBoxShow, handleMsgClick, handleMsgDelete, handleMsgDblclick, menuList, specialMenuList }
+  return {
+    msgBoxShow,
+    handleMsgClick,
+    handleMsgDelete,
+    handleMsgDblclick,
+    menuList,
+    specialMenuList,
+    visibleMenu,
+    visibleSpecialMenu,
+    preloadChatRoom
+  }
 }

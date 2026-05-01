@@ -51,7 +51,9 @@ export enum EventEnum {
   /** 共享屏幕 */
   SHARE_SCREEN = 'shareScreen',
   /** 锁屏 */
-  LOCK_SCREEN = 'lockScreen'
+  LOCK_SCREEN = 'lockScreen',
+  /** 多窗口 */
+  MULTI_MSG = 'multiMsg'
 }
 
 /** Mitt兄弟组件通信 */
@@ -76,8 +78,12 @@ export enum MittEnum {
   OPEN_EDIT_INFO = 'openEditInfo',
   /** 关闭个人信息浮窗 */
   CLOSE_INFO_SHOW = 'closeInfoShow',
+  /** 打开修改群昵称弹窗 */
+  OPEN_GROUP_NICKNAME_MODAL = 'openGroupNicknameModal',
   /** 左边菜单弹窗 */
   LEFT_MODAL_SHOW = 'leftModalShow',
+  /** 登录窗口异地登录弹窗 */
+  LOGIN_REMOTE_MODAL = 'loginRemoteModal',
   /** 触发home窗口事件 */
   HOME_WINDOW_RESIZE = 'homeWindowResize',
   /** @ AT */
@@ -101,7 +107,23 @@ export enum MittEnum {
   /** 视频下载状态更新 */
   VIDEO_DOWNLOAD_STATUS_UPDATED = 'videoDownloadStatusUpdated',
   /** 切换语言页面 */
-  VOICE_RECORD_TOGGLE = 'voiceRecordToggle'
+  VOICE_RECORD_TOGGLE = 'voiceRecordToggle',
+  /** 消息多选 */
+  MSG_MULTI_CHOOSE = 'msgMultiChoose',
+  /** 扫码事件 */
+  QR_SCAN_EVENT = 'qrScanEvent',
+  /** 移动端通话浮层请求 */
+  MOBILE_RTC_CALL_REQUEST = 'mobileRtcCallRequest',
+  /** 移动端关闭输入框面板 */
+  MOBILE_CLOSE_PANEL = 'mobileClosePanel',
+  /** 全局文件拖拽 */
+  GLOBAL_FILES_DROP = 'globalFilesDrop',
+  /** 切换会话 */
+  MSG_INIT = 'msg_init',
+  /** 会话切换完成*/
+  SESSION_CHANGED = 'sessionChanged',
+  /** 更新会话最后一条消息 */
+  UPDATE_SESSION_LAST_MSG = 'updateSessionLastMsg'
 }
 
 /** 主题类型 */
@@ -140,6 +162,8 @@ export enum StoresEnum {
   USER = 'user',
   /** 群组 */
   GROUP = 'group',
+  /** 公告 */
+  ANNOUNCEMENT = 'announcement',
   /** 全局 */
   GLOBAL = 'global',
   /** 表情 */
@@ -148,6 +172,8 @@ export enum StoresEnum {
   CONTACTS = 'contacts',
   /** 聊天 */
   CHAT = 'chat',
+  /** 会话未读缓存 */
+  SESSION_UNREAD = 'sessionUnread',
   /** 缓存 */
   CACHED = 'cached',
   /** 配置 */
@@ -161,7 +187,19 @@ export enum StoresEnum {
   /** 目录扫描器 */
   SCANNER = 'scanner',
   /** 引导状态 */
-  GUIDE = 'guide'
+  GUIDE = 'guide',
+  /** 动态/朋友圈 */
+  FEED = 'feed',
+  /** 朋友圈通知 */
+  FEED_NOTIFICATION = 'feedNotification',
+  /** Bot 视图状态 */
+  BOT = 'bot',
+  /** 文件管理 */
+  FILE = 'file',
+  /** 缩略图缓存 */
+  THUMBNAIL_CACHE = 'thumbnailCache',
+  /** 初始化同步状态 */
+  INITIAL_SYNC = 'initialSync'
 }
 
 /**
@@ -187,7 +225,7 @@ export enum MsgEnum {
   EMOJI,
   /** 系统消息 8*/
   SYSTEM,
-  /** 合并消息 9*/
+  /** 聊天记录 9*/
   MERGE,
   /** 公告 10*/
   NOTICE,
@@ -204,7 +242,24 @@ export enum MsgEnum {
   /** 回复 16*/
   REPLY,
   /** AI 17*/
-  AI
+  AI,
+  /** 位置 18*/
+  LOCATION
+}
+
+/**
+ * AI 消息内容类型枚举
+ * 用于标识 AI 生成的消息内容类型（文本、图片、视频、音频）
+ */
+export enum AiMsgContentTypeEnum {
+  /** 文本 1 */
+  TEXT = 1,
+  /** 图片 2 */
+  IMAGE = 2,
+  /** 视频 3 */
+  VIDEO = 3,
+  /** 音频 4 */
+  AUDIO = 4
 }
 
 /**
@@ -313,7 +368,11 @@ export enum RoomActEnum {
   /** 删除记录 */
   DELETE_RECORD,
   /** 屏蔽好友 */
-  BLOCK_FRIEND
+  BLOCK_FRIEND,
+  /** 修改群名称 */
+  UPDATE_GROUP_NAME,
+  /** 修改群信息 */
+  UPDATE_GROUP_INFO
 }
 
 /** 变更类型 1 加入群组，2： 移除群组 */
@@ -340,16 +399,6 @@ export enum LimitEnum {
   COM_COUNT = 5
 }
 
-/** ws请求类型 */
-export enum WsReqEnum {
-  /** 请求登录二维码 */
-  LOGIN = 1,
-  /** 心跳包 */
-  HEARTBEAT = 2,
-  /** 登录认证 */
-  AUTHORIZE = 3
-}
-
 /** ws响应类型 */
 export enum WorkerMsgEnum {
   /** open */
@@ -369,9 +418,7 @@ export enum ModalEnum {
   /** 锁屏弹窗 */
   LOCK_SCREEN,
   /** 检查更新弹窗 */
-  CHECK_UPDATE,
-  /** 异地登录弹窗 */
-  REMOTE_LOGIN
+  CHECK_UPDATE
 }
 
 /** MacOS键盘映射 */
@@ -449,6 +496,20 @@ export enum UploadSceneEnum {
   AVATAR = 'avatar'
 }
 
+/** 移动端面板状态枚举 */
+export enum MobilePanelStateEnum {
+  /** 无面板 */
+  NONE = 'none',
+  /** 表情面板 */
+  EMOJI = 'emoji',
+  /** 语音面板 */
+  VOICE = 'voice',
+  /** 更多面板 */
+  MORE = 'more',
+  /** 输入框聚焦 */
+  FOCUS = 'focus'
+}
+
 /** 会话操作 */
 export enum SessionOperateEnum {
   /** 删除好友 */
@@ -493,6 +554,10 @@ export enum TauriCommand {
   SAVE_MSG = 'save_msg',
   /** 保存消息标记 */
   SAVE_MESSAGE_MARK = 'save_message_mark',
+  /** 删除单条聊天消息 */
+  DELETE_MESSAGE = 'delete_message',
+  /** 删除房间内的所有聊天记录 */
+  DELETE_ROOM_MESSAGES = 'delete_room_messages',
   /** 更新消息撤回状态 */
   UPDATE_MESSAGE_RECALL_STATUS = 'update_message_recall_status',
   /** 获取用户 tokens */
@@ -500,7 +565,17 @@ export enum TauriCommand {
   /** 更新 token */
   UPDATE_TOKEN = 'update_token',
   /** 移除 token */
-  REMOVE_TOKENS = 'remove_tokens'
+  REMOVE_TOKENS = 'remove_tokens',
+  /** 查询聊天历史记录 */
+  QUERY_CHAT_HISTORY = 'query_chat_history',
+  /** AI 消息流式发送 */
+  AI_MESSAGE_SEND_STREAM = 'ai_message_send_stream',
+  /** 生成 MinIO 预签名 URL */
+  GENERATE_MINIO_PRESIGNED_URL = 'generate_minio_presigned_url',
+  /** 通过 Rust 端 PUT 上传本地文件 */
+  UPLOAD_FILE_PUT = 'upload_file_put',
+  /** 通过 Rust 端七牛分片上传本地文件 */
+  QINIU_UPLOAD_RESUMABLE = 'qiniu_upload_resumable'
 }
 
 // 通话状态枚举
@@ -540,8 +615,16 @@ export enum ImUrlEnum {
   GET_QINIU_TOKEN = 'getQiniuToken',
   /** 初始化配置 */
   INIT_CONFIG = 'initConfig',
-  /** 文件上传 */
-  FILE_UPLOAD = 'fileUpload',
+  /** 获取默认存储提供者 */
+  STORAGE_PROVIDER = 'storageProvider',
+  /** 获取模型列表 */
+  GET_ASSISTANT_MODEL_LIST = 'getAssistantModelList',
+  /** 坐标转换 */
+  MAP_COORD_TRANSLATE = 'mapCoordTranslate',
+  /** 逆地理编码 */
+  MAP_REVERSE_GEOCODE = 'mapReverseGeocode',
+  /** 地址静态图片 */
+  MAP_STATIC = 'mapStatic',
 
   // 验证码相关
   /** 发送验证码 */
@@ -550,6 +633,8 @@ export enum ImUrlEnum {
   GET_CAPTCHA = 'getCaptcha',
 
   // 群公告相关
+  /** 查看群公告 */
+  ANNOUNCEMENT = 'announcement',
   /** 编辑群公告 */
   EDIT_ANNOUNCEMENT = 'editAnnouncement',
   /** 删除群公告 */
@@ -560,10 +645,6 @@ export enum ImUrlEnum {
   GET_ANNOUNCEMENT_LIST = 'getAnnouncementList',
 
   // 群聊申请相关
-  /** 申请加群列表 */
-  APPLY_GROUP_LIST = 'applyGroupList',
-  /** 处理加群申请 */
-  APPLY_HANDLE = 'applyHandle',
   /** 申请加群 */
   APPLY_GROUP = 'applyGroup',
 
@@ -578,6 +659,8 @@ export enum ImUrlEnum {
   GROUP_LIST = 'groupList',
   /** 群聊详情 */
   GROUP_DETAIL = 'groupDetail',
+  /** 群聊信息 */
+  GROUP_INFO = 'groupInfo',
 
   // 群聊管理员
   /** 撤销管理员 */
@@ -626,10 +709,12 @@ export enum ImUrlEnum {
   SEND_ADD_FRIEND_REQUEST = 'sendAddFriendRequest',
   /** 处理邀请 */
   HANDLE_INVITE = 'handleInvite',
-  /** 申请未读数 */
-  APPLY_UN_READ_COUNT = 'applyUnReadCount',
-  /** 请求申请页面 */
-  REQUEST_APPLY_PAGE = 'requestApplyPage',
+  /** 通知未读数 */
+  NOTICE_UN_READ_COUNT = 'noticeUnReadCount',
+  /** 请求通知页面 */
+  REQUEST_NOTICE_PAGE = 'requestNoticePage',
+  /** 通知已读 */
+  REQUEST_NOTICE_READ = 'RequestNoticeRead',
   /** 获取联系人列表 */
   GET_CONTACT_LIST = 'getContactList',
   /** 搜索好友 */
@@ -640,6 +725,16 @@ export enum ImUrlEnum {
   CHANGE_USER_STATE = 'changeUserState',
   /** 获取所有用户状态 */
   GET_ALL_USER_STATE = 'getAllUserState',
+
+  // 二维码相关
+  /** 生成二维码 */
+  GENERATE_QR_CODE = 'generateQRCode',
+  /** 检查二维码状态 */
+  CHECK_QR_STATUS = 'checkQRStatus',
+  /** 扫描二维码 */
+  SCAN_QR_CODE = 'scanQRCode',
+  /** 确认登录 */
+  CONFIRM_QR_CODE = 'confirmQRCode',
 
   // 用户信息相关
   /** 上传头像 */
@@ -652,12 +747,10 @@ export enum ImUrlEnum {
   ADD_EMOJI = 'addEmoji',
   /** 设置用户徽章 */
   SET_USER_BADGE = 'setUserBadge',
-  /** 修改用户名 */
-  MODIFY_USER_NAME = 'modifyUserName',
+  /** 修改用户基础信息 */
+  MODIFY_USER_INFO = 'ModifyUserInfo',
   /** 获取用户信息详情 */
   GET_USER_INFO_DETAIL = 'getUserInfoDetail',
-  /** 批量获取用户信息 */
-  GET_USER_INFO_BATCH = 'getUserInfoBatch',
   /** 批量获取徽章 */
   GET_BADGES_BATCH = 'getBadgesBatch',
   /** 获取徽章列表 */
@@ -675,6 +768,41 @@ export enum ImUrlEnum {
   /** 获取成员统计 */
   GET_MEMBER_STATISTIC = 'getMemberStatistic',
 
+  /** 获取朋友圈详情 */
+  FEED_DETAIL = 'feedDetail',
+  /** 获取朋友圈列表 */
+  FEED_LIST = 'feedList',
+  /** 发布朋友圈 */
+  PUSH_FEED = 'pushFeed',
+  /** 删除朋友圈 */
+  DEL_FEED = 'delFeed',
+  /** 编辑朋友圈 */
+  EDIT_FEED = 'editFeed',
+  /** 获取朋友圈权限 */
+  GET_FEED_PERMISSION = 'getFeedPermission',
+
+  // 朋友圈点赞相关
+  /** 点赞或取消点赞 */
+  FEED_LIKE_TOGGLE = 'feedLikeToggle',
+  /** 获取点赞列表 */
+  FEED_LIKE_LIST = 'feedLikeList',
+  /** 获取点赞数量 */
+  FEED_LIKE_COUNT = 'feedLikeCount',
+  /** 判断是否已点赞 */
+  FEED_LIKE_HAS_LIKED = 'feedLikeHasLiked',
+
+  // 朋友圈评论相关
+  /** 发表评论 */
+  FEED_COMMENT_ADD = 'feedCommentAdd',
+  /** 删除评论 */
+  FEED_COMMENT_DELETE = 'feedCommentDelete',
+  /** 获取评论列表 */
+  FEED_COMMENT_LIST = 'feedCommentList',
+  /** 获取所有评论列表（不分页） */
+  FEED_COMMENT_ALL = 'feedCommentAll',
+  /** 获取评论数量 */
+  FEED_COMMENT_COUNT = 'feedCommentCount',
+
   // 群成员信息
   /** 获取所有用户基础信息 */
   GET_ALL_USER_BASE_INFO = 'getAllUserBaseInfo',
@@ -686,7 +814,108 @@ export enum ImUrlEnum {
   MARK_MSG_READ = 'markMsgRead',
   /** 移出群成员 */
   REMOVE_GROUP_MEMBER = 'removeGroupMember',
-  CHECK_EMAIL = 'checkEmail'
+  CHECK_EMAIL = 'checkEmail',
+
+  MERGE_MSG = 'mergeMsg',
+  GET_USER_BY_IDS = 'getUserByIds',
+
+  /** 发送 AI 消息 */
+  MESSAGE_SEND_STREAM = 'messageSendStream',
+  /** 保存生成内容消息（用于音频、图片、视频等生成功能） */
+  MESSAGE_SAVE_GENERATED_CONTENT = 'messageSaveGeneratedContent',
+  /** 获取指定会话消息列表 */
+  MESSAGE_LIST_BY_CONVERSATION_ID = 'messageListByConversationId',
+  /** 删除单条消息 */
+  MESSAGE_DELETE = 'messageDelete',
+  /** 删除指定对话的消息 */
+  MESSAGE_DELETE_BY_CONVERSATION_ID = 'messageDeleteByConversationId',
+  /** 获取会话消息列表 */
+  CONVERSATION_PAGE = 'conversationPage',
+  /** 获得【我的】聊天对话 */
+  CONVERSATION_GET_MY = 'conversationGetMy',
+  /** 创建会话 */
+  CONVERSATION_CREATE_MY = 'conversationCreateMy',
+  /** 更新会话 */
+  CONVERSATION_UPDATE_MY = 'conversationUpdateMy',
+  /** 删除会话 */
+  CONVERSATION_DELETE_MY = 'conversationDeleteMy',
+  /** 获得模型 */
+  MODEL_GET = 'modelGet',
+  /** 获得模型剩余使用次数 */
+  MODEL_REMAINING_USAGE = 'modelRemainingUsage',
+  /** 获得模型分页 */
+  MODEL_PAGE = 'modelPage',
+  /** 创建模型 */
+  MODEL_CREATE = 'modelCreate',
+  /** 更新模型 */
+  MODEL_UPDATE = 'modelUpdate',
+  /** 删除模型 */
+  MODEL_DELETE = 'modelDelete',
+
+  // ==================== AI 图片生成 ====================
+  /** 获取【我的】图片生成分页 */
+  IMAGE_MY_PAGE = 'imageMyPage',
+  /** 获取【我的】图片生成记录 */
+  IMAGE_GET = 'imageGet',
+  /** 根据ID列表获取【我的】图片记录 */
+  IMAGE_MY_LIST_BY_IDS = 'imageMyListByIds',
+  /** 生成图片 */
+  IMAGE_DRAW = 'imageDraw',
+  /** 删除【我的】图片记录 */
+  IMAGE_DELETE_MY = 'imageDeleteMy',
+
+  // ==================== AI 视频生成 ====================
+  /** 获取【我的】视频生成分页 */
+  VIDEO_MY_PAGE = 'videoMyPage',
+  /** 获取【我的】视频生成记录 */
+  VIDEO_GET = 'videoGet',
+  /** 根据ID列表获取【我的】视频记录 */
+  VIDEO_MY_LIST_BY_IDS = 'videoMyListByIds',
+  /** 生成视频 */
+  VIDEO_GENERATE = 'videoGenerate',
+  /** 删除【我的】视频记录 */
+  VIDEO_DELETE_MY = 'videoDeleteMy',
+
+  // ==================== AI 音频生成 ====================
+  /** 获取【我的】音频生成分页 */
+  AUDIO_MY_PAGE = 'audioMyPage',
+  /** 获取【我的】音频生成记录 */
+  AUDIO_GET_MY = 'audioGetMy',
+  /** 根据ID列表获取【我的】音频记录 */
+  AUDIO_MY_LIST_BY_IDS = 'audioMyListByIds',
+  /** 生成音频 */
+  AUDIO_GENERATE = 'audioGenerate',
+  /** 删除【我的】音频记录 */
+  AUDIO_DELETE_MY = 'audioDeleteMy',
+  /** 获取指定模型支持的声音列表 */
+  AUDIO_VOICES = 'audioVoices',
+
+  /** API 密钥分页 */
+  API_KEY_PAGE = 'apiKeyPage',
+  /** API 密钥简单列表 */
+  API_KEY_SIMPLE_LIST = 'apiKeySimpleList',
+  /** 创建 API 密钥 */
+  API_KEY_CREATE = 'apiKeyCreate',
+  /** 更新 API 密钥 */
+  API_KEY_UPDATE = 'apiKeyUpdate',
+  /** 删除 API 密钥 */
+  API_KEY_DELETE = 'apiKeyDelete',
+  /** 查询 API 密钥余额 */
+  API_KEY_BALANCE = 'apiKeyBalance',
+  /** 获取平台列表 */
+  PLATFORM_LIST = 'platformList',
+  /** 添加平台模型 */
+  PLATFORM_ADD_MODEL = 'platformAddModel',
+  /** 聊天角色分页 */
+  CHAT_ROLE_PAGE = 'chatRolePage',
+  /** 聊天角色类别列表 */
+  CHAT_ROLE_CATEGORY_LIST = 'chatRoleCategoryList',
+  /** 创建聊天角色 */
+  CHAT_ROLE_CREATE = 'chatRoleCreate',
+  /** 更新聊天角色 */
+  CHAT_ROLE_UPDATE = 'chatRoleUpdate',
+  /** 删除聊天角色 */
+  CHAT_ROLE_DELETE = 'chatRoleDelete'
 }
 
 // 滚动意图管理枚举
@@ -695,4 +924,14 @@ export enum ScrollIntentEnum {
   INITIAL = 'initial', // 初始化或切换房间
   NEW_MESSAGE = 'new_message', // 新消息到达
   LOAD_MORE = 'load_more' // 加载更多历史消息
+}
+
+export enum MergeMessageType {
+  SINGLE = 1,
+  MERGE = 2
+}
+
+// 用户类型
+export enum UserType {
+  BOT = 'bot'
 }

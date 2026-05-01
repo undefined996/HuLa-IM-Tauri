@@ -1,18 +1,20 @@
 {
   "$schema": "https://biomejs.dev/schemas/latest/schema.json",
-  "vcs": { "enabled": false, "clientKind": "git", "useIgnoreFile": false },
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": false,
     "includes": [
       "**/*.{js,jsx,ts,tsx,vue,json}",
       "!.*",
       "!public/*",
+      "!coverage",
       "!src/typings/*.d.ts",
       "!src-tauri/*",
       "!node_modules/*",
       "!tauri-plugin-hula/*",
       "!dist/*",
-      "!src-tauri/gen/schemas"
+      "!src-tauri/gen/schemas",
+      "!.release-it.json"
     ]
   },
   "formatter": {
@@ -52,7 +54,8 @@
         "useNodejsImportProtocol": "off",
         "noNonNullAssertion": "off",
         "useNamingConvention": "off",
-        "useTemplate": "off"
+        "useTemplate": "off",
+        "useImportType": "off"
       },
       "suspicious": {
         "noGlobalIsNan": "off",
@@ -85,7 +88,7 @@
   },
   "assist": {
     "enabled": true,
-    "actions": { "source": { "organizeImports": "on" } }
+    "actions": { "source": { "organizeImports": "off" } }
   },
   "overrides": [
     {

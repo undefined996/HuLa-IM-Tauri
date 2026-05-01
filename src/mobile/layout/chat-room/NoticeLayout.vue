@@ -3,7 +3,9 @@
   <div class="flex flex-col flex-1">
     <RouterView v-slot="{ Component }">
       <Transition name="slide" appear mode="out-in">
-        <component :is="Component" :key="route.fullPath" />
+        <keep-alive :include="['mobileChatNoticeList']">
+          <component :is="Component" :key="route.name" />
+        </keep-alive>
       </Transition>
     </RouterView>
   </div>
@@ -17,7 +19,7 @@ const route = useRoute()
 
 <style scoped>
 /* 侧滑切换动画 */
-.slide-enter-active,
+/* .slide-enter-active,
 .slide-leave-active {
   transition: all 0.1s ease;
 }
@@ -30,5 +32,5 @@ const route = useRoute()
 .slide-leave-to {
   transform: translateX(30px);
   opacity: 0;
-}
+} */
 </style>

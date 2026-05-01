@@ -23,6 +23,7 @@ declare namespace OPT {
       tip?: string
       size?: {
         minWidth?: number
+        minHeight?: number
         width: number
         height: number
       }
@@ -54,7 +55,7 @@ declare namespace OPT {
       url: string
       label: string
       icon: string
-      versionStatus?: 'Beta' | 'New' | 'alpha'
+      versionStatus?: 'Beta' | 'New' | 'alpha' | string
     }
   }
 

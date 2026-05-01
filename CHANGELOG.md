@@ -1,3 +1,581 @@
+# Changelog
+
+## [3.0.9](https://github.com/HuLaSpark/HuLa/compare/v3.0.8...v3.0.9) (2026-01-19)
+
+### ✨ Features | 新功能
+
+* **chat:** :sparkles: support group member alias resolution when extracting [@mentions](https://github.com/mentions) ([86a7f3e](https://github.com/HuLaSpark/HuLa/commit/86a7f3e456b9cedc8a99f554557aa12cd0fb8e08))
+* **i18n:** :sparkles: add loading states and system settings translations ([a08bb76](https://github.com/HuLaSpark/HuLa/commit/a08bb762ff66f353a2ff01f529d6b778f55d22cc))
+* **i18n:** add i18n for community post ([7648f77](https://github.com/HuLaSpark/HuLa/commit/7648f777fd821ac7028b69423a3a3fa20caad046))
+* **i18n:** enhance internationalization support by adding mobile titles and computed labels ([9c07f86](https://github.com/HuLaSpark/HuLa/commit/9c07f8695820227f29f1f5b3961096c9d9ec0ba5))
+* **login:** :sparkles: add 3-second delay and cancel option for auto-login on desktop ([1f661ea](https://github.com/HuLaSpark/HuLa/commit/1f661eaaecf64c5e9ac411832b5a446c915be3e7))
+* **login:** :sparkles: add message sync and error handling for OAuth login ([7d7f0c2](https://github.com/HuLaSpark/HuLa/commit/7d7f0c2d6bc438ba93546aeb756d63cf2388eee7))
+* **login:** :sparkles: preload group member data and announcements during login ([2cc3eab](https://github.com/HuLaSpark/HuLa/commit/2cc3eab991a192cba654956fdc693ab2e75147ad))
+* **monitor:** :sparkles: add development memory monitor component ([709bcc4](https://github.com/HuLaSpark/HuLa/commit/709bcc4514f0eab86e88e9e8e86247d51511764c))
+* **notification:** :sparkles: add volume control for message alert sound ([d560912](https://github.com/HuLaSpark/HuLa/commit/d56091250799bcf35a751ff5764c197e1445c2e5))
+* **skill:** :sparkles: add HuLa skill linking script and project context documentation ([0aaf60c](https://github.com/HuLaSpark/HuLa/commit/0aaf60c0d2e1b8484afe4b7b7ecb791b1ab66e53))
+* **theme:** :sparkles: preserve user theme preference on app restart ([3d81c33](https://github.com/HuLaSpark/HuLa/commit/3d81c3338b8ef7d30a2ca883fbe16f035c9eb7f3))
+* **view:** :sparkles: add gitecode login ([cf80f79](https://github.com/HuLaSpark/HuLa/commit/cf80f793334c8917a0b8c8ef7ea30c12aa3f31e6))
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **chat:** :bug: validate emoji insertion range is within input box ([e027e32](https://github.com/HuLaSpark/HuLa/commit/e027e320aca2c12c2b0694d8c81d5fa76b0ecbb5))
+* **ci:** :bug: fix draft release detection to avoid multiple release IDs for same tag ([342eae6](https://github.com/HuLaSpark/HuLa/commit/342eae600ca7394a4748ef04d1f589fd92ac6b8c))
+* **common:** :bug: page the friends list ([cc14874](https://github.com/HuLaSpark/HuLa/commit/cc14874773b9eab5579d0a53e4a58193269651a5))
+* **forget-password:** :bug: reset initial step to 1 from 3 ([cd42271](https://github.com/HuLaSpark/HuLa/commit/cd422712748e4659ad50e5c3893272ee11eac207))
+* **group:** :bug: fix group member refresh problem in single chat ([4cd1c3c](https://github.com/HuLaSpark/HuLa/commit/4cd1c3cd66f605c58ad4115e023a39035ea4ed0e))
+* **ios:** :bug: fix ios crash and auto login failure ([c860a14](https://github.com/HuLaSpark/HuLa/commit/c860a140e3b7a52ef1af7db5c553fa4c69b14ddc)), closes [#472](https://github.com/HuLaSpark/HuLa/issues/472)
+* **ios:** :bug: fix ios real machine stuck on startup page due to useNetworkStatus() ([8c18806](https://github.com/HuLaSpark/HuLa/commit/8c18806a83cd83d0a435022a8dc15d74f4a81f9a))
+* **ios:** :bug: fix ios simulator can't start ([cb2028a](https://github.com/HuLaSpark/HuLa/commit/cb2028a971acb2d6902a149885573d5e96557d3b))
+* **ios:** :bug: fix packaging error due to ios permissions issue ([18fb1fd](https://github.com/HuLaSpark/HuLa/commit/18fb1fd14ea230782794d9ce6b11aeada29171c4))
+* **logout:** :bug: skip token validation during logout to prevent error loops ([c65c740](https://github.com/HuLaSpark/HuLa/commit/c65c7407975bc959bebc01ca0f7ad7ff66486cc1))
+* **plugin:** :bug: display of ai usage times ([ca10f5d](https://github.com/HuLaSpark/HuLa/commit/ca10f5ddce0fa51e390c00cbeac2c8e40b6c925a))
+* **theme:** follow system to change theme ([7a7b5b2](https://github.com/HuLaSpark/HuLa/commit/7a7b5b24c133afb2dc9ca113a8c8020969a7af19))
+* **view:** :bug: render gitcode icon ([0ba6187](https://github.com/HuLaSpark/HuLa/commit/0ba61876b34eb8f87a44d19f776c93a7a4f6e887))
+
+## [3.0.8](https://github.com/HuLaSpark/HuLa/compare/v3.0.6...v3.0.8) (2025-12-31)
+
+### ✨ Features | 新功能
+
+* **AI rules:** :sparkles: add mainstream ai rules ([86c5d11](https://github.com/HuLaSpark/HuLa/commit/86c5d11ba81bafaf100f03dc48dd828b8b3515f4))
+* **component:** :sparkles: add upgradelink ([15ca9a2](https://github.com/HuLaSpark/HuLa/commit/15ca9a2c7c76dbd0cc6edeab715a7a539b338741))
+* **Drag Upload:** :sparkles: add drag file uploads ([70df9d5](https://github.com/HuLaSpark/HuLa/commit/70df9d5d24028e65f8d8864cb6d5bce3d7a3a7a3)), closes [#444](https://github.com/HuLaSpark/HuLa/issues/444)
+* **group QR code:** :sparkles: add group QR code save and forward ([4ca6ccc](https://github.com/HuLaSpark/HuLa/commit/4ca6ccc3d5caa0e8dbd2da92756d82930b4ddf82))
+* **ios:** :sparkles: add notification badges and improve iOS notification support ([c1b446b](https://github.com/HuLaSpark/HuLa/commit/c1b446b6a69b5563e56081ddc7aed98d3981b831))
+* **layout:** :sparkles: add some page layouts to resize ([d069fe7](https://github.com/HuLaSpark/HuLa/commit/d069fe7f3bdf7df751ee93854ec75c3ac523d71e)), closes [#393](https://github.com/HuLaSpark/HuLa/issues/393)
+* **macOS 26:** :sparkles: improved window traffic light button spacing processing logic ([2d0523c](https://github.com/HuLaSpark/HuLa/commit/2d0523c8a6760847853ab30407525e9f83487ca9))
+* **macOS:** :sparkles: add traffic light button spacing and optimize iOS build support ([ad72331](https://github.com/HuLaSpark/HuLa/commit/ad72331c165c9dd0fc6b6be15761bbdaa1cda622))
+* **mobile:** add mobile i18n support ([#449](https://github.com/HuLaSpark/HuLa/issues/449)) ([bdacf4e](https://github.com/HuLaSpark/HuLa/commit/bdacf4ed3f7af298d7ac0427f71f4140f2b9c2f7)), closes [#441](https://github.com/HuLaSpark/HuLa/issues/441) [#443](https://github.com/HuLaSpark/HuLa/issues/443) [#444](https://github.com/HuLaSpark/HuLa/issues/444)
+* **plugin:** :sparkles: add ai stop reply ([61c6108](https://github.com/HuLaSpark/HuLa/commit/61c61083b98b7609f7a1a4c55c71497f3aadce41))
+* **settings:** sync native theme ([#458](https://github.com/HuLaSpark/HuLa/issues/458)) ([c28ffaa](https://github.com/HuLaSpark/HuLa/commit/c28ffaa4518a0b1cbfd673219918e4124c493433))
+* **sqlcipher:** :sparkles: add sqlcipher for sqlite encryption ([9aae783](https://github.com/HuLaSpark/HuLa/commit/9aae783f8cffe1da5d3bb49dbfa17910837e4d67)), closes [#438](https://github.com/HuLaSpark/HuLa/issues/438)
+* **view:** :sparkles: add gitee and gitHub authorized login ([69c2e47](https://github.com/HuLaSpark/HuLa/commit/69c2e470c02be0b49a9c4533c76501ec3a5e6381))
+* **vscode:** add i18n-ally configuration and update extensions ([5278ab4](https://github.com/HuLaSpark/HuLa/commit/5278ab435e36e0a3db15f9b9415191f69455b825))
+* **window:** :sparkles: add windows, system theme follow and custom theme settings ([b20d674](https://github.com/HuLaSpark/HuLa/commit/b20d67436a5e3f941f7cebef24f94ed877bf7049))
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **android:** :bug: add MODIFY_AUDIO_SETTINGS permission for audio control ([6b66141](https://github.com/HuLaSpark/HuLa/commit/6b661418e5df051c9bf846a1a4f3709993d1cf63)), closes [#IDGIXN](https://github.com/HuLaSpark/HuLa/issues/IDGIXN)
+* **chat:** :bug: fix incorrect variable usage in currently selected room ([63748bd](https://github.com/HuLaSpark/HuLa/commit/63748bdad0643eaa11a0b31d4a8be1074dd28dfa))
+* **common:** 🐛 simplify reconnection sync to avoid duplicate full syncs on first ([6057af2](https://github.com/HuLaSpark/HuLa/commit/6057af2ec72bb443ed7b894d849a8e62f5d164a4))
+* **emoji:** :bug: fix a problem where emoticons were stuck when sent continuously ([38724e8](https://github.com/HuLaSpark/HuLa/commit/38724e8e10cabb6e1eee9cc0851ad3b11efa5dc7))
+* **emoji:** :bug: fix emoji emoji list stuttering issue ([1c8ebfd](https://github.com/HuLaSpark/HuLa/commit/1c8ebfdf8a1cb172ee5941d487eeac48067f95a7))
+* **favicon.ico:** :bug: fix error due to missing favicon.ico ([c08f89a](https://github.com/HuLaSpark/HuLa/commit/c08f89a57bb85dec3ac1e841630ea536e7965352))
+* **group:** :bug: fix group member status sorting problem ([c90b871](https://github.com/HuLaSpark/HuLa/commit/c90b871cc9c727b817d2028aa1c6cefc8ef62668))
+* **group:** :bug: fix group members online status and show unknown users ([3951265](https://github.com/HuLaSpark/HuLa/commit/395126591dcbb67bc93456546cffd0be027c2403))
+* **ios:** :bug: improved iOS Simulator detection and build configuration ([8719def](https://github.com/HuLaSpark/HuLa/commit/8719def4b2a0298dfc06ca60e92f37c361b308f8))
+* **nsis:** uninstall fails when manually close app on kill app dialog, per-machine installer not requesting elevation when run by non-admin users ([1bcc03e](https://github.com/HuLaSpark/HuLa/commit/1bcc03e963ec5d3f542e0a66b2cd6b0ce3cb057e))
+* **perl:** :bug: handle 8.3 short filename format in Strawberry Perl prefix check ([34e9c4d](https://github.com/HuLaSpark/HuLa/commit/34e9c4dc2d3a2ed7e69246eed171500603bf1dbf))
+* **proxy:** Fix the bug where the app does not load the user's previous configuration on launch ([be78edf](https://github.com/HuLaSpark/HuLa/commit/be78edf62f66821eaf40c1bf6d1d3016d5f3e714))
+* **unread count:** :bug: fix inaccurate unread count on mac dock ([3f45dc7](https://github.com/HuLaSpark/HuLa/commit/3f45dc786242542cdbe3c3943fda81cf65ab36f3))
+* **unread:** :bug: fix unread count not clearing when clicking session in full plmatfor view ([21fda09](https://github.com/HuLaSpark/HuLa/commit/21fda09cbc4b3913b6bcafcbc623a64688b1ac68))
+* **UnreadCount:** :bug: continue to repair session check unread count unerased ([433cad4](https://github.com/HuLaSpark/HuLa/commit/433cad4f9f3d849e580a908c9e876edcff497511))
+* **unreadCount:** :bug: fix dock icon unread count not displayed on mac ([960978c](https://github.com/HuLaSpark/HuLa/commit/960978c465fb2889e95a4d7c63548fb429ff96a3))
+* **win:** :bug: add and install Perl script to fix win startup problems ([0a658a7](https://github.com/HuLaSpark/HuLa/commit/0a658a77e0c246703111d1fbb86e86ffca0bc1ac))
+* **win:** :bug: fix win10 multi-screen high resolution layout confusion due to useFixedScale ([0f2854a](https://github.com/HuLaSpark/HuLa/commit/0f2854aa8db56a17a3995cfa48b137fa229b1f7f)), closes [#389](https://github.com/HuLaSpark/HuLa/issues/389)
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **chat:** :zap: increase message list size limit and memory footprint ([9638de0](https://github.com/HuLaSpark/HuLa/commit/9638de05b639b0c92de79ef23fdfad50690f605e))
+* **common:** :zap: optimize message storage and timer for some uncleaned footprint ([e0e7a9b](https://github.com/HuLaSpark/HuLa/commit/e0e7a9bf4b84d259e2c98e47f5fefec45b6b77ad))
+* **DPI:** :zap: add monitor-aware window size clamping to prevent oversized windows ([97074ac](https://github.com/HuLaSpark/HuLa/commit/97074ac9f4bee44361e6a64b1bb68d6e6c675f1d))
+* **Keychain:** :zap: mac does not use Keychain to save keys by default ([4483307](https://github.com/HuLaSpark/HuLa/commit/44833079f86a63ff24e394d83dc8b080af3f4543))
+* **layout:** :zap: optimize group member loading ([76ab5f5](https://github.com/HuLaSpark/HuLa/commit/76ab5f5ae1cb459d5252ef2265787267af96de4f))
+* **media:** :zap: optimize multimedia presentation on PC and mobile ([54902c9](https://github.com/HuLaSpark/HuLa/commit/54902c9649cebcf4cdc70b45ff82e0d44aff691a))
+* **moblie:** :zap: optimize mobile text bubble display ([2cab73a](https://github.com/HuLaSpark/HuLa/commit/2cab73afd872cfd156a49c0611743ca550d79e68))
+* **pc circle of friends:** :zap: optimize page layout and style of PC circle of friends ([25bf49d](https://github.com/HuLaSpark/HuLa/commit/25bf49d8e3e0eaefa5cd7d832d67bd8706db4348))
+* **PC circle of friends:** :zap: optimize the scroll bar layout of the PC friend circle ([11dff28](https://github.com/HuLaSpark/HuLa/commit/11dff28bbdc3c05d168a41bbc91b771182f10c30))
+* **pc list scroll:** :zap: optimize message list scrolling sometimes without bottoming ([3488b3a](https://github.com/HuLaSpark/HuLa/commit/3488b3adf51abb656c46ac743eadd6393e4b061c))
+
+## [3.0.7](https://github.com/HuLaSpark/HuLa/compare/v3.0.6...v3.0.7) (2025-12-19)
+
+### ✨ Features | 新功能
+
+* **component:** :sparkles: add upgradelink ([15ca9a2](https://github.com/HuLaSpark/HuLa/commit/15ca9a2c7c76dbd0cc6edeab715a7a539b338741))
+* **layout:** :sparkles: add some page layouts to resize ([d069fe7](https://github.com/HuLaSpark/HuLa/commit/d069fe7f3bdf7df751ee93854ec75c3ac523d71e)), closes [#393](https://github.com/HuLaSpark/HuLa/issues/393)
+* **plugin:** :sparkles: add ai stop reply ([61c6108](https://github.com/HuLaSpark/HuLa/commit/61c61083b98b7609f7a1a4c55c71497f3aadce41))
+* **sqlcipher:** :sparkles: add sqlcipher for sqlite encryption ([9aae783](https://github.com/HuLaSpark/HuLa/commit/9aae783f8cffe1da5d3bb49dbfa17910837e4d67)), closes [#438](https://github.com/HuLaSpark/HuLa/issues/438)
+* **vscode:** add i18n-ally configuration and update extensions ([5278ab4](https://github.com/HuLaSpark/HuLa/commit/5278ab435e36e0a3db15f9b9415191f69455b825))
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **chat:** :bug: fix incorrect variable usage in currently selected room ([63748bd](https://github.com/HuLaSpark/HuLa/commit/63748bdad0643eaa11a0b31d4a8be1074dd28dfa))
+* **emoji:** :bug: fix a problem where emoticons were stuck when sent continuously ([38724e8](https://github.com/HuLaSpark/HuLa/commit/38724e8e10cabb6e1eee9cc0851ad3b11efa5dc7))
+* **emoji:** :bug: fix emoji emoji list stuttering issue ([1c8ebfd](https://github.com/HuLaSpark/HuLa/commit/1c8ebfdf8a1cb172ee5941d487eeac48067f95a7))
+* **favicon.ico:** :bug: fix error due to missing favicon.ico ([c08f89a](https://github.com/HuLaSpark/HuLa/commit/c08f89a57bb85dec3ac1e841630ea536e7965352))
+* **group:** :bug: fix group member status sorting problem ([c90b871](https://github.com/HuLaSpark/HuLa/commit/c90b871cc9c727b817d2028aa1c6cefc8ef62668))
+* **group:** :bug: fix group members online status and show unknown users ([3951265](https://github.com/HuLaSpark/HuLa/commit/395126591dcbb67bc93456546cffd0be027c2403))
+* **perl:** :bug: handle 8.3 short filename format in Strawberry Perl prefix check ([34e9c4d](https://github.com/HuLaSpark/HuLa/commit/34e9c4dc2d3a2ed7e69246eed171500603bf1dbf))
+* **unread count:** :bug: fix inaccurate unread count on mac dock ([3f45dc7](https://github.com/HuLaSpark/HuLa/commit/3f45dc786242542cdbe3c3943fda81cf65ab36f3))
+* **unread:** :bug: fix unread count not clearing when clicking session in full plmatfor view ([21fda09](https://github.com/HuLaSpark/HuLa/commit/21fda09cbc4b3913b6bcafcbc623a64688b1ac68))
+* **UnreadCount:** :bug: continue to repair session check unread count unerased ([433cad4](https://github.com/HuLaSpark/HuLa/commit/433cad4f9f3d849e580a908c9e876edcff497511))
+* **unreadCount:** :bug: fix dock icon unread count not displayed on mac ([960978c](https://github.com/HuLaSpark/HuLa/commit/960978c465fb2889e95a4d7c63548fb429ff96a3))
+* **win:** :bug: add and install Perl script to fix win startup problems ([0a658a7](https://github.com/HuLaSpark/HuLa/commit/0a658a77e0c246703111d1fbb86e86ffca0bc1ac))
+* **win:** :bug: fix win10 multi-screen high resolution layout confusion due to useFixedScale ([0f2854a](https://github.com/HuLaSpark/HuLa/commit/0f2854aa8db56a17a3995cfa48b137fa229b1f7f)), closes [#389](https://github.com/HuLaSpark/HuLa/issues/389)
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **chat:** :zap: increase message list size limit and memory footprint ([9638de0](https://github.com/HuLaSpark/HuLa/commit/9638de05b639b0c92de79ef23fdfad50690f605e))
+* **common:** :zap: optimize message storage and timer for some uncleaned footprint ([e0e7a9b](https://github.com/HuLaSpark/HuLa/commit/e0e7a9bf4b84d259e2c98e47f5fefec45b6b77ad))
+* **DPI:** :zap: add monitor-aware window size clamping to prevent oversized windows ([97074ac](https://github.com/HuLaSpark/HuLa/commit/97074ac9f4bee44361e6a64b1bb68d6e6c675f1d))
+* **Keychain:** :zap: mac does not use Keychain to save keys by default ([4483307](https://github.com/HuLaSpark/HuLa/commit/44833079f86a63ff24e394d83dc8b080af3f4543))
+* **layout:** :zap: optimize group member loading ([76ab5f5](https://github.com/HuLaSpark/HuLa/commit/76ab5f5ae1cb459d5252ef2265787267af96de4f))
+* **media:** :zap: optimize multimedia presentation on PC and mobile ([54902c9](https://github.com/HuLaSpark/HuLa/commit/54902c9649cebcf4cdc70b45ff82e0d44aff691a))
+* **moblie:** :zap: optimize mobile text bubble display ([2cab73a](https://github.com/HuLaSpark/HuLa/commit/2cab73afd872cfd156a49c0611743ca550d79e68))
+* **pc circle of friends:** :zap: optimize page layout and style of PC circle of friends ([25bf49d](https://github.com/HuLaSpark/HuLa/commit/25bf49d8e3e0eaefa5cd7d832d67bd8706db4348))
+* **PC circle of friends:** :zap: optimize the scroll bar layout of the PC friend circle ([11dff28](https://github.com/HuLaSpark/HuLa/commit/11dff28bbdc3c05d168a41bbc91b771182f10c30))
+* **pc list scroll:** :zap: optimize message list scrolling sometimes without bottoming ([3488b3a](https://github.com/HuLaSpark/HuLa/commit/3488b3adf51abb656c46ac743eadd6393e4b061c))
+
+## [3.0.6](https://github.com/HuLaSpark/HuLa/compare/v3.0.5...v3.0.6) (2025-12-07)
+
+### ✨ Features | 新功能
+
+* **common:** :sparkles: add to minio storage ([9d68254](https://github.com/HuLaSpark/HuLa/commit/9d682545f72c5253e57c6b749d19c37f3e1e10ee))
+* **mac、linux:** :sparkles: add webview intrusion protection for mac and linux platforms ([7001ed0](https://github.com/HuLaSpark/HuLa/commit/7001ed0fcd517766e3e09eeb5f063460980a77ad))
+* **plugin:** :sparkles: deep Thinking Model for AI Interface ([527045a](https://github.com/HuLaSpark/HuLa/commit/527045a2c9280625c0af8292aa85ae794ce7dd3d))
+* **security:** :sparkles: add Windows runtime security guards ([e66738c](https://github.com/HuLaSpark/HuLa/commit/e66738c18509292e22e9683796544c98601ac023))
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **common:** :bug: fix cursor out of focus and read report race issues ([c581c76](https://github.com/HuLaSpark/HuLa/commit/c581c76bd94d7721615a1a4238ceed94b816dc3b))
+* **emoji:** :bug: fix ix my emoji download logic ([17b2126](https://github.com/HuLaSpark/HuLa/commit/17b21269a973abc88ec41e6818ef3f64bc92bf10)), closes [#390](https://github.com/HuLaSpark/HuLa/issues/390)
+* **i18n:** :bug: fix some content without i18n support ([5bc55dd](https://github.com/HuLaSpark/HuLa/commit/5bc55ddf151734589abe834ea53b3bf02d5faa1d))
+* **README:** :bug: fix README layout issues and show withdrawn message lists ([d631f9b](https://github.com/HuLaSpark/HuLa/commit/d631f9b27107e6de5a1fc60b6ee66092c4ddeb2d))
+* **recall:** :bug: fix Reedit after Withdrawal does not disappear ([5562e54](https://github.com/HuLaSpark/HuLa/commit/5562e5479f47b62a0d9b42c5e79d72abcc4d3b93))
+* **session:** :bug: fix selected session unable to read unread count ([3582920](https://github.com/HuLaSpark/HuLa/commit/35829206ad39076728ff558371424ee1c1291342))
+* **session:** :bug: fix session unread count not resetting issue ([fb2a076](https://github.com/HuLaSpark/HuLa/commit/fb2a0767edab1f0430670b6def14213068526651))
+* **session:** :bug: fix unread tag cannot be removed issue ([3f3332b](https://github.com/HuLaSpark/HuLa/commit/3f3332ba676f026836d122a5639020040ed84d35))
+* **view:** :bug: connect to Tencent Address ResolutionConnect to Tencent Address Resolution ([2138613](https://github.com/HuLaSpark/HuLa/commit/2138613576705ab1683de998114d2fadda20b3d4))
+* **view:** :bug: switch to backend translationSwitch to backend translation ([0397989](https://github.com/HuLaSpark/HuLa/commit/0397989c7fde86cf8146cb256a730f2c4c20a741))
+* **windows:** :bug: fix code bug with win_runtime_guard ([c4f73d0](https://github.com/HuLaSpark/HuLa/commit/c4f73d04ff95c7ee89efe29d4142d3413ee00014))
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **sync:** :zap: do not reset selected sessions when synchronizing messages ([b583031](https://github.com/HuLaSpark/HuLa/commit/b583031367082ec5cb6d1b7ff5496f72bd0de57b))
+
+## [3.0.5](https://github.com/HuLaSpark/HuLa/compare/v3.0.4...v3.0.5) (2025-11-28)
+
+
+### ✨ Features | 新功能
+
+* **del msg:** :sparkles: add delete chat log function ([0698866](https://github.com/HuLaSpark/HuLa/commit/0698866226589b429594941e7e385e35bea4378b)), closes [#386](https://github.com/HuLaSpark/HuLa/issues/386)
+* **i18n:** :sparkles: add English translations for agreement, auth, dynamic, and settings modules ([f9e6693](https://github.com/HuLaSpark/HuLa/commit/f9e6693163382956596380c824e185973980a29f))
+* **i18n:** :sparkles: add i18n for remaining pages and fix content disorder ([b7ec9b2](https://github.com/HuLaSpark/HuLa/commit/b7ec9b21d47be15b46ed1512418cdfb603318ba4))
+* **i18n:** :sparkles: add recognition of language auto ([8aee1f0](https://github.com/HuLaSpark/HuLa/commit/8aee1f0ef894962751c44f669ced410e978fb832))
+* **i18n:** :sparkles: bring i18 n-compatible pages to 98%（exc mobile） ([d582052](https://github.com/HuLaSpark/HuLa/commit/d582052da4733262aa1be8395dbf36b22b88958e))
+* **i18n:** :sparkles: i18n to add content for other pages and windows ([715d629](https://github.com/HuLaSpark/HuLa/commit/715d6298791aa4bf23de367ba615f4c5b62aef15))
+* **i18n:** add internationalization support ([#405](https://github.com/HuLaSpark/HuLa/issues/405)) ([799dce1](https://github.com/HuLaSpark/HuLa/commit/799dce10e11e4b6286c086af103ad3d52624cfa9))
+* **i18n:** add new translation entries ([#409](https://github.com/HuLaSpark/HuLa/issues/409)) ([fe3085b](https://github.com/HuLaSpark/HuLa/commit/fe3085b4fde3c059c00a2d9c4c6f64a58cb89176))
+* **log:** :sparkles: add versioning details for console output ([c0d3fc9](https://github.com/HuLaSpark/HuLa/commit/c0d3fc9a97d38a51d78512cdaaec197801be1997))
+* **message:** :sparkles: add click user name auto @ ([5ca19e2](https://github.com/HuLaSpark/HuLa/commit/5ca19e2f37948398f8ccef72b1ec6e17081f1023)), closes [#385](https://github.com/HuLaSpark/HuLa/issues/385)
+* **session:** :sparkles: add persistent unread count cache for sessions ([a00ea17](https://github.com/HuLaSpark/HuLa/commit/a00ea17755547a7b0f67a0e86c6b666062d264ed))
+* **sync:** :sparkles: add message sync throttling and optimize login flow ([d3690b1](https://github.com/HuLaSpark/HuLa/commit/d3690b1ab6a4b2f4408ac44085bb6b2c8baa2446))
+* **theme:** :sparkles: add login window and other windows compatible with dark mode ([581daac](https://github.com/HuLaSpark/HuLa/commit/581daac28dd6b73a421bda65f8b69098d30d724f))
+* **webSocket:** :sparkles: add automatic message sync after reconnection ([5411cc4](https://github.com/HuLaSpark/HuLa/commit/5411cc4e1f89a7bfbc6dd7fcde47d9f7417920c6))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* commits list not collapsible ([f938c49](https://github.com/HuLaSpark/HuLa/commit/f938c497c47f6b4ab36fe75106301c44848846a7))
+* **common:** :bug: add loading indicator for message synchronization during reconnection and login ([36444f6](https://github.com/HuLaSpark/HuLa/commit/36444f62025788e9b03756943cfeef058f8b1643))
+* **common:** :bug: fix friend request message maximum width issue ([0715860](https://github.com/HuLaSpark/HuLa/commit/07158608d45a59bde82ec1037ce8b8af49632087))
+* **common:** :bug: fix model avatar modificationFix model avatar modification ([8c15424](https://github.com/HuLaSpark/HuLa/commit/8c15424116f97b48b5cc0e93d96f6d881cdf9b21))
+* **common:** :bug: fix recall message conversation list not updated ([e072c27](https://github.com/HuLaSpark/HuLa/commit/e072c27ec7050998a43b87384fc15106bc19461c))
+* **common:** :bug: optimize QR code login ([ae69f57](https://github.com/HuLaSpark/HuLa/commit/ae69f579300714d2fb04081a7bc45e5e08c5ea54))
+* **common:** :bug: wS reconnection request message ([daefd83](https://github.com/HuLaSpark/HuLa/commit/daefd839a981bfa9de7b426d13a3843a14aafc0d))
+* **i18n:** :bug: migrate to Composition API mode and add reactive locale support ([73b71d4](https://github.com/HuLaSpark/HuLa/commit/73b71d46c938fda8e94928caddacd91a842a565f))
+* **mac:** :bug: disable mac right-click selected text features ([fb95df5](https://github.com/HuLaSpark/HuLa/commit/fb95df576e20ac805fd3af6cafacbd26b80a8a59))
+* **mobile:** :bug: fix the QR code scanning failure issue ([58812f9](https://github.com/HuLaSpark/HuLa/commit/58812f90ce30937fce88eddaa60e4752478091fe))
+* **notification:** :bug: fix batch modification group notifications not taking effect ([3a8dd7c](https://github.com/HuLaSpark/HuLa/commit/3a8dd7c0090c07c838370d772d82e04b83e77250))
+* **plugin:** :bug: adapt to deep thinking ([f419cd2](https://github.com/HuLaSpark/HuLa/commit/f419cd241e3a75438e6cbef18009e52eb460c89a))
+* **plugin:** :bug: add AI balance inquiry ([e3db8ce](https://github.com/HuLaSpark/HuLa/commit/e3db8ce0318882d75041fbe9ad08174ec4689929))
+* **session:** :bug: add null safety checks for currentSession across components ([993648d](https://github.com/HuLaSpark/HuLa/commit/993648d13504703e655f8591a6e41a71ba4d9790))
+* **types:** narrow LoadLocale return type to Record<string, string> ([#407](https://github.com/HuLaSpark/HuLa/issues/407)) ([ff5e94f](https://github.com/HuLaSpark/HuLa/commit/ff5e94ffd235c4ec532287c7bbbaa33056da7f4c))
+* **update:** prevent program from exiting when only update window is open ([5b53fa5](https://github.com/HuLaSpark/HuLa/commit/5b53fa53dc32a2d8b8959d96fa9ec831de190a45))
+* upgrade @tauri-apps/plugin-barcode-scanner from 2.4.0 to 2.4.2 ([caf0bb2](https://github.com/HuLaSpark/HuLa/commit/caf0bb22bf32083114bcb7d6b5fb08e6336b6acd))
+* upgrade dayjs from 1.11.18 to 1.11.19 ([4c6fff7](https://github.com/HuLaSpark/HuLa/commit/4c6fff7d4337bc7e79b2a10d23c798f13bf00f3f))
+* upgrade hula-emojis from 1.2.30 to 1.2.31 ([15a69c3](https://github.com/HuLaSpark/HuLa/commit/15a69c3e72ada32a2f5b233baffcaffa4a7bec85))
+* upgrade pinia from 3.0.3 to 3.0.4 ([70aa7c3](https://github.com/HuLaSpark/HuLa/commit/70aa7c34d90c7d923a2086426a17335cfd3305f8))
+* **window:** handle tray window on Windows; prevent exit blocking when update window closes ([907d5e6](https://github.com/HuLaSpark/HuLa/commit/907d5e62d4ab1646ef06d41bb73e4459ea6c85f3))
+
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **common:** :zap: optimize my emoji page caching logic ([2999564](https://github.com/HuLaSpark/HuLa/commit/29995649ee4a33dab5cf7fd90cb393c6a1b1c0d2))
+* **i18n:** :zap: add i18n support for dayjs ([7dba84b](https://github.com/HuLaSpark/HuLa/commit/7dba84b56631c83ea6aba166305d13badb7c5d2f))
+* **i18n:** :zap: add some pages to support i18n ([e6240d0](https://github.com/HuLaSpark/HuLa/commit/e6240d0395dad281eea014aa56314abd9a61aa75))
+
+## [3.0.4](https://github.com/HuLaSpark/HuLa/compare/v3.0.3...v3.0.4) (2025-11-14)
+
+
+### ✨ Features | 新功能
+
+* **common:** :sparkles: generate images sounds videos text ([c46cd1a](https://github.com/HuLaSpark/HuLa/commit/c46cd1a85cfe3ea0f3464dfb4311927020b50caa))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **android:** :bug: fix android does not start due to version dependency ([0ff3ecc](https://github.com/HuLaSpark/HuLa/commit/0ff3ecc75f042cc2d7276b4f144c447fdf938e94))
+* **android:** :bug: fix android packaging issues ([1e2b748](https://github.com/HuLaSpark/HuLa/commit/1e2b748494e9addae780588e72cc907abd5a5a47))
+* **ci:** :bug: fix release.yml issues ([b59d517](https://github.com/HuLaSpark/HuLa/commit/b59d51771712a99839d7884a594291ca3d391592))
+* **common:** :bug: develop Gitee AI ([9b76348](https://github.com/HuLaSpark/HuLa/commit/9b76348cd23472b5d99f608b496381ed5ec1bd8f))
+* **common:** :bug: development ai platform ([4b5b8d1](https://github.com/HuLaSpark/HuLa/commit/4b5b8d1d4460f80aedb040db82e76e520e91b43c))
+* **common:** :bug: fix message loss when resetting message after bottoming ([a0e2178](https://github.com/HuLaSpark/HuLa/commit/a0e2178177f2cd95c854a3e204aa1c63dff478d1))
+* **hooks:** :bug: fix restart application is not ready to call tauri command ([23ca225](https://github.com/HuLaSpark/HuLa/commit/23ca2252696e563b2ba00ff4177cdd98fed0b5fe))
+* **release:** :bug: fix ci issue in release version ([f0c4cd1](https://github.com/HuLaSpark/HuLa/commit/f0c4cd18dfdc866a4449c83215b63e9528578c15))
+
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **cache:** :zap: optimize thumbnail download and rendering ([a1a80fd](https://github.com/HuLaSpark/HuLa/commit/a1a80fd291ac45364ac9596b5702bf7f9c21fc63))
+* **common:** :zap: optimize pop-up logic for child windows and restrictions on mac ([6fe865c](https://github.com/HuLaSpark/HuLa/commit/6fe865c03b265aba801a962a2b8cc1d0593564d6))
+* **common:** :zap: responsive expressions for optimizing lists ([f372241](https://github.com/HuLaSpark/HuLa/commit/f372241390e90db96e2a7fed85eba84fba30cd10))
+
+## [3.0.3](https://github.com/HuLaSpark/HuLa/compare/v3.0.2...v3.0.3) (2025-11-06)
+
+
+### ✨ Features | 新功能
+
+* **common:** :sparkles: comments and likes in the WeChat Moments ([0d84851](https://github.com/HuLaSpark/HuLa/commit/0d84851414e7341dcdcd0fefd6887964909e1918))
+* **mobile:** :sparkles: added "Dynamic List" feature for mobile ([5a7068a](https://github.com/HuLaSpark/HuLa/commit/5a7068a3a557c101457c7bb0a638d13bc5270e02))
+* **mobile:** :sparkles: added "Post Dynamic" feature for desktop ([083d81d](https://github.com/HuLaSpark/HuLa/commit/083d81d0e43b12373318fa348356b7b0fce4ac48))
+* **mobile:** :sparkles: added "Post Dynamic" feature for mobile ([a588729](https://github.com/HuLaSpark/HuLa/commit/a5887299b2d0980ad45ca8d8955affa1e3fb954d))
+* **mobile:** :sparkles: added batch member removal, disabled for official groups ([f13c70b](https://github.com/HuLaSpark/HuLa/commit/f13c70b924e759842af5add7712d6280822e440d))
+* **mobile:** :sparkles: added forced re-login on token expiration ([ac0e55b](https://github.com/HuLaSpark/HuLa/commit/ac0e55bee95d17b9b5b62a87f06c93576e50bc44))
+* **mobile:** :sparkles: added photo album feature on mobile; added blank AI assistant page ([38eb9e5](https://github.com/HuLaSpark/HuLa/commit/38eb9e5d23d1cf9e45d7c8d872861ef07258fb86))
+* **mobile:** :sparkles: added the feature to invite friends to join the group ([e3df3e2](https://github.com/HuLaSpark/HuLa/commit/e3df3e2f302cbd0daad8e99f7ef9304c1010850c))
+* **mobile:** :sparkles: added the group member management page ([236c085](https://github.com/HuLaSpark/HuLa/commit/236c08599061548136d3a10ebf9b5f95b9740a48))
+* **mobile:** :sparkles: new "Add Announcement" feature added to the mobile app ([c7cce79](https://github.com/HuLaSpark/HuLa/commit/c7cce79d6b2044b46d4beb6ea3217af91f8fed99))
+* **mobile:** :sparkles: optimize dynamic page display performance on PC ([15defcb](https://github.com/HuLaSpark/HuLa/commit/15defcb5a5643ad4559956380d99f6e95f4d2b30))
+* **mobile:** :sparkles: optimize the layout and functionality of dynamic pages ([7a18971](https://github.com/HuLaSpark/HuLa/commit/7a18971c48bc744be90d1a4ee78c31c9ee8536d9))
+* **view:** :sparkles: abutment ai apiKey、model、role ([392c159](https://github.com/HuLaSpark/HuLa/commit/392c15900c5763ea069138e6585442e1df75929b))
+* **view:** :sparkles: add a new dynamic detail page ([32c5186](https://github.com/HuLaSpark/HuLa/commit/32c5186bc10dd68e57aac7f43719d184a0953632))
+* **view:** :sparkles: added AI message reply feature, integrated with server-side SSE ([03329fe](https://github.com/HuLaSpark/HuLa/commit/03329febe240001217e51a727c309a6f617b281f))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **android:** :bug: fix error caused by Chromium 91 version not importing 4k wasm in Android ([6d0d95e](https://github.com/HuLaSpark/HuLa/commit/6d0d95e0b149ce206855396fdf8672bc60265412))
+* **announcement:** :bug: fix bulletin does not display issue ([6c52904](https://github.com/HuLaSpark/HuLa/commit/6c529047f217364cfd6bcae42f1abe42ca16ffab))
+* **badge:** :bug: fix issues caused by missing badge fields ([9deb0fc](https://github.com/HuLaSpark/HuLa/commit/9deb0fc4f96caa9aa900e3aaf5badda58a56b310))
+* **build:** :bug: fix packaging error due to parameter problem ([dbf504b](https://github.com/HuLaSpark/HuLa/commit/dbf504b591abb1fe9f7234fc23e9360ffdcd2890))
+* **chat:** :bug: fix unread count not initialized ([c7d73bf](https://github.com/HuLaSpark/HuLa/commit/c7d73bf1f4eb0d2fa956fd67dc4427f085c1485e))
+* **chatBot:** :bug: fix package startup error due to md stream rendering component ([712c1df](https://github.com/HuLaSpark/HuLa/commit/712c1df912f9288594b1949353dc6d81a352da4e))
+* **chatBot:** :bug: fix some model synchronization issues with chatBot ([8b664b1](https://github.com/HuLaSpark/HuLa/commit/8b664b16263fb74a28454ce9f231e4f14337e1d7))
+* **common:** :bug: add AI interface ([c65c3e7](https://github.com/HuLaSpark/HuLa/commit/c65c3e7840f3b979ad71b5360f14590049729f5f))
+* **common:** :bug: add group info method ([f763517](https://github.com/HuLaSpark/HuLa/commit/f7635175a3c203da18de57a1fb4d0a27aa8a4f5a))
+* **common:** :bug: adjust login parameters ([fd85394](https://github.com/HuLaSpark/HuLa/commit/fd85394e43ec0a56fe645fb2e3437ad1a5f725fa))
+* **common:** :bug: allow modification of public roles and models ([ec6a28e](https://github.com/HuLaSpark/HuLa/commit/ec6a28edc1c6499b7c17915117020712d81f91b8))
+* **common:** :bug: default values for homeWindowState ([d838709](https://github.com/HuLaSpark/HuLa/commit/d838709b9f9f80143439635bbbcbafcda92b6723))
+* **common:** :bug: fix group chats invitation approval ([687a907](https://github.com/HuLaSpark/HuLa/commit/687a907f933d097b4e1358f08bdf907f0adb5ee5))
+* **common:** :bug: fix some issues with tray reminders ([24ba1e6](https://github.com/HuLaSpark/HuLa/commit/24ba1e6618c05de3456bb64714c1fd97c7d0f2e3))
+* **common:** :bug: modify the location of the remote login window ([c01304f](https://github.com/HuLaSpark/HuLa/commit/c01304fb356bc67d1081a8c4663efe7d3473feb7))
+* **common:** :bug: optimize apikeyapikey ([5de0982](https://github.com/HuLaSpark/HuLa/commit/5de0982357e892dc3ae1bd38fa45d3caf6f76029))
+* **common:** :bug: optimize comment rendering in MomentsOptimize comment rendering in Moments ([c04adb1](https://github.com/HuLaSpark/HuLa/commit/c04adb1bae4fc7baae207ad3d20368a18a9a0504))
+* **currentSession:** :bug: modify the way roomId gets and administrator settings issues ([91436c6](https://github.com/HuLaSpark/HuLa/commit/91436c690f9e2360009ae74b13de1bcfcbe995f8))
+* **invite:** :bug: fix failure to invite people into groups ([3e64d8a](https://github.com/HuLaSpark/HuLa/commit/3e64d8ad7531ff5f1149d857f7d686bd63ad17b6))
+* **mobile:** :bug: distinguish between friends and groups when refreshing notifications ([5c9f230](https://github.com/HuLaSpark/HuLa/commit/5c9f230a4d57cdd794d13de42067814f7ccd40f5))
+* **mobile:** :bug: fix issues with the emoji sticker panel and click interactions ([e7db486](https://github.com/HuLaSpark/HuLa/commit/e7db486b3a6b92719329b43de85c28be6ec6a0a1))
+* **mobile:** :bug: fix mobile frontend login issue ([d8ebde5](https://github.com/HuLaSpark/HuLa/commit/d8ebde5b8c7a3b6db936e29a19adfb5bc04612ad))
+* **mobile:** :bug: fix mobile tab bar safe area bug during navigation ([de35722](https://github.com/HuLaSpark/HuLa/commit/de35722f18e3cccfb45c9a4330534ac2332163dd))
+* **mobile:** :bug: fix the issue where automatic login fails on mobile devices ([faa8a09](https://github.com/HuLaSpark/HuLa/commit/faa8a09b866fe604511b231263f38b553c653204))
+* **mobile:** :bug: reposted in Moments, unread notification in Moments ([08a3abc](https://github.com/HuLaSpark/HuLa/commit/08a3abc6cc8591bf7b55e5c0dca797fe221b0ba3))
+* **mobile:** :bug: reuse the "Group Chat Member Management" page ([f8c22e6](https://github.com/HuLaSpark/HuLa/commit/f8c22e6648f9e140cfcc292ac972c4d0e7d921b5))
+* **renderMessage:** :bug: fix problems with clicking @ in history window causing jump ([79016f6](https://github.com/HuLaSpark/HuLa/commit/79016f65e95d3688b021e5027d280ad3b65d72f8))
+* **session:** :bug: fix duplicate session creation issue ([2ed17d5](https://github.com/HuLaSpark/HuLa/commit/2ed17d5d72de0a0b5d3e2ce5a66546ca5950386a))
+* **view:** :bug: 修复注册窗口打开的情况下登录后注册窗口不会被自动关闭 ([eaea8f8](https://github.com/HuLaSpark/HuLa/commit/eaea8f87456fc5189a9b858e9d12ebf38dea9ef0))
+* **view:** :bug: aI interface for CRUD operations ([68826f5](https://github.com/HuLaSpark/HuLa/commit/68826f5ade35ce11cbcc865d02623f2845b8c5d8))
+* **view:** :bug: aI Module ([80466f9](https://github.com/HuLaSpark/HuLa/commit/80466f995e764a2bc6b625a4bdf04dfa8468e8a6))
+* **view:** :bug: reuse the IM client to handle AI data streams ([bb244fd](https://github.com/HuLaSpark/HuLa/commit/bb244fd1e97b4bebc55fa580e7555972f8a9f28e))
+* **view:** :bug: type cannot be selected when repairing AI-generated characters ([04030fc](https://github.com/HuLaSpark/HuLa/commit/04030fc4aee382695c2930f88bec1b70f1463f0d))
+
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **chatBot:** :zap: optimize chatBot rendering code block issues ([7e21a12](https://github.com/HuLaSpark/HuLa/commit/7e21a123b4a77ccb772364a0d3cec2b5f4d9b1ee))
+* **common:** :zap: add performance monitoring to optimize some performance issues ([0c6c438](https://github.com/HuLaSpark/HuLa/commit/0c6c438f44d06ae6fdce8b936609feb515ac4df0))
+* **common:** :zap: optimize session handover stagnation ([6607283](https://github.com/HuLaSpark/HuLa/commit/660728333c98da9f79dfec43397222c9846bf093))
+* **common:** :zap: optimize session lists and chat stores ([1fb6c77](https://github.com/HuLaSpark/HuLa/commit/1fb6c77f34a091dc57b9934537bda72e23ba73b5))
+* **common:** :zap: optimize session presentation ([67e9f1d](https://github.com/HuLaSpark/HuLa/commit/67e9f1d8a106f1be768f4969f6a860a5cefe97e6))
+* **common:** :zap: optimizing Channel Switching Session Stagnation ([966abeb](https://github.com/HuLaSpark/HuLa/commit/966abeb2bfdd645a6587e4e9471570ba96305613))
+* **common:** :zap: replace lodash-es with es-toolkit ([6ed3052](https://github.com/HuLaSpark/HuLa/commit/6ed3052a378aa9dc651fb6c48f6c53dfc5aa62ba))
+* **notifications:** :zap: optimize unread counts for friend and group chat notifications ([c96f13e](https://github.com/HuLaSpark/HuLa/commit/c96f13e1490473672758c27f3e15d35a932172d4))
+* **style:** :zap: optimize the format display of ai output ([e449118](https://github.com/HuLaSpark/HuLa/commit/e449118268027a8244e1c4ba16e4469f5b6239df))
+
+## [3.0.2](https://github.com/HuLaSpark/HuLa/compare/v3.0.1...v3.0.2) (2025-10-24)
+
+
+### ✨ Features | 新功能
+
+* **mobile:** :sparkles: add First-Time Login Confirmation Page ([135bd26](https://github.com/HuLaSpark/HuLa/commit/135bd26ef258d430282cba357cf49f8c6dc637f6))
+* **mobile:** :sparkles: improve the announcement editing function ([846a5c5](https://github.com/HuLaSpark/HuLa/commit/846a5c5791fa923cdd533189d88a1d7410c372eb))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **common:** :bug: modify logic of registration pop-up captcha ([7ba133d](https://github.com/HuLaSpark/HuLa/commit/7ba133da6218b42ff9789f836d4e7df5e8405677))
+* **hook:** :bug: click the message to resend the audio and video message ([839bea9](https://github.com/HuLaSpark/HuLa/commit/839bea95b5c4183eb3e19b4bc7b5d02f5fd09709))
+* **ios:** :bug: fix ios keyboard pop-up problem ([ab933e3](https://github.com/HuLaSpark/HuLa/commit/ab933e37ffbb10e879cd35ce8da12cd58751c17a))
+* **location:** :bug: fix location cannot send issue ([78cdf84](https://github.com/HuLaSpark/HuLa/commit/78cdf846d125c182c43bf9319f133d849a511d54))
+* **mobile:** :bug: "Fixed style issues; excluded Hula Assistant when adding group chats ([d865a1f](https://github.com/HuLaSpark/HuLa/commit/d865a1f9035a1a9f1c4c8dd6ad7a865e27251b62))
+* **mobile:** :bug: adjust session listening logic ([782645f](https://github.com/HuLaSpark/HuLa/commit/782645fb8ea6dd087c14c7da17eb616941c37d92))
+* **mobile:** :bug: fix bubble width, scroll, and SVG color ([c1ce99e](https://github.com/HuLaSpark/HuLa/commit/c1ce99e8d1068f796856132728e9c193c1afc465))
+* **mobile:** :bug: fix style display issues ([124a3c0](https://github.com/HuLaSpark/HuLa/commit/124a3c03460eb6541bce83a21ad0f61701ef7db9))
+* **mobile:** :bug: fixed background image issue ([0dfc96f](https://github.com/HuLaSpark/HuLa/commit/0dfc96f6e5c95f682e9c7bb502917ce0d645ef3f))
+* **mobile:** :bug: preliminary fix for logout issue; fixed issue of friends not loading ([53f80c5](https://github.com/HuLaSpark/HuLa/commit/53f80c5069681e16e5293d7912dee0718a5f6cdc))
+* **readme:** :bug: fix readme file not showing issue ([4df4fd9](https://github.com/HuLaSpark/HuLa/commit/4df4fd95ca366f56883a967d4cf507c8b6bd671d))
+* **store:** :bug: adjust session switching and announcement listening location ([7c1d2cf](https://github.com/HuLaSpark/HuLa/commit/7c1d2cf3b2be474550071bdf34da6becf6bdc705))
+* **transmit:** :bug: fix forwarding function can not be used ([ae86ee3](https://github.com/HuLaSpark/HuLa/commit/ae86ee3a1f8dd2b7b9536a86129175c0519283ed))
+* **update:** :bug: fix forced updates in development environments ([e40dd5a](https://github.com/HuLaSpark/HuLa/commit/e40dd5a01f9d6a90f902363bfc3620226bc93b74))
+* **view:** :bug: display announcement ([fe9f228](https://github.com/HuLaSpark/HuLa/commit/fe9f228426b66f8ac0b50c413e97ab3e1c7fc415))
+
+## [3.0.1](https://github.com/HuLaSpark/HuLa/compare/v3.0.0...v3.0.1) (2025-10-21)
+
+
+### ✨ Features | 新功能
+
+* **mobile:** :sparkles: add new model processing file for android ([7f729c0](https://github.com/HuLaSpark/HuLa/commit/7f729c09a2cbb9092e1dd61686deae122bb9aa42))
+* **mobile:** :sparkles: new Mobile Terms Page ([76f2c28](https://github.com/HuLaSpark/HuLa/commit/76f2c28e3d59df564d0ffcb661bf461ece177083))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **assistant:** :bug: fix document not opening problem ([60f4c9d](https://github.com/HuLaSpark/HuLa/commit/60f4c9dc161c1deb2e1e036d1ada0e6c7719fcc1))
+* **bot:** :bug: assistant sorting problem ([89305ee](https://github.com/HuLaSpark/HuLa/commit/89305ee8af5be8daaca611d21586f19a83ac0ec0))
+* **common:** :bug: adjust announcement logic ([8e6bc85](https://github.com/HuLaSpark/HuLa/commit/8e6bc85ac4327672cb25e2a8cf272e3893a6f634))
+* **common:** :bug: adjust the logic for marking messages as read ([9e82cd6](https://github.com/HuLaSpark/HuLa/commit/9e82cd618b4af0b57f9f33d3a5a3fed030bd15b3))
+* **common:** :bug: fix bg color ([e47c80e](https://github.com/HuLaSpark/HuLa/commit/e47c80ebcdbb91beb331b0214bbedc6dd73ebb41))
+* **common:** :bug: login bg pic ([466e46d](https://github.com/HuLaSpark/HuLa/commit/466e46d38be0567a1095b7e551350f764c627b58))
+* **mobile:** :bug: fix the registration popup issue ([585d0b7](https://github.com/HuLaSpark/HuLa/commit/585d0b7c732db904c4fa77a62f74d3fd335b7aed))
+* **store:** :bug: set group admin ([96bfa9e](https://github.com/HuLaSpark/HuLa/commit/96bfa9e2e5cda9a7d07aa5b7ab398121758093fc))
+* **video:** :bug: fix video not playing problem ([1ecb58d](https://github.com/HuLaSpark/HuLa/commit/1ecb58d6d1c30bf072de1c5679b6e43d0ed76b44))
+
+## [3.0.0](https://github.com/HuLaSpark/HuLa/compare/v2.6.13...v3.0.0) (2025-10-20)
+
+
+### ✨ Features | 新功能
+
+* **bot:** :sparkles: add built-in webview for hula rendering content ([7007662](https://github.com/HuLaSpark/HuLa/commit/70076622e518339d75287aebc6f56a29cfa26880))
+* **bot:** :sparkles: add content displayed by Assistant user type ([3238e5a](https://github.com/HuLaSpark/HuLa/commit/3238e5a51ed6d281d67275d3e0275d739ecc0009))
+* **bot:** :sparkles: add preview 3D models ([8015bf9](https://github.com/HuLaSpark/HuLa/commit/8015bf925c7dc98f4ebd993d8f2d4a6f394c5cb2))
+* **common:** :sparkles: create MobileLayout ([f88db9e](https://github.com/HuLaSpark/HuLa/commit/f88db9eafc0410300a80005fbcc6b28356a7dcda))
+* **common:** :sparkles: mediaViewer ([e2148a0](https://github.com/HuLaSpark/HuLa/commit/e2148a0fc3e5b2e11e9a0016eeb0b45f94a6da5a))
+* **common:** :sparkles: mobile image review ([fa2cab3](https://github.com/HuLaSpark/HuLa/commit/fa2cab3e7eb83a55c76ae38f4d9a80b03d1983a9))
+* **common:** :sparkles: optimize the mobile experience and some styles ([#348](https://github.com/HuLaSpark/HuLa/issues/348)) ([35f0d2a](https://github.com/HuLaSpark/HuLa/commit/35f0d2a43cb3f38dafe1d90649ccd295f3d98b9d))
+* **common:** :sparkles: scan login and notification counter ([cf9dbdf](https://github.com/HuLaSpark/HuLa/commit/cf9dbdff1914a70fa0b8ecff038fb7d139a0aa1d))
+* **common:** :sparkles: searchChatContent ([d58eee3](https://github.com/HuLaSpark/HuLa/commit/d58eee3be857fccb254a48d29b7dee47519dc9c0))
+* **common:** :sparkles: ws ack ([4731392](https://github.com/HuLaSpark/HuLa/commit/4731392ebb913cc0384b12491424ce6de0b2db40))
+* **common:** ✨ add positioning and file management functions ([#344](https://github.com/HuLaSpark/HuLa/issues/344)) ([8082370](https://github.com/HuLaSpark/HuLa/commit/80823706d9404c39ece9fbb703abd1fd75eff76f)), closes [#212](https://github.com/HuLaSpark/HuLa/issues/212)
+* **common:** ✨ sqlite 本地存储 ([#305](https://github.com/HuLaSpark/HuLa/issues/305)) ([49aef65](https://github.com/HuLaSpark/HuLa/commit/49aef65e5c6c330f41ac04efee363a9680b2be71))
+* **conversation:** :sparkles: enhance right-click border effect ([3b2ed4d](https://github.com/HuLaSpark/HuLa/commit/3b2ed4dcd2cda46dbdb05ab0ebdc43cc22bacd8f))
+* **file manage:** :sparkles: init file manage ([85fb0c5](https://github.com/HuLaSpark/HuLa/commit/85fb0c50fc455ca621d972450671c555fc585836))
+* **function:** :sparkles: add screenshot assistance function, and enhanced guidance function ([4b0f170](https://github.com/HuLaSpark/HuLa/commit/4b0f17035f3e452a1218740fa7bf3f6550dbbfff))
+* **guidance:** :sparkles: add novice guide ([ef82ba8](https://github.com/HuLaSpark/HuLa/commit/ef82ba851f36186af1cdb5b50a0e8790fd4a0be8))
+* **historical news:** :sparkles: add History Message Management ([09535c4](https://github.com/HuLaSpark/HuLa/commit/09535c42e0ba54ea31d786757c24c9c8e9932991))
+* **location:** :sparkles: add connect tencent map api ([e4739b0](https://github.com/HuLaSpark/HuLa/commit/e4739b08209f89293c3ae14d2a66526141774213))
+* **location:** :sparkles: add positioning function ([1f10a82](https://github.com/HuLaSpark/HuLa/commit/1f10a825d27fb39573a1be614873deaeb7211b56))
+* **merger news:** :sparkles: add merge message forwarding ([19a0471](https://github.com/HuLaSpark/HuLa/commit/19a0471df753526380ac9b8cd1581ac3b8af09b8))
+* **mobile:** :sparkles: add 'voice' and 'More' panel ([4766e12](https://github.com/HuLaSpark/HuLa/commit/4766e12703538cc2967cc71962d56eabacfc7e8d))
+* **mobile:** :sparkles: add a 'Forgot Password' page and fix the input field height issue ([6684887](https://github.com/HuLaSpark/HuLa/commit/66848871443d008fc474b98dca75835e49be9158))
+* **mobile:** :sparkles: add new “Do Not Disturb” feature ([1732f6d](https://github.com/HuLaSpark/HuLa/commit/1732f6d8d48ff348abf7938704354e331fc5c6b4))
+* **mobile:** :sparkles: add new dependencies ([ced68f8](https://github.com/HuLaSpark/HuLa/commit/ced68f8ce1f1e344335a2fcd95b3f5ae3c6f7a7f))
+* **mobile:** :sparkles: add new permission request ([11b239a](https://github.com/HuLaSpark/HuLa/commit/11b239a9a933c625c8524b7c1d1a62d393013224))
+* **mobile:** :sparkles: add qr-code type ([1769aad](https://github.com/HuLaSpark/HuLa/commit/1769aade2cdf5ce00796b04312ad34cb8cf98f20))
+* **mobile:** :sparkles: add qs-code event ([9ffa7d4](https://github.com/HuLaSpark/HuLa/commit/9ffa7d41da06de690845cfebd29873fc1907eb51))
+* **mobile:** :sparkles: add Scan-to-Login Feature ([0c80384](https://github.com/HuLaSpark/HuLa/commit/0c8038482d15530e2a9de4565bbc0a7804b19bd2))
+* **mobile:** :sparkles: added avatar online status; enhanced WebSocket event handling ([c974afa](https://github.com/HuLaSpark/HuLa/commit/c974afa811024ee9121243f20e99cb118ae8536f))
+* **mobile:** :sparkles: added click-to-open image message feature ([a32f186](https://github.com/HuLaSpark/HuLa/commit/a32f18688aa5eb5917a5547a5b744c1ce01cbfa9))
+* **mobile:** :sparkles: added group member avatar/name data; fixed my message display issue ([1d15292](https://github.com/HuLaSpark/HuLa/commit/1d15292a81e962fe21106dcb19ddd85ed968a302))
+* **mobile:** :sparkles: added message count on mobile ([b115cc9](https://github.com/HuLaSpark/HuLa/commit/b115cc9eac42002224d82a28becb8587bc29c7bd))
+* **mobile:** :sparkles: added QR code friend-adding feature ([7ddfbab](https://github.com/HuLaSpark/HuLa/commit/7ddfbabb44c0239821995c29fbaa86590a431f30))
+* **mobile:** :sparkles: improve the 'More' feature menu in the chatroom ([56f9ab3](https://github.com/HuLaSpark/HuLa/commit/56f9ab3bcc80fa7a3b87ee46d20f0819bc561f4a))
+* **mobile:** :sparkles: modify the mobile footer bar ([8412b5a](https://github.com/HuLaSpark/HuLa/commit/8412b5a621eb03eff4e7f5a0dff3e2ae8f82dd23))
+* **mobile:** :sparkles: optimize mobile style and functionality ([#355](https://github.com/HuLaSpark/HuLa/issues/355)) ([ae144b6](https://github.com/HuLaSpark/HuLa/commit/ae144b6e55aae1b005c664103423ff87bcfe6534))
+* **mobile:** :sparkles: optimize the effects and functions of the chatroom input box ([5e54106](https://github.com/HuLaSpark/HuLa/commit/5e5410635d07188fb463aaf0c9a534401d0bcb4e))
+* **mobile:** :sparkles: replace the log-out confirmation dialog ([3dc77df](https://github.com/HuLaSpark/HuLa/commit/3dc77df4524efa3c222b3be7c0620537e87004a8))
+* **mobile:** ✨ add and improve mobile ([#328](https://github.com/HuLaSpark/HuLa/issues/328)) ([9a342f7](https://github.com/HuLaSpark/HuLa/commit/9a342f7804f24ea5d8d14e31b0f388ba4f2bc2d7))
+* **mobile:** ✨ add mobile compatibility ([#332](https://github.com/HuLaSpark/HuLa/issues/332)) ([1b0e31d](https://github.com/HuLaSpark/HuLa/commit/1b0e31d06b7310b3264eff58b350f118a4b00e77))
+* **screenshot:** :sparkles: add screenshots of rounded corners and write input box ([0ccedaf](https://github.com/HuLaSpark/HuLa/commit/0ccedafdb61eae9d3f40fc16bf9da41011682a69)), closes [#323](https://github.com/HuLaSpark/HuLa/issues/323)
+* **setting:** ✨ 增加应用占用磁盘空间计算功能和可视化 ([#303](https://github.com/HuLaSpark/HuLa/issues/303)) ([d8caa5a](https://github.com/HuLaSpark/HuLa/commit/d8caa5a4313774f6ae2e22b006849d96efd733e2))
+* **shortcut:** :sparkles: add global shortcut key switch ([1572490](https://github.com/HuLaSpark/HuLa/commit/15724906200bda918666a3c71efd1954f1efb843))
+* **shortcut:** ✨ add mobile pages and scanning plug-ins ([#319](https://github.com/HuLaSpark/HuLa/issues/319)) ([27f1545](https://github.com/HuLaSpark/HuLa/commit/27f15453051e81316b508884e4a259b0decad190))
+* **shortcut:** ✨ add shortcut keys, screenshots and voice, video calls ([3ab5b0b](https://github.com/HuLaSpark/HuLa/commit/3ab5b0bdbb9ba8cf92a0db851d34114977b0218d))
+* **shortcut:** ✨ increased mobile compatibility (60%) ([#315](https://github.com/HuLaSpark/HuLa/issues/315)) ([a05ebce](https://github.com/HuLaSpark/HuLa/commit/a05ebcef575a881063073d9ec926e8fb5d372eb9)), closes [#ICT1](https://github.com/HuLaSpark/HuLa/issues/ICT1)
+* **system:** ✨ 增加分布式兼容和语音视频通话、移动端部分兼容 ([#311](https://github.com/HuLaSpark/HuLa/issues/311)) ([ac3dac3](https://github.com/HuLaSpark/HuLa/commit/ac3dac35a397d627affe283723a1622cfe8b881b)), closes [#IBQB1](https://github.com/HuLaSpark/HuLa/issues/IBQB1) [#ICT1](https://github.com/HuLaSpark/HuLa/issues/ICT1)
+* **view:** ✨ 新增文件预览功能 ([#301](https://github.com/HuLaSpark/HuLa/issues/301)) ([19e6a15](https://github.com/HuLaSpark/HuLa/commit/19e6a15ad0bab88f97b9ce746ed8e96b12f544a5))
+* **views:** :sparkles: add protocol window ([dc16505](https://github.com/HuLaSpark/HuLa/commit/dc16505d7812c3b3686a932aa7cebc02c013508e))
+* **voice:** :sparkles: add voice progress dragging ([fd175a5](https://github.com/HuLaSpark/HuLa/commit/fd175a53d1e24e42a104711fe4b23595317ce656))
+* **windows:** add NSIS installer packaging with uninstall logo support ([abdbbd7](https://github.com/HuLaSpark/HuLa/commit/abdbbd7c95ff258fe2a0c92ea9ea592fb15f4d11))
+
+
+### 🐛 Bug Fixes | Bug 修复
+
+* **Android:** :bug: fix startup failure due to platform judgment during startup ([e173978](https://github.com/HuLaSpark/HuLa/commit/e17397881f16901a9d303ebdb026e5a36d09b172))
+* **bar:** :bug: fix bar and some mobile style issues ([1ddb855](https://github.com/HuLaSpark/HuLa/commit/1ddb855c2aa75ccaf0e422cc1c0433eb0c7efa80))
+* **chatbox:** :bug: fix n-split with extra height ([3a199b3](https://github.com/HuLaSpark/HuLa/commit/3a199b3dd9f5f5ae6430ce0a69020139f98fdef6))
+* **common:** :bug: a change group myname and B can't see that issue ([7c957d0](https://github.com/HuLaSpark/HuLa/commit/7c957d0e8772146bc60418815a43a1ca8b77504f))
+* **common:** :bug: abutment ack ([00b10fb](https://github.com/HuLaSpark/HuLa/commit/00b10fbffe87cefe364027557ad4e1461bfbf4cf))
+* **common:** :bug: add chatStore.clearRedundantMessages ([fd54337](https://github.com/HuLaSpark/HuLa/commit/fd54337364a8e7584123e6eb6f77b5de94d4968c))
+* **common:** :bug: add fingerprint information to the login interface ([f698d3f](https://github.com/HuLaSpark/HuLa/commit/f698d3fae58b51155a2b514ca7c68c028a524341))
+* **common:** :bug: add scanning flag ([f00534e](https://github.com/HuLaSpark/HuLa/commit/f00534e5441f51de3095ee8d9ab699e111895ab5))
+* **common:** :bug: add session when join group ([99f5dc2](https://github.com/HuLaSpark/HuLa/commit/99f5dc23e62680b214c10cd3e768bb99c4a2877b))
+* **common:** :bug: add session when join group; pop email code input in register windows ([aa0afbd](https://github.com/HuLaSpark/HuLa/commit/aa0afbd4eb4205a0f1dd0533368ebdcc51e5873c))
+* **common:** :bug: android keybord ([717ddcf](https://github.com/HuLaSpark/HuLa/commit/717ddcf7b49ef4c04ff380a1503c9c0ff7c278f4))
+* **common:** :bug: announcement time issue ([9bbaa32](https://github.com/HuLaSpark/HuLa/commit/9bbaa320bfac8e71ee4840eeefbc038be199abdd))
+* **common:** :bug: apply issue ([#318](https://github.com/HuLaSpark/HuLa/issues/318)) ([2ac3568](https://github.com/HuLaSpark/HuLa/commit/2ac3568d15e6eceb2ebf7f2adeb9c17a12020fe0))
+* **common:** :bug: auto login ([171076c](https://github.com/HuLaSpark/HuLa/commit/171076c8da084facd256e2a1f92fff9af1d96132))
+* **common:** :bug: auto login issue ([b86eb5a](https://github.com/HuLaSpark/HuLa/commit/b86eb5a1f8b50c841ad739c55eae8bb805e2fcbb))
+* **common:** :bug: autoFixHeightPage useage ([c29201c](https://github.com/HuLaSpark/HuLa/commit/c29201c012e68c1eeb8af3bd2974dfe98e22e866))
+* **common:** :bug: autoFixHeightPage.vue ([dbad023](https://github.com/HuLaSpark/HuLa/commit/dbad0233b588684752366a77c92733c21e64732b))
+* **common:** :bug: badge display ([1b086b9](https://github.com/HuLaSpark/HuLa/commit/1b086b97595c58d90d76ed189bc98b1214d328ba))
+* **common:** :bug: change group member count ([f74fcc0](https://github.com/HuLaSpark/HuLa/commit/f74fcc0afbd0d4f60d338caf57abceb707cd6c06))
+* **common:** :bug: change init msg lenth ([fc69d6b](https://github.com/HuLaSpark/HuLa/commit/fc69d6b40fe1e10a0d5a9b8713a16603dd134b65))
+* **common:** :bug: change my group user info ([a3d2425](https://github.com/HuLaSpark/HuLa/commit/a3d24252454f7a4906f52a1e13bba605e8ac3967))
+* **common:** :bug: chatSetting display ([b1e0af7](https://github.com/HuLaSpark/HuLa/commit/b1e0af78f126e8db7f38a0b66f8b75cceae79cd5))
+* **common:** :bug: clear msg check ([f26cf2c](https://github.com/HuLaSpark/HuLa/commit/f26cf2c759d6c775a68a6dd32f1b797ac098082a))
+* **common:** :bug: compatibility administrator ([6c09d33](https://github.com/HuLaSpark/HuLa/commit/6c09d33c5bab97473f23739c5afd511bde004ecb))
+* **common:** :bug: delete announcement error ([de5ad5a](https://github.com/HuLaSpark/HuLa/commit/de5ad5a8ed19e1a63eba36d15bf5cc4f7d0768a6))
+* **common:** :bug: delete useless code; fix session change ([cac88a7](https://github.com/HuLaSpark/HuLa/commit/cac88a7853c78afd66604920e68997690aaa796e))
+* **common:** :bug: desktop line break ([a93970d](https://github.com/HuLaSpark/HuLa/commit/a93970d3da398caa2e9c4879a49cdc25c93f0a1f))
+* **common:** :bug: display error msg when login error ([a108333](https://github.com/HuLaSpark/HuLa/commit/a1083337686a55ad75ba11aa1985425e5e34e255))
+* **common:** :bug: display friend contact error when friend delete ([eacd91b](https://github.com/HuLaSpark/HuLa/commit/eacd91b8ff6a60e2b71d68a28d7b67d0c1e3baf1))
+* **common:** :bug: dissolve group if dissolved and switch to first session ([e843675](https://github.com/HuLaSpark/HuLa/commit/e843675daf72e9c4c9d74c4a0c35602e1c9c49e4))
+* **common:** :bug: fix compile error ([de5fd7d](https://github.com/HuLaSpark/HuLa/commit/de5fd7da368c26dc15caeede9a06a493caded100))
+* **common:** :bug: fix display the name of the msg in chatbox ([3de7bb2](https://github.com/HuLaSpark/HuLa/commit/3de7bb203439947d655b1453ac9f2c9f784c3b4b))
+* **common:** :bug: fix mobile logout problem ([80ce0de](https://github.com/HuLaSpark/HuLa/commit/80ce0de82991de86b6887ea7a7e87c1396ee863f))
+* **common:** :bug: fix some defects and improve mobile terminal ([#335](https://github.com/HuLaSpark/HuLa/issues/335)) ([d2be80a](https://github.com/HuLaSpark/HuLa/commit/d2be80a5db379f4d8cc8e8a5f778bc16c33cdf1c))
+* **common:** :bug: fix some personal information styles ([b53abbd](https://github.com/HuLaSpark/HuLa/commit/b53abbd58049008e7172db25088310ed72cdd06a))
+* **common:** :bug: fix some styles and initialization login error ([ecd27d8](https://github.com/HuLaSpark/HuLa/commit/ecd27d8e4f01ca86c77ecd105aa0b6a2012290ed))
+* **common:** :bug: friend note was modified ([949b527](https://github.com/HuLaSpark/HuLa/commit/949b5278cd7fe09dfc96792277483169085e3466))
+* **common:** :bug: get group chats automatically when no group exists ([deb0916](https://github.com/HuLaSpark/HuLa/commit/deb0916869a48cf3e2f303a985d45f9e8c2c76d1))
+* **common:** :bug: group administrators set notifications ([de145aa](https://github.com/HuLaSpark/HuLa/commit/de145aacac2d8e50e96015b1a24c9b2af1c4a29d))
+* **common:** :bug: group chat hide rtc call ([f36b51f](https://github.com/HuLaSpark/HuLa/commit/f36b51f8e0f7b62310cf2228999c17de3fada4ab))
+* **common:** :bug: group info change ([c7330dc](https://github.com/HuLaSpark/HuLa/commit/c7330dca21dcd4d14316c64eccad345bef976a92))
+* **common:** :bug: handle request 401 error ([f7f18c1](https://github.com/HuLaSpark/HuLa/commit/f7f18c16d4b445df603381504da6c39732238022))
+* **common:** :bug: ios soft keybord hide tool box ([c822deb](https://github.com/HuLaSpark/HuLa/commit/c822deb689fd1de5dfc93b1b98922ccf7fcc0dc0))
+* **common:** :bug: last msg error ([bedf11b](https://github.com/HuLaSpark/HuLa/commit/bedf11b3e8d100ab345aa421fa96775f79579166))
+* **common:** :bug: lazy change user item when click group member ([a835198](https://github.com/HuLaSpark/HuLa/commit/a835198e90c4da513dc61a19f153d2e7447e4679))
+* **common:** :bug: logout notify when other login ([e3330e9](https://github.com/HuLaSpark/HuLa/commit/e3330e9d7ffb9a4d653ccae9027697c9c5841af5))
+* **common:** :bug: mobile bg issue ([abc0078](https://github.com/HuLaSpark/HuLa/commit/abc007815064e7ca1e6142d8e17c3fcddc6b781d))
+* **common:** :bug: mobile bg-color ([fdcd40b](https://github.com/HuLaSpark/HuLa/commit/fdcd40b978fc2fb5baa72778d376d2da9c4323ea))
+* **common:** :bug: mobile msg input ([182f830](https://github.com/HuLaSpark/HuLa/commit/182f830782f8330e5f7b34df83f46c905833eada))
+* **common:** :bug: mobile msg input focus after msg send ([728f4b9](https://github.com/HuLaSpark/HuLa/commit/728f4b98f6e94b6d96f53b1ea3ec766e7842982a))
+* **common:** :bug: mobile scan qrcode page ([4e18237](https://github.com/HuLaSpark/HuLa/commit/4e18237d47a8270bd30eabe1daffb56e3d93bf06))
+* **common:** :bug: mobile video call switch video direction ([6f0ce82](https://github.com/HuLaSpark/HuLa/commit/6f0ce8264dffd960f5bb9f383659f529c1e597a6))
+* **common:** :bug: msg list interface pass {} when data is Non ([a7d3c93](https://github.com/HuLaSpark/HuLa/commit/a7d3c93dee745cdcbede2e4c7083a56954a829b0))
+* **common:** :bug: msg mark ([cb82ec2](https://github.com/HuLaSpark/HuLa/commit/cb82ec2b0e9740074b03b526c1f94303247a9059))
+* **common:** :bug: my group user info ([ddd29d6](https://github.com/HuLaSpark/HuLa/commit/ddd29d6dbbcfaaad34606401b2239f810eb6152a))
+* **common:** :bug: notification display mode of the group ([4dfb775](https://github.com/HuLaSpark/HuLa/commit/4dfb77593857ce9d5b70c404644566cadf0e57fe))
+* **common:** :bug: optimize scan interaction logic ([8355d10](https://github.com/HuLaSpark/HuLa/commit/8355d109645a041ee86945c7a5be5b11d5e480f8))
+* **common:** :bug: optimize the message withdrawal logic ([df11073](https://github.com/HuLaSpark/HuLa/commit/df110737b52a37a7e163720b008f838fbc18514b))
+* **common:** :bug: parsing the time, it is strongly converted to a number type ([6a87411](https://github.com/HuLaSpark/HuLa/commit/6a87411360837565b35cc567e9b26d4c0257befc))
+* **common:** :bug: qrcode scan login ([ae29ac0](https://github.com/HuLaSpark/HuLa/commit/ae29ac0a5cd7f3ed5291e59df2fc72e8f7ff7b59))
+* **common:** :bug: recall msg and re-edit ([bfd5357](https://github.com/HuLaSpark/HuLa/commit/bfd53574c53141180cd78b8568b19bdb1bfafbd6))
+* **common:** :bug: register bug ([f9fdf98](https://github.com/HuLaSpark/HuLa/commit/f9fdf98fffdca890d30e01e21c3534ffe9af9fb2))
+* **common:** :bug: remove captcha ([627e07a](https://github.com/HuLaSpark/HuLa/commit/627e07a1127108a56913f6ae01ac452a638435f6))
+* **common:** :bug: remove friend request ([b9b8419](https://github.com/HuLaSpark/HuLa/commit/b9b8419256faf592d6d4c52c2a11bd21c9cc7615))
+* **common:** :bug: remove group member issue ([640f9d7](https://github.com/HuLaSpark/HuLa/commit/640f9d7c2ff7d254d1d7296463db0e6e64756761))
+* **common:** :bug: rename mobile Voice to VoicePanel ([69fdbbb](https://github.com/HuLaSpark/HuLa/commit/69fdbbb47eeb058d3db1039680c6a6916b2b1f54))
+* **common:** :bug: reply message display error ([403d129](https://github.com/HuLaSpark/HuLa/commit/403d129083011db05986eb6bb34f8d18ab3d7a8d))
+* **common:** :bug: scroll msg ([3356fe6](https://github.com/HuLaSpark/HuLa/commit/3356fe6865825c7d44355bbde72addf97c7e1bed))
+* **common:** :bug: scroll to bottom when msg list change ([4cb4eba](https://github.com/HuLaSpark/HuLa/commit/4cb4ebaaa59682a06990a6c5811dc36c58f4c5ed))
+* **common:** :bug: search user in group ([5bc51d9](https://github.com/HuLaSpark/HuLa/commit/5bc51d9be7ecd9c36b2a3f4421742b7ceddc21a6))
+* **common:** :bug: set model window closeable in register window ([9e4c179](https://github.com/HuLaSpark/HuLa/commit/9e4c17983c0c76a1cb8f6e978d79bdbfd94e680a))
+* **common:** :bug: unified monitoring messages and resolve group creation white screen ([3b472d4](https://github.com/HuLaSpark/HuLa/commit/3b472d4f6d7d4ce220b89ad86843e804e645e266))
+* **common:** :bug: update group contact when self group change ([8e051aa](https://github.com/HuLaSpark/HuLa/commit/8e051aa44f20b675e64e1208e0778f39675876c5))
+* **common:** :bug: update group count ([34a9321](https://github.com/HuLaSpark/HuLa/commit/34a932100fa249bc01417cb6073f1fa4f50d0563))
+* **common:** :bug: update my group info ([5ab052c](https://github.com/HuLaSpark/HuLa/commit/5ab052c74047a456df53709ee211bd0ce7bdbe49))
+* **common:** :bug: update session name when change the group room remark ([623101a](https://github.com/HuLaSpark/HuLa/commit/623101a7981a77932373ac7bdddfead40cd506ec))
+* **common:** :bug: update the display username of the msg when my group userinfo change ([a49502b](https://github.com/HuLaSpark/HuLa/commit/a49502b9fb5558a9e15a38fcbc3bc1443c502bca))
+* **common:** :bug: update user state ([0b20ca2](https://github.com/HuLaSpark/HuLa/commit/0b20ca23d2da900628e41f2eb10712e3caba835d))
+* **common:** :bug: webrtc candidate exchange ([f67ff5f](https://github.com/HuLaSpark/HuLa/commit/f67ff5f42dc170454f97923480da6741bcf7700e))
+* **common:** :bug: webrtc issue ([368f7f8](https://github.com/HuLaSpark/HuLa/commit/368f7f84feada274742d8cf6dc6aeeed859459af))
+* **common:** :bug: webrtc issue ([a9058a5](https://github.com/HuLaSpark/HuLa/commit/a9058a5aa3035bf87771f673e9acb3c1438fa0ab))
+* **common:** :bug: webrtc listener ([7844dc2](https://github.com/HuLaSpark/HuLa/commit/7844dc2d78375aea38d2820f240093d65b6894fa))
+* **common:** :bug: webrtc send ice candidate issue ([b6652fb](https://github.com/HuLaSpark/HuLa/commit/b6652fb787d983f8431309e3e962c1d7a29c7be1))
+* **common:** :bug: websocket reconnect ([e540e9a](https://github.com/HuLaSpark/HuLa/commit/e540e9a2966c70df26cf02735788e90b842453cf))
+* **component:** :bug: 修复录音取消后线程内没有被取消导致另外会话录音失败 ([2a96881](https://github.com/HuLaSpark/HuLa/commit/2a9688180e845ef655725e3b57b4cbaa29c9c97b))
+* **component:** :bug: 修复消息标记不显示问题 ([3b6469c](https://github.com/HuLaSpark/HuLa/commit/3b6469c58014253debce464dc2ff141b2a9b2f45))
+* **config:** :bug: fix some configuration issues on windows ([9006441](https://github.com/HuLaSpark/HuLa/commit/90064415c6010712625c26cdf7894bdbaffbdb30))
+* **doc:** :bug: fix document jump problem ([84422bf](https://github.com/HuLaSpark/HuLa/commit/84422bfbf841a8b0af2daade41418c08d55f5d44))
+* **DPR:** :bug: fix popover offset issues and scaling issues at high multiples ([d904845](https://github.com/HuLaSpark/HuLa/commit/d90484579e06d8f8a9c26bb371df029e431caf00))
+* **DPR:** :bug: fix resolution and zoom factor affected due to text size zoom ([1986eec](https://github.com/HuLaSpark/HuLa/commit/1986eec6d96d73ee0b76d8b1f600ba388ac69e0d))
+* **history:** :bug: fix history manager unable to open pictures and videos ([1cef301](https://github.com/HuLaSpark/HuLa/commit/1cef3017b69f079728e6348a32e0469c96e598c1))
+* **history:** :bug: fix history window content not wrapping ([d66c1b6](https://github.com/HuLaSpark/HuLa/commit/d66c1b6086e920688b9e07e25f6d0518dd9c59a6))
+* **history:** :bug: fix issues such as not being able to view pictures and videos in history ([a08da0d](https://github.com/HuLaSpark/HuLa/commit/a08da0df4bd01f7f044fd235bdc0f6081ca6c3c6))
+* **input:** :bug: fix some logic errors sent by pc input box ([5e61381](https://github.com/HuLaSpark/HuLa/commit/5e6138162c16186df3c084eb180365005051d6aa))
+* **layout:** :bug: fix import issue in voicepanel component ([c0526f2](https://github.com/HuLaSpark/HuLa/commit/c0526f235b8bebc35820da144de5800e267f04f2))
+* **layout:** :bug: fix layout drag zoom out abnormal issue ([d45bec2](https://github.com/HuLaSpark/HuLa/commit/d45bec22d2c0ce5437388f1bbf74685f124d2105))
+* **list:**  fix some existing problems ([e381165](https://github.com/HuLaSpark/HuLa/commit/e38116529a4bc5869ea50505bd43fec0d7ea7584))
+* **list:** :bug: fix message list not bottomed out ([0834eb8](https://github.com/HuLaSpark/HuLa/commit/0834eb8f87baee65ac2c98039c4ca2ebcedd77c6))
+* **login:** :bug: fix automatic login logic issues ([d9e6024](https://github.com/HuLaSpark/HuLa/commit/d9e6024b66e3a7db137f707f84d55a65b15dd443))
+* **mac:** :bug: fix issues caused by resolution ([4e9f7cf](https://github.com/HuLaSpark/HuLa/commit/4e9f7cf32278b9c813f33e4803d88ec92e4e228e))
+* **mobile audio:** :bug: fix mobile audio issues ([a4a3ace](https://github.com/HuLaSpark/HuLa/commit/a4a3ace30cf6e976a64358ddf53192736a18858c))
+* **mobile:** :bug: fix chat room height and pull-to-refresh issues ([2305cd8](https://github.com/HuLaSpark/HuLa/commit/2305cd8e307387223be459e99436859640049191))
+* **mobile:** :bug: fix duplicate trigger count and ring tone in mobile session list ([682c56c](https://github.com/HuLaSpark/HuLa/commit/682c56c6296436e48b1bd63dfae5542278183fa1))
+* **mobile:** :bug: fix error when mobile receives message ([ba55a2f](https://github.com/HuLaSpark/HuLa/commit/ba55a2f7df96d238b2219ed87fb70cae608f6f94))
+* **mobile:** :bug: fix HMR address config in Vite ([4f0096e](https://github.com/HuLaSpark/HuLa/commit/4f0096ec8478379f8d100cf84d0c5b97f56bfdd2))
+* **mobile:** :bug: fix HMR address config in Vite ([e38ecb7](https://github.com/HuLaSpark/HuLa/commit/e38ecb79df517f09ea214401bead552c7b0ec539))
+* **mobile:** :bug: fix some known issues ([#353](https://github.com/HuLaSpark/HuLa/issues/353)) ([542760b](https://github.com/HuLaSpark/HuLa/commit/542760be0e3e10d6f07d490edb3b826f1729c840))
+* **mobile:** :bug: fix style issues, create group chats, and resolve logout problems ([2b1cdec](https://github.com/HuLaSpark/HuLa/commit/2b1cdec9da97b6584c6cd9fd28051945a7afce23))
+* **mobile:** :bug: fix the 'System Type Error' issue in the registry ([5671334](https://github.com/HuLaSpark/HuLa/commit/56713345ef63e2f76651d6cd614d95cac60c2a37))
+* **mobile:** :bug: fix the input box and panel display functionality on mobile devices ([36e7aef](https://github.com/HuLaSpark/HuLa/commit/36e7aef3b9d5d8353130e33ad3456aafc1b9577b))
+* **mobile:** :bug: fix the issue where messages can't wrap to the next line ([594ba26](https://github.com/HuLaSpark/HuLa/commit/594ba26b43a800c5149d6e9c1304cb45bc867dfe))
+* **mobile:** :bug: fix the issue where the message list page cannot scroll ([b1d0aff](https://github.com/HuLaSpark/HuLa/commit/b1d0affb189738ef948eb42ce24d8cd40954848f))
+* **mobile:** :bug: fix unimported dependencies ([cb7f271](https://github.com/HuLaSpark/HuLa/commit/cb7f27160afe6a89cb700213d577eb75b09b90c6))
+* **mobile:** :bug: fix white screen when returning from group notice page; fix wrong route name ([211df23](https://github.com/HuLaSpark/HuLa/commit/211df23e8a02d97a77f48720386a453a8205b622))
+* **mobile:** :bug: fixed message avatar display issue in friends list ([78ba51c](https://github.com/HuLaSpark/HuLa/commit/78ba51c5dd8c7d4feacba1781864ca205cf79145))
+* **mobile:** :bug: remove animation, fix mobile styles ([893df8a](https://github.com/HuLaSpark/HuLa/commit/893df8ac41ba9ba9b4695f84c623949adb288ee7))
+* **not mac:** :bug: fix startup error for platforms other than mac ([58e284c](https://github.com/HuLaSpark/HuLa/commit/58e284cd22a73acb5a807279b264d48af1512f04))
+* **pc:** :bug: fix update issue of my group nickname and comments in pc ([6f9d766](https://github.com/HuLaSpark/HuLa/commit/6f9d766d81f4ba922e61c9392bca020a15d38bdf))
+* **plug-in:** :bug: modify plug-in styles ([3a05ec3](https://github.com/HuLaSpark/HuLa/commit/3a05ec3e05a75bc883c0e5741a471761181d373d))
+* **router:** :bug: fix white screen on mobile terminal caused by routing ([300860c](https://github.com/HuLaSpark/HuLa/commit/300860cda4fa05f806c42286f2b1b5fea7a108c6))
+* **rust:** :bug: fix mobile startup error ([43b52cd](https://github.com/HuLaSpark/HuLa/commit/43b52cd6e2fe1ac34d6d5190b0b1d3f06bb7ef96))
+* **rust:** :bug: fix startup warning issue ([9f5486d](https://github.com/HuLaSpark/HuLa/commit/9f5486d4152429d34c4ff1992cff61bb81001f64))
+* **system:** :bug: 修复打包安装启动不成功问题 ([fe37c24](https://github.com/HuLaSpark/HuLa/commit/fe37c246777cde3325555ed2ba2fcf860888a4a8))
+* **system:** :bug: fix an issue where scrolling bars could appear in windows ([0ee589b](https://github.com/HuLaSpark/HuLa/commit/0ee589b35053fb4faa66cfb9cd9dd14a447ab80a))
+* **system:** :bug: fix app content becoming larger due to system enlargement ([a7768aa](https://github.com/HuLaSpark/HuLa/commit/a7768aa3b1639145c5c5008d3714014368f5b288)), closes [#324](https://github.com/HuLaSpark/HuLa/issues/324)
+* **system:** :bug: modify some styles and fix lock screen, home search function ([959a43e](https://github.com/HuLaSpark/HuLa/commit/959a43ecf07db16e604b10a9f2acf69708f4d42f))
+* **tray:** :bug: fix tray prompt issues ([cbeee6d](https://github.com/HuLaSpark/HuLa/commit/cbeee6d96fd5704927d27ef30595b0a90782b801))
+* **validate:** correct password special character regex in login, register and reset pages ([6235a0a](https://github.com/HuLaSpark/HuLa/commit/6235a0ad24eb61377c328187fbc05bf0784dad95))
+* **view:** :bug: fix QR code login issue ([d05541e](https://github.com/HuLaSpark/HuLa/commit/d05541e6c7a88d8030f78aa747c9a0c43e7049f2))
+* **view:** :bug: fixed session right-click switch room status sidebar settings not synchronized ([98f10bd](https://github.com/HuLaSpark/HuLa/commit/98f10bdefa7791231d49e42c3e2d6897b1807625))
+* **views:** :bug: fix ip and screenshot issues ([28f1f70](https://github.com/HuLaSpark/HuLa/commit/28f1f701fbdc200185962d6b3cd775e738eafbad))
+* **vitest config:** :bug: fix problems caused by inconsistent vitest configuration ([28043f5](https://github.com/HuLaSpark/HuLa/commit/28043f528b4b80ceacae3636e73aff8a7e8923e0))
+* **voice:** :bug: fix voice error ([bc60d9c](https://github.com/HuLaSpark/HuLa/commit/bc60d9c091fd67eb8ca5fbfa1316354cb053d832))
+* **windows:** :bug: fix windows tray flicker abnormal problem ([bea61c5](https://github.com/HuLaSpark/HuLa/commit/bea61c55d30b3c137eaf1ca3be4b2b3e146091ec))
+* **XSS:** :bug: fix some possible bugs in XSS ([946dce4](https://github.com/HuLaSpark/HuLa/commit/946dce4bf8ef16cbf242f4a89588a076c7da7df4))
+
+
+### ⚡️ Performance Improvements | 性能优化
+
+* **avatar:** :zap: remove avatar replacement check ([b9225aa](https://github.com/HuLaSpark/HuLa/commit/b9225aa98bc53729f502e4b4b8a438c4baf77e1c))
+* **build:** :zap: optimize the handling of packaged scripts ([a50cc5f](https://github.com/HuLaSpark/HuLa/commit/a50cc5f31c00b52828209d747832e60fd62337e2))
+* **chat:** :zap: optimize chat layout jitter problem ([3b4e55d](https://github.com/HuLaSpark/HuLa/commit/3b4e55def931678cf6dc0ef5afec75ad23079568))
+* **chat:** :zap: optimize chat list scrolling, loading, switching, etc ([80dc1af](https://github.com/HuLaSpark/HuLa/commit/80dc1afc7544723a5beb1e9a56e0cc9ebfea8516))
+* **code:** :zap: remove unnecessary fields ([5ad8b2f](https://github.com/HuLaSpark/HuLa/commit/5ad8b2f569ab5fa5c4a7f7bc07dfe81bf6959154))
+* **common:** :zap: load all data after login ([2d6388f](https://github.com/HuLaSpark/HuLa/commit/2d6388fd65bb7eef256791578f16603b1dcc40bd))
+* **config:** :zap: optimize how map keys are read ([a676b3b](https://github.com/HuLaSpark/HuLa/commit/a676b3b70b1ca5cd9d675267fd529a1645ed6837))
+* **DPR:** :zap: optimize some problems caused by scaling factors ([49ff049](https://github.com/HuLaSpark/HuLa/commit/49ff04956f5a6af3a7fe4fd532d069bac931e0dd))
+* **file manager:** :zap: optimize file management functions and logic for multi-file sending ([9629cff](https://github.com/HuLaSpark/HuLa/commit/9629cff8762ef155b64c54bdb6706cb26e36c586))
+* **file manager:** :zap: optimize style and functionality for file management ([e87f5d8](https://github.com/HuLaSpark/HuLa/commit/e87f5d815d5363a9e0a7e32065d2b9fbaaa8392a))
+* **history:** :zap: optimize historical message management ([aa0f6b0](https://github.com/HuLaSpark/HuLa/commit/aa0f6b0894e4ade7303495b5d23526bb723982a1))
+* **layout:** :zap: optimal layout jitter problem ([499de18](https://github.com/HuLaSpark/HuLa/commit/499de180d799dd03394e89eedb6343e0323d6a25))
+* **list:** :zap: optimize message list display ([d462675](https://github.com/HuLaSpark/HuLa/commit/d462675fa489b72332d537d15cedcf8892005c9e))
+* **messages:** :zap: optimize the content and style of forwarded messages ([d1f9669](https://github.com/HuLaSpark/HuLa/commit/d1f9669650495a8dd41683efdb78aabe37d2174c))
+* **mobile:** :zap: perfect mobile launch page and some other issues ([#352](https://github.com/HuLaSpark/HuLa/issues/352)) ([86f8736](https://github.com/HuLaSpark/HuLa/commit/86f873633c11b8ab55418b4538fa23818772313a))
+* **mobile:** ⚡ optimize mobile startup page ([c5905d7](https://github.com/HuLaSpark/HuLa/commit/c5905d7c7b06de3ee9bbbeff3807ef02080a1aac))
+* **model:** :zap: optimize 3D model preview functionality ([78ed8fb](https://github.com/HuLaSpark/HuLa/commit/78ed8fbcac415ae488ec54e059e2a8a9011974e1))
+* **multiple:** :zap: optimize multi-choice logic and announcement display logic ([a0d30f7](https://github.com/HuLaSpark/HuLa/commit/a0d30f7b14e5fe4bb317100229975a7b292b55d6))
+* **right click:** :zap: optimize right-click menu display ([0141554](https://github.com/HuLaSpark/HuLa/commit/0141554fd5f9ef627ab27cf3f186a305f0fe3caf))
+* **rtc:** :zap: optimize rtc logic and style ([884ff8b](https://github.com/HuLaSpark/HuLa/commit/884ff8bb1757a295af76ab710c63aad91d16f5be))
+* **shortcut:** :zap: optimize keyboard mapping compatibility ([f48ff0f](https://github.com/HuLaSpark/HuLa/commit/f48ff0f7f10209ccd13ad6d79ae0e1eb5c1a985f))
+* **system:** :zap: optimize chat history, forwarding, merging content and more ([1e66623](https://github.com/HuLaSpark/HuLa/commit/1e66623a87dc32b0193a02e03e4f14ae570c09f9))
+* **views:** :zap: optimize page layout and toggle loading states ([fa99ac2](https://github.com/HuLaSpark/HuLa/commit/fa99ac25ac4bc2526fad0949b3c6391d94a5f5fc))
+* **views:** :zap: optimize reply function and chat page, request list style、 ([56f4096](https://github.com/HuLaSpark/HuLa/commit/56f4096e6d67eb4d976c883bbc5b14921cfca495))
+* **virtual list:** :zap: remove virtual list, use native list ([3625828](https://github.com/HuLaSpark/HuLa/commit/362582865347994efd0d68f1b32254c2dcbd5145))
+* **virtual:** :zap: optimize virtual lists ([8c98b95](https://github.com/HuLaSpark/HuLa/commit/8c98b95bd29a69f2c8cad82b08679014bc541a22))
+
 ## [2.6.13](https://github.com/HuLaSpark/HuLa/compare/v2.6.12...v2.6.13) (2025-07-04)
 
 
@@ -211,7 +789,7 @@
 * **view:** :zap: 优化申请群聊功能 ([c492c0d](https://github.com/HuLaSpark/HuLa/commit/c492c0d18e9b0288ae45827b71bd29f4632bb636))
 * **view:** :zap: 优化项目中类型的编写和定义方式 ([a832dc1](https://github.com/HuLaSpark/HuLa/commit/a832dc1220468de33f724c78256047a84ff62811))
 
-# Changelog
+
 
 ## <small>2.6.6 (2025-03-01)</small>
 

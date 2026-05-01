@@ -12,28 +12,28 @@ impl SqlDebug {
     {
         let statement = query.build(backend);
 
-        info!("📝 [{}] SQL: {}", label, statement.sql);
+        info!("[{}] SQL: {}", label, statement.sql);
         if let Some(ref values) = statement.values {
-            info!("📋 [{}] 参数: {:?}", label, values);
+            info!("[{}] Parameters: {:?}", label, values);
 
             // 打印格式化的完整SQL（参数已替换）
             let formatted_sql = Self::format_sql_with_values(&statement.sql, values);
-            info!("🔍 [{}] 完整SQL: {}", label, formatted_sql);
+            info!("[{}] Complete SQL: {}", label, formatted_sql);
         } else {
-            info!("🔍 [{}] 完整SQL: {}", label, statement.sql);
+            info!("[{}] Complete SQL: {}", label, statement.sql);
         }
     }
 
     /// 打印Statement
     pub fn log_statement(statement: &Statement, label: &str) {
-        info!("📝 [{}] SQL: {}", label, statement.sql);
+        info!("[{}] SQL: {}", label, statement.sql);
         if let Some(ref values) = statement.values {
-            info!("📋 [{}] 参数: {:?}", label, values);
+            info!("[{}] Parameters: {:?}", label, values);
 
             let formatted_sql = Self::format_sql_with_values(&statement.sql, values);
-            info!("🔍 [{}] 完整SQL: {}", label, formatted_sql);
+            info!("[{}] Complete SQL: {}", label, formatted_sql);
         } else {
-            info!("🔍 [{}] 完整SQL: {}", label, statement.sql);
+            info!("[{}] Complete SQL: {}", label, statement.sql);
         }
     }
 
@@ -77,10 +77,10 @@ impl SqlDebug {
 
     /// 简化的SQL日志记录
     pub fn log_simple(sql: &str, values: Option<&sea_orm::Values>, label: &str) {
-        info!("📝 [{}] {}", label, sql);
+        info!("[{}] {}", label, sql);
         if let Some(values) = values {
             if !values.0.is_empty() {
-                info!("📋 [{}] 参数: {:?}", label, values);
+                info!("[{}] Parameters: {:?}", label, values);
             }
         }
     }
