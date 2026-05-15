@@ -4,63 +4,59 @@
     v-if="activeItem"
     data-tauri-drag-region
     class="z-999 flex-y-center flex-shrink-0 border-b-(1px solid [--right-chat-footer-line-color]) select-none cursor-default justify-between p-[6px_22px_10px]">
-    <n-flex align="center">
-      <Transition name="loading" mode="out-in">
-        <n-flex align="center">
-          <n-avatar
-            :class="[
-              'rounded-8px select-none',
-              { grayscale: activeItem?.type === RoomTypeEnum.SINGLE && !isOnline && !isBotUser }
-            ]"
-            :size="28"
-            :color="themes.content === ThemeEnum.DARK ? '' : '#fff'"
-            :fallback-src="themes.content === ThemeEnum.DARK ? '/logoL.png' : '/logoD.png'"
-            :src="currentUserAvatar" />
-          <label class="flex-y-center gap-6px">
-            <p class="text-(16px [--text-color])">{{ groupStore.countInfo?.remark || activeItem?.name }}</p>
-            <p
-              v-if="activeItem?.type === RoomTypeEnum.GROUP && groupStore.countInfo?.memberNum"
-              class="text-(11px #808080)">
-              [{{ groupStore.countInfo?.memberNum }}]
-            </p>
-            <!-- bot用户标签 -->
-            <div
-              v-if="isBotUser"
-              class="dark:bg-[#13987f40] bg-[#e8f4f1] dark:border-(1px solid #13987f) border-(1px solid #13987f) flex-center px-8px py-4px rounded-6px">
-              <p class="text-(11px #13987f)">{{ t('home.chat_header.bot_tag') }}</p>
-            </div>
-          </label>
-          <svg
-            v-if="activeItem?.hotFlag === IsAllUserEnum.Yes"
-            class="size-20px color-#13987f select-none outline-none">
-            <use href="#auth"></use>
-          </svg>
-          <n-flex v-else-if="activeItem?.type === RoomTypeEnum.SINGLE && !isBotUser" align="center">
-            <template v-if="shouldShowDeleteFriend">
-              <n-flex align="center" :size="6">
-                <!-- 状态图标 -->
-                <img v-if="hasCustomState && statusIcon" :src="statusIcon" class="size-18px rounded-50%" alt="" />
-                <n-badge v-else :color="isOnline ? '#1ab292' : '#909090'" dot />
+    <Transition name="loading" mode="out-in">
+      <n-flex align="center">
+        <n-avatar
+          :class="[
+            'rounded-8px select-none',
+            { grayscale: activeItem?.type === RoomTypeEnum.SINGLE && !isOnline && !isBotUser }
+          ]"
+          :size="28"
+          :color="themes.content === ThemeEnum.DARK ? '' : '#fff'"
+          :fallback-src="themes.content === ThemeEnum.DARK ? '/logoL.png' : '/logoD.png'"
+          :src="currentUserAvatar" />
+        <label class="flex-y-center gap-6px">
+          <p class="text-(16px [--text-color])">{{ groupStore.countInfo?.remark || activeItem?.name }}</p>
+          <p
+            v-if="activeItem?.type === RoomTypeEnum.GROUP && groupStore.countInfo?.memberNum"
+            class="text-(11px #808080)">
+            [{{ groupStore.countInfo?.memberNum }}]
+          </p>
+          <!-- bot用户标签 -->
+          <div
+            v-if="isBotUser"
+            class="dark:bg-[#13987f40] bg-[#e8f4f1] dark:border-(1px solid #13987f) border-(1px solid #13987f) flex-center px-8px py-4px rounded-6px">
+            <p class="text-(11px #13987f)">{{ t('home.chat_header.bot_tag') }}</p>
+          </div>
+        </label>
+        <svg v-if="activeItem?.hotFlag === IsAllUserEnum.Yes" class="size-20px color-#13987f select-none outline-none">
+          <use href="#auth"></use>
+        </svg>
+        <n-flex v-else-if="activeItem?.type === RoomTypeEnum.SINGLE && !isBotUser" align="center">
+          <template v-if="shouldShowDeleteFriend">
+            <n-flex align="center" :size="6">
+              <!-- 状态图标 -->
+              <img v-if="hasCustomState && statusIcon" :src="statusIcon" class="size-18px rounded-50%" alt="" />
+              <n-badge v-else :color="isOnline ? '#1ab292' : '#909090'" dot />
 
-                <!-- 状态文本 -->
-                <p class="text-(12px [--text-color])">
-                  {{ statusTitle }}
-                </p>
-              </n-flex>
-            </template>
+              <!-- 状态文本 -->
+              <p class="text-(12px [--text-color])">
+                {{ statusTitle }}
+              </p>
+            </n-flex>
+          </template>
 
-            <template v-else>
-              <n-flex align="center" :size="4">
-                <svg class="size-16px color-#d03553">
-                  <use href="#close"></use>
-                </svg>
-                <p class="text-(12px [--text-color])">{{ t('home.chat_header.status_abnormal') }}</p>
-              </n-flex>
-            </template>
-          </n-flex>
+          <template v-else>
+            <n-flex align="center" :size="4">
+              <svg class="size-16px color-#d03553">
+                <use href="#close"></use>
+              </svg>
+              <p class="text-(12px [--text-color])">{{ t('home.chat_header.status_abnormal') }}</p>
+            </n-flex>
+          </template>
         </n-flex>
-      </Transition>
-    </n-flex>
+      </n-flex>
+    </Transition>
     <!-- 顶部右边选项栏 -->
     <nav v-if="shouldShowDeleteFriend || chatStore.isGroup" class="options flex-y-center gap-20px color-[--icon-color]">
       <div v-if="!isChannel && !isBotUser" class="options-box">
@@ -131,297 +127,41 @@
       </div>
     </nav>
 
-    <!-- 侧边选项栏 -->
-    <Transition v-if="shouldShowDeleteFriend || chatStore.isGroup" name="sidebar">
-      <div v-if="sidebarShow" style="border: 1px solid rgba(90, 90, 90, 0.1)" class="sidebar">
-        <n-scrollbar style="height: calc(100vh / var(--page-scale, 1) - 24px)" class="p-22px box-border">
-          <!-- 单聊侧边栏选项 -->
-          <template v-if="!chatStore.isGroup">
-            <div class="box-item flex-col-y-center">
-              <div class="flex-between-center">
-                <p>{{ t('home.chat_header.sidebar.single.pin') }}</p>
-                <n-switch size="small" :value="activeItem?.top" @update:value="handleTop" />
-              </div>
-              <div class="h-1px bg-[--setting-item-line] m-[10px_0]"></div>
-              <div class="flex-between-center">
-                <p>{{ t('home.chat_header.sidebar.single.mute') }}</p>
-                <n-switch
-                  size="small"
-                  :value="activeItem?.muteNotification === NotificationTypeEnum.NOT_DISTURB"
-                  @update:value="handleNotification" />
-              </div>
-            </div>
+    <ChatInnerDrawer v-model:show="sidebarShow" v-if="shouldShowDeleteFriend || chatStore.isGroup">
+      <SingleChatSidebar
+        v-if="!chatStore.isGroup"
+        :active-item="activeItem"
+        :is-bot-user="isBotUser"
+        @top="handleTop"
+        @notification="handleNotification"
+        @shield="handleShield"
+        @delete="handleDelete" />
 
-            <div class="box-item">
-              <div class="flex-between-center">
-                <p>{{ t('home.chat_header.sidebar.single.shield') }}</p>
-                <n-switch size="small" :value="activeItem?.shield" @update:value="handleShield" />
-              </div>
-            </div>
-
-            <div class="box-item cursor-pointer" @click="handleDelete(RoomActEnum.DELETE_RECORD)">
-              <p>{{ t('home.chat_header.sidebar.single.delete_history') }}</p>
-            </div>
-
-            <div
-              v-if="!isBotUser"
-              class="box-item flex-x-center cursor-pointer"
-              @click="handleDelete(RoomActEnum.DELETE_FRIEND)">
-              <p class="color-#d03553">{{ t('home.chat_header.sidebar.single.delete_friend') }}</p>
-            </div>
-
-            <p v-if="!isBotUser" class="m-[0_auto] text-(12px #13987f center) mt-20px cursor-pointer">
-              {{ t('home.chat_header.sidebar.single.report') }}
-            </p>
-          </template>
-
-          <!-- 群聊侧边栏选项 -->
-          <template v-else>
-            <div class="box-item cursor-default">
-              <n-flex
-                align="center"
-                :justify="groupStore.countInfo!.allowScanEnter ? 'space-between' : ''"
-                :size="groupStore.countInfo!.allowScanEnter ? 0 : 12">
-                <!-- 群头像 -->
-                <div class="relative group">
-                  <!-- 群主可以编辑头像，显示黑色蒙层和上传图标 -->
-                  <div v-if="isGroupOwner" class="avatar-wrapper relative" @click="handleUploadAvatar">
-                    <n-avatar round :size="40" :src="AvatarUtils.getAvatarUrl(activeItem?.avatar || '')" />
-                    <div class="avatar-hover absolute size-full rounded-50% flex-center">
-                      <svg class="size-14px color-#fefefe">
-                        <use href="#Export"></use>
-                      </svg>
-                    </div>
-                  </div>
-
-                  <n-avatar v-else round :size="40" :src="AvatarUtils.getAvatarUrl(activeItem?.avatar || '')" />
-                </div>
-
-                <n-flex vertical :size="6">
-                  <!-- 群名称 -->
-                  <n-flex :size="10" align="center">
-                    <div v-if="isGroupOwner && isEditingGroupName">
-                      <n-input
-                        ref="groupNameInputRef"
-                        v-model:value="editingGroupName"
-                        @blur.stop="handleGroupNameChange"
-                        @keydown.enter.stop="handleGroupNameChange"
-                        size="tiny"
-                        style="width: 100px; height: 22px"
-                        maxlength="12"
-                        spellCheck="false"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        class="border-(solid 1px [--line-color])"
-                        :placeholder="t('home.chat_header.sidebar.group.name_placeholder')" />
-                    </div>
-                    <div
-                      v-else
-                      class="text-(14px --text-color) leading-loose cursor-default h-22px flex-center"
-                      :class="{ 'cursor-pointer': isGroupOwner }"
-                      @click="isGroupOwner && startEditGroupName()">
-                      <p :title="activeItem?.name" class="max-w-100px truncate">{{ activeItem?.name }}</p>
-                      <!-- 显示编辑图标 -->
-                      <svg v-if="isGroupOwner" class="size-14px ml-1 inline-block color-[--icon-color]">
-                        <use href="#edit"></use>
-                      </svg>
-                    </div>
-
-                    <n-popover trigger="hover" v-if="activeItem?.hotFlag === IsAllUserEnum.Yes && !isEditingGroupName">
-                      <template #trigger>
-                        <svg class="size-20px select-none outline-none cursor-pointer color-#13987f">
-                          <use href="#auth"></use>
-                        </svg>
-                      </template>
-                      <span>{{ t('home.chat_header.sidebar.group.official_badge') }}</span>
-                    </n-popover>
-                  </n-flex>
-
-                  <n-flex align="center" :size="8">
-                    <!-- hula号 -->
-                    <p
-                      class="text-(12px center [--chat-text-color]) rounded-4px w-100px py-2px bg-[#e3e3e3] dark:bg-[#505050]">
-                      {{ activeItem?.account }}
-                    </p>
-
-                    <n-tooltip trigger="hover">
-                      <template #trigger>
-                        <svg
-                          class="size-12px cursor-pointer hover:color-#909090 hover:transition-colors"
-                          @click="handleCopy">
-                          <use href="#copy"></use>
-                        </svg>
-                      </template>
-                      <span>{{ t('home.chat_header.sidebar.group.copy') }}</span>
-                    </n-tooltip>
-                  </n-flex>
-                </n-flex>
-
-                <div
-                  v-if="groupStore.countInfo!.allowScanEnter"
-                  class="flex-center cursor-pointer bg-#e3e3e380 dark:bg-#303030 border-(1px solid #90909080) gap-6px px-4px py-6px rounded-6px"
-                  @click="showQRCodeModal = true">
-                  <svg class="size-16px"><use href="#pay-code-one"></use></svg>
-                  <p class="text-(12px [--chat-text-color])">{{ t('home.chat_header.sidebar.group.qr') }}</p>
-                </div>
-              </n-flex>
-            </div>
-
-            <!-- 群聊成员列表 -->
-            <div class="box-item cursor-default">
-              <n-flex vertical justify="center" :size="16">
-                <p class="text-(14px --text-color)">
-                  {{
-                    activeItem?.hotFlag !== IsAllUserEnum.Yes
-                      ? t('home.chat_header.sidebar.group.members')
-                      : t('home.chat_header.sidebar.group.channel_members')
-                  }}
-                </p>
-
-                <n-flex align="center" justify="start" :size="[24, 20]">
-                  <template v-for="(item, _index) in userList" :key="_index">
-                    <n-flex vertical justify="center" align="center" :size="10">
-                      <n-avatar round :size="30" :src="AvatarUtils.getAvatarUrl(item.avatar)" />
-
-                      <p class="text-(10px --text-color center) w-30px truncate">
-                        {{ item.name }}
-                      </p>
-                    </n-flex>
-                  </template>
-                </n-flex>
-              </n-flex>
-            </div>
-
-            <!-- 我本群的昵称 -->
-            <p class="text-(12px [--chat-text-color]) mt-20px mb-10px">
-              {{ t('home.chat_header.sidebar.group.my_name') }}
-            </p>
-            <n-input
-              class="border-(solid 1px [--line-color]) custom-shadow"
-              spellCheck="false"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              :maxlength="12"
-              clearable
-              v-model:value="localMyName"
-              @blur.stop="handleGroupInfoChange" />
-            <!-- 群备注 -->
-            <p class="flex-start-center gap-10px text-(12px [--chat-text-color]) mt-20px mb-10px">
-              {{ t('home.chat_header.sidebar.group.remark') }}
-              <span class="text-(10px #909090)">{{ t('home.chat_header.sidebar.group.remark_desc') }}</span>
-            </p>
-            <n-input
-              class="border-(solid 1px [--line-color]) custom-shadow"
-              v-model:value="localRemark"
-              spellCheck="false"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              clearable
-              @blur.stop="handleGroupInfoChange" />
-
-            <!-- 群设置选项 -->
-            <div class="box-item cursor-default">
-              <n-flex vertical justify="center" :size="4">
-                <p class="text-(12px #909090) pb-14px">{{ t('home.chat_header.sidebar.group.settings.title') }}</p>
-
-                <div class="flex-between-center">
-                  <p>{{ t('home.chat_header.sidebar.group.settings.pin') }}</p>
-                  <n-switch size="small" :value="activeItem?.top" @update:value="handleTop" />
-                </div>
-
-                <div class="h-1px bg-[--setting-item-line] m-[10px_0]"></div>
-
-                <div class="flex-between-center">
-                  <p>{{ t('home.chat_header.sidebar.group.settings.mute') }}</p>
-                  <n-switch
-                    size="small"
-                    :value="activeItem?.muteNotification === NotificationTypeEnum.NOT_DISTURB"
-                    @update:value="handleNotification" />
-                </div>
-                <template v-if="groupStore.isAdminOrLord()">
-                  <div class="h-1px bg-[--setting-item-line] m-[10px_0]"></div>
-
-                  <div class="flex-between-center">
-                    <p>{{ t('home.chat_header.sidebar.group.settings.scan') }}</p>
-                    <n-switch
-                      size="small"
-                      :value="groupStore.countInfo!.allowScanEnter"
-                      @update:value="
-                        (val: any) => {
-                          updateRoomInfo({
-                            id: groupStore.countInfo!.roomId,
-                            allowScanEnter: val
-                          })
-                        }
-                      " />
-                  </div>
-                </template>
-              </n-flex>
-            </div>
-
-            <!-- 群消息设置（仅在消息免打扰开启时显示） -->
-            <div
-              v-if="activeItem?.muteNotification === NotificationTypeEnum.NOT_DISTURB"
-              class="box-item cursor-default">
-              <n-flex vertical justify="center" :size="4">
-                <p class="text-(12px #909090) pb-14px">
-                  {{ t('home.chat_header.sidebar.group.message_settings.title') }}
-                </p>
-
-                <div class="flex-between-center">
-                  <n-select
-                    v-model:value="messageSettingType"
-                    :options="messageSettingOptions"
-                    @update:value="handleMessageSetting" />
-                </div>
-              </n-flex>
-            </div>
-
-            <!-- 管理群成员（仅管理员和群主可见） -->
-            <div
-              v-if="
-                groupStore.isAdminOrLord() && activeItem?.hotFlag !== IsAllUserEnum.Yes && currentSessionRoomId !== '1'
-              "
-              class="box-item cursor-pointer mb-20px"
-              @click="handleManageGroupMember">
-              <p>{{ t('home.chat_header.sidebar.group.manage_members') }}</p>
-            </div>
-
-            <div class="box-item cursor-pointer mb-20px" @click="handleDelete(RoomActEnum.DELETE_RECORD)">
-              <p>{{ t('home.chat_header.sidebar.group.delete_history') }}</p>
-            </div>
-
-            <div
-              v-if="activeItem?.hotFlag !== IsAllUserEnum.Yes"
-              class="box-item flex-x-center cursor-pointer mb-20px"
-              @click="
-                handleDelete(
-                  activeItem?.operate === SessionOperateEnum.DISSOLUTION_GROUP
-                    ? RoomActEnum.DISSOLUTION_GROUP
-                    : RoomActEnum.EXIT_GROUP
-                )
-              ">
-              <p class="color-#d03553">
-                {{
-                  activeItem?.operate === SessionOperateEnum.DISSOLUTION_GROUP
-                    ? t('home.chat_header.sidebar.group.dissolve')
-                    : t('home.chat_header.sidebar.group.exit')
-                }}
-              </p>
-            </div>
-
-            <p
-              v-if="activeItem?.hotFlag !== IsAllUserEnum.Yes"
-              class="text-(12px #13987f center) my-20px cursor-pointer">
-              {{ t('home.chat_header.sidebar.group.report') }}
-            </p>
-          </template>
-        </n-scrollbar>
-      </div>
-    </Transition>
+      <GroupChatSidebar
+        v-else
+        :active-item="activeItem"
+        :user-list="userList"
+        :is-group-owner="isGroupOwner"
+        :is-editing-group-name="isEditingGroupName"
+        v-model:editing-group-name="editingGroupName"
+        v-model:local-my-name="localMyName"
+        v-model:local-remark="localRemark"
+        :current-session-room-id="currentSessionRoomId"
+        v-model:message-setting-type="messageSettingType"
+        :message-setting-options="messageSettingOptions"
+        @top="handleTop"
+        @notification="handleNotification"
+        @shield="handleShield"
+        @delete="handleDelete"
+        @copy="handleCopy"
+        @upload-avatar="handleUploadAvatar"
+        @group-name-change="handleGroupNameChange"
+        @start-edit-group-name="startEditGroupName"
+        @group-info-change="handleGroupInfoChange"
+        @manage-group-member="handleManageGroupMember"
+        @show-qr-code="showQRCodeModal = true"
+        @update-room-info="updateRoomInfo" />
+    </ChatInnerDrawer>
   </main>
 
   <!-- 弹出框 -->
@@ -453,91 +193,13 @@
   </n-modal>
 
   <!-- 群二维码分享弹窗 -->
-  <n-modal v-model:show="showQRCodeModal" class="w-400px rounded-8px">
-    <div class="bg-[--bg-popover] w-400px p-6px box-border flex flex-col">
-      <div
-        v-if="isMac()"
-        @click="showQRCodeModal = false"
-        class="mac-close z-999 size-13px shadow-inner bg-#ed6a5eff rounded-50% select-none absolute left-6px">
-        <svg class="hidden size-7px color-#000 select-none absolute top-3px left-3px">
-          <use href="#close"></use>
-        </svg>
-      </div>
-
-      <svg v-if="isWindows()" @click="showQRCodeModal = false" class="size-12px ml-a cursor-pointer select-none">
-        <use href="#close"></use>
-      </svg>
-
-      <div class="flex flex-col gap-20px p-[22px_20px_20px_22px] select-none">
-        <div class="flex justify-center">
-          <div class="w-full max-w-250px flex flex-col gap-20px">
-            <div class="flex items-center gap-10px">
-              <n-avatar
-                round
-                :size="44"
-                :src="AvatarUtils.getAvatarUrl(activeItem?.avatar || '')"
-                class="flex-shrink-0" />
-              <div class="flex flex-col overflow-hidden gap-6px w-full cursor-default">
-                <p class="text-(18px [--text-color]) font-bold truncate">
-                  {{ groupStore.countInfo?.remark || activeItem?.name }}
-                </p>
-                <span class="flex items-center text-(13px [--chat-text-color]) truncate">
-                  {{ t('home.chat_header.qr.group_id_label') }}{{ activeItem?.account || currentSessionRoomId || '--' }}
-                  <n-tooltip v-if="activeItem?.account" trigger="hover">
-                    <template #trigger>
-                      <svg
-                        class="size-14px cursor-pointer color-[--icon-color] hover:color-#13987f transition-colors inline-block ml-6px"
-                        @click="handleCopy">
-                        <use href="#copy"></use>
-                      </svg>
-                    </template>
-                    <span>{{ t('home.chat_header.sidebar.group.copy') }}</span>
-                  </n-tooltip>
-                </span>
-              </div>
-            </div>
-
-            <div ref="qrCodeWrapperRef" class="rounded-24px flex flex-col items-center gap-12px">
-              <n-qr-code
-                style="border-radius: 16px"
-                :value="groupQrValue"
-                :size="220"
-                type="canvas"
-                :color="themes.content === ThemeEnum.DARK ? '#202020' : '#000000'"
-                :background-color="themes.content === ThemeEnum.DARK ? '#e3e3e3' : '#e3e3e382'"
-                :icon-src="AvatarUtils.getAvatarUrl(activeItem?.avatar || '')" />
-              <p class="text-(12px [--chat-text-color])">{{ t('home.chat_header.qr.tip') }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div ref="qrCodeExportWrapperRef" class="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none">
-          <n-qr-code
-            :value="groupQrValue"
-            :size="200"
-            type="canvas"
-            :color="themes.content === ThemeEnum.DARK ? '#202020' : '#000000'"
-            :background-color="themes.content === ThemeEnum.DARK ? '#e3e3e3' : '#e3e3e382'"
-            :icon-src="qrExportIconSrc || undefined" />
-        </div>
-
-        <div class="flex items-center justify-between gap-12px border-t-(1px solid [--line-color]) pt-12px">
-          <div class="QRcode-item" @click="handleForwardGroupQr">
-            <svg class="size-20px"><use href="#share-three"></use></svg>
-            <span>{{ t('home.chat_header.qr.actions.forward') }}</span>
-          </div>
-          <div class="QRcode-item" @click="handleCopyGroupId">
-            <svg class="size-20px"><use href="#copy"></use></svg>
-            <span>{{ t('home.chat_header.qr.actions.copy_group_id') }}</span>
-          </div>
-          <div class="QRcode-item" @click="handleSaveGroupQrImage">
-            <svg class="size-20px"><use href="#Importing"></use></svg>
-            <span>{{ t('home.chat_header.qr.actions.save_image') }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </n-modal>
+  <GroupQrCodeModal
+    v-model:show="showQRCodeModal"
+    :avatar="activeItem?.avatar || ''"
+    :name="groupStore.countInfo?.remark || activeItem?.name || ''"
+    :account="activeItem?.account || ''"
+    :room-id="currentSessionRoomId"
+    :on-copy-account="handleCopy" />
 
   <!-- 管理群成员弹窗 -->
   <n-modal v-model:show="showManageGroupMemberModal" class="w-600px rounded-8px" :mask-closable="false">
@@ -576,34 +238,27 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { save } from '@tauri-apps/plugin-dialog'
-import { writeFile } from '@tauri-apps/plugin-fs'
-import { fetch as nativeFetch } from '@tauri-apps/plugin-http'
 import { ErrorType } from '@/common/exception'
 import { useDisplayMedia } from '@vueuse/core'
 import AvatarCropper from '@/components/common/AvatarCropper.vue'
 import ManageGroupMember from '@/views/ManageGroupMember.vue'
 import {
   CallTypeEnum,
-  MergeMessageType,
-  MessageStatusEnum,
   MittEnum,
   NotificationTypeEnum,
   RoleEnum,
   RoomActEnum,
   RoomTypeEnum,
-  SessionOperateEnum,
   ThemeEnum,
   TauriCommand,
-  UserType,
-  MsgEnum
+  UserType
 } from '@/enums'
 import { useAvatarUpload } from '@/hooks/useAvatarUpload'
 import { useMyRoomInfoUpdater } from '@/hooks/useMyRoomInfoUpdater'
 import { useMitt } from '@/hooks/useMitt.ts'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useWindow } from '@/hooks/useWindow'
-import { IsAllUserEnum, type UserItem, type MessageType } from '@/services/types.ts'
+import { IsAllUserEnum, type UserItem } from '@/services/types.ts'
 import { WsResponseMessageType } from '@/services/wsType'
 import { useChatStore } from '@/stores/chat.ts'
 import { useContactStore } from '@/stores/contacts.ts'
@@ -613,15 +268,12 @@ import { useSettingStore } from '@/stores/setting'
 import { useUserStore } from '@/stores/user.ts'
 import { AvatarUtils } from '@/utils/AvatarUtils'
 import { notification, setSessionTop, shield, updateRoomInfo } from '@/utils/ImRequestUtils'
-import { canvasToImageBytes } from '@/utils/Canvas2Dom'
 import { invokeWithErrorHandler } from '@/utils/TauriInvokeHandler'
 import { isMac, isWindows } from '@/utils/PlatformConstants'
-
-// 转发群二维码尺寸
-const QR_IMAGE_SIZE = 200
-const QR_CARD_EXPORT_WIDTH = 360
-const QR_CARD_EXPORT_HEIGHT = 460
-const QR_CARD_RADIUS = 36
+import ChatInnerDrawer from '../../chat-inner-drawer.vue'
+import SingleChatSidebar from './SingleChatSidebar.vue'
+import GroupChatSidebar from './GroupChatSidebar.vue'
+import GroupQrCodeModal from './GroupQrCodeModal.vue'
 
 const { t } = useI18n()
 const { createModalWindow, startRtcCall } = useWindow()
@@ -641,120 +293,8 @@ const modalShow = ref(false)
 const sidebarShow = ref(false)
 const showQRCodeModal = ref(false)
 const showManageGroupMemberModal = ref(false)
-const qrCodeWrapperRef = ref<HTMLElement | null>(null)
-const qrCodeExportWrapperRef = ref<HTMLElement | null>(null)
-const qrExportIconSrc = ref<string | null>(null)
-const qrExportIconKey = ref<string>('')
 const { currentSession: activeItem, currentSessionRoomId } = storeToRefs(globalStore)
 const { persistMyRoomInfo, resolveMyRoomNickname } = useMyRoomInfoUpdater()
-
-const groupQrValue = computed(() => {
-  if (!currentSessionRoomId.value) return ''
-  return JSON.stringify({ type: 'scanEnterGroup', roomId: currentSessionRoomId.value })
-})
-
-const isTauriContext = () =>
-  Boolean((window as any).__TAURI__ || (window as any).__TAURI_INTERNALS__ || (window as any).__TAURI_INVOKE__)
-
-const convertHttpDataToArrayBuffer = (data: unknown): ArrayBuffer => {
-  if (data === null || data === undefined) {
-    throw new Error('无法解析图片数据')
-  }
-
-  if (data instanceof ArrayBuffer) {
-    return data
-  }
-
-  if (data instanceof Uint8Array) {
-    return data.slice().buffer
-  }
-
-  if (Array.isArray(data)) {
-    return Uint8Array.from(data).buffer
-  }
-
-  if (typeof data === 'object') {
-    const maybeData = (data as { data?: number[] }).data
-    if (Array.isArray(maybeData)) {
-      return Uint8Array.from(maybeData).buffer
-    }
-  }
-
-  if (typeof data === 'string') {
-    const binaryString = atob(data)
-    const len = binaryString.length
-    const bytes = new Uint8Array(len)
-    for (let i = 0; i < len; i += 1) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-    return bytes.buffer
-  }
-
-  throw new Error('无法解析图片数据')
-}
-
-const revokeQrExportIcon = () => {
-  if (qrExportIconSrc.value?.startsWith('blob:')) {
-    URL.revokeObjectURL(qrExportIconSrc.value)
-  }
-  qrExportIconSrc.value = null
-}
-
-const resolveQrExportIcon = async () => {
-  const avatar = activeItem.value?.avatar || ''
-  if (!avatar) {
-    revokeQrExportIcon()
-    qrExportIconKey.value = ''
-    return
-  }
-
-  const avatarUrl = AvatarUtils.getAvatarUrl(avatar)
-  if (!avatarUrl || avatarUrl === qrExportIconKey.value) return
-  qrExportIconKey.value = avatarUrl
-  revokeQrExportIcon()
-
-  if (!isTauriContext() || !/^https?:\/\//i.test(avatarUrl)) {
-    qrExportIconSrc.value = avatarUrl
-    return
-  }
-
-  try {
-    const response = await nativeFetch(avatarUrl, { method: 'GET' })
-    const anyResponse = response as any
-    const status = typeof anyResponse.status === 'number' ? anyResponse.status : 200
-    const statusText = typeof anyResponse.statusText === 'string' ? anyResponse.statusText : ''
-    const ok = 'ok' in anyResponse ? Boolean(anyResponse.ok) : status >= 200 && status < 400
-    if (!ok) {
-      throw new Error(`下载失败: ${status} ${statusText}`.trim())
-    }
-
-    let buffer: ArrayBuffer | null = null
-    if (typeof anyResponse.arrayBuffer === 'function') {
-      const resBuffer = await anyResponse.arrayBuffer()
-      if (resBuffer instanceof ArrayBuffer) {
-        buffer = resBuffer
-      }
-    }
-    if (!buffer && typeof anyResponse.bytes === 'function') {
-      const bytes = await anyResponse.bytes()
-      buffer = convertHttpDataToArrayBuffer(bytes)
-    }
-    if (!buffer && 'data' in anyResponse) {
-      buffer = convertHttpDataToArrayBuffer(anyResponse.data)
-    }
-    if (!buffer) {
-      throw new Error('无法解析图片数据')
-    }
-
-    const contentType =
-      typeof anyResponse.headers?.get === 'function' ? anyResponse.headers.get('content-type') : 'image/png'
-    const blob = new Blob([buffer], { type: contentType || 'image/png' })
-    qrExportIconSrc.value = URL.createObjectURL(blob)
-  } catch (error) {
-    console.error('获取二维码头像失败:', error)
-    qrExportIconSrc.value = null
-  }
-}
 
 // 是否为频道（仅显示 more 按钮）
 const isChannel = computed(() => activeItem.value?.hotFlag === IsAllUserEnum.Yes || currentSessionRoomId.value === '1')
@@ -776,8 +316,6 @@ const isGroupOwner = computed(() => {
 const isEditingGroupName = ref(false)
 // 编辑中的群名称
 const editingGroupName = ref('')
-// 群名称输入框引用
-const groupNameInputRef = useTemplateRef<HTMLInputElement | null>('groupNameInputRef')
 // 待保存的群信息
 const pendingGroupInfo = ref<{
   groupName?: string
@@ -821,13 +359,22 @@ watch(
   }
 )
 
-const messageSettingType = computed(() => {
-  // 群消息设置只在免打扰模式下有意义
-  if (activeItem.value?.muteNotification === NotificationTypeEnum.NOT_DISTURB) {
-    return activeItem.value?.shield ? 'shield' : 'notification'
+const messageSettingType = computed({
+  get() {
+    if (activeItem.value?.muteNotification === NotificationTypeEnum.NOT_DISTURB) {
+      return activeItem.value?.shield ? 'shield' : 'notification'
+    }
+    return 'notification'
+  },
+  set(value: string) {
+    const session = activeItem.value
+    if (!session) return
+    if (value === 'shield' && !session.shield) {
+      handleShield(true)
+    } else if (value === 'notification' && session.shield) {
+      handleShield(false)
+    }
   }
-  // 非免打扰模式下，默认返回 notification
-  return 'notification'
 })
 const messageSettingOptions = computed(() => [
   { label: t('home.chat_header.message_setting.receive_no_alert'), value: 'notification' },
@@ -902,295 +449,12 @@ watchEffect(() => {
   })
 })
 
-watch(showQRCodeModal, (visible) => {
-  if (visible) {
-    void resolveQrExportIcon()
-  } else {
-    revokeQrExportIcon()
-  }
-})
-
-watch(
-  () => activeItem.value?.avatar,
-  () => {
-    if (showQRCodeModal.value) {
-      void resolveQrExportIcon()
-    }
-  }
-)
-
 // 处理复制账号
 const handleCopy = () => {
   const session = activeItem.value
   if (!session?.account) return
   navigator.clipboard.writeText(session.account)
   window.$message.success(t('home.chat_header.toast.copy_success', { account: session.account }))
-}
-
-const getGroupQrCanvas = () => {
-  const wrapper = qrCodeExportWrapperRef.value || qrCodeWrapperRef.value
-  if (!wrapper) return null
-  const canvas = wrapper.querySelector('canvas')
-  return canvas instanceof HTMLCanvasElement ? canvas : null
-}
-
-const drawRoundedRectPath = (
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-) => {
-  const r = Math.min(radius, width / 2, height / 2)
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.lineTo(x + width - r, y)
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r)
-  ctx.lineTo(x + width, y + height - r)
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
-  ctx.lineTo(x + r, y + height)
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r)
-  ctx.lineTo(x, y + r)
-  ctx.quadraticCurveTo(x, y, x + r, y)
-  ctx.closePath()
-}
-
-const loadImageSafely = (src?: string | null): Promise<HTMLImageElement | null> => {
-  return new Promise((resolve) => {
-    if (!src) {
-      resolve(null)
-      return
-    }
-    const image = new Image()
-    if (/^https?:/i.test(src)) {
-      image.crossOrigin = 'anonymous'
-    }
-    image.onload = () => resolve(image)
-    image.onerror = () => resolve(null)
-    image.src = src
-  })
-}
-
-const truncateCanvasText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
-  if (ctx.measureText(text).width <= maxWidth) {
-    return text
-  }
-  let truncated = text
-  while (truncated.length > 0 && ctx.measureText(`${truncated}…`).width > maxWidth) {
-    truncated = truncated.slice(0, -1)
-  }
-  return `${truncated}…`
-}
-
-const buildGroupQrShareCanvas = async (): Promise<HTMLCanvasElement | null> => {
-  const baseCanvas = getGroupQrCanvas()
-  if (!baseCanvas) return null
-  const canvas = document.createElement('canvas')
-  canvas.width = QR_CARD_EXPORT_WIDTH
-  canvas.height = QR_CARD_EXPORT_HEIGHT
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return null
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.save()
-  drawRoundedRectPath(ctx, 0, 0, canvas.width, canvas.height, QR_CARD_RADIUS)
-  ctx.clip()
-  ctx.fillStyle = '#f6f7fb'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  const horizontalPadding = 42
-  const avatarSize = 44
-  const avatarX = horizontalPadding
-  const contentAnchorY = 52
-  const avatarY = contentAnchorY + 8
-
-  // 头像
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2)
-  ctx.closePath()
-  ctx.clip()
-  const avatarSrc = qrExportIconSrc.value || AvatarUtils.getAvatarUrl(activeItem.value?.avatar || '') || undefined
-  const avatarImg = await loadImageSafely(avatarSrc)
-  if (avatarImg) {
-    ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize)
-  } else {
-    ctx.fillStyle = '#e2e8f0'
-    ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize)
-    ctx.fillStyle = '#64748b'
-    ctx.font = 'bold 20px "PingFang SC", system-ui'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    const initial = (activeItem.value?.name || 'H').slice(0, 1).toUpperCase()
-    ctx.fillText(initial, avatarX + avatarSize / 2, avatarY + avatarSize / 2)
-  }
-  ctx.restore()
-
-  // 文本信息
-  const textX = avatarX + avatarSize + 16
-  const maxTextWidth = canvas.width - textX - horizontalPadding
-  const groupName = groupStore.countInfo?.remark || activeItem.value?.name || ''
-  const groupId = activeItem.value?.account || currentSessionRoomId.value || ''
-  ctx.fillStyle = '#0f172a'
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'alphabetic'
-  ctx.font = 'bold 20px "PingFang SC", system-ui'
-  const title = truncateCanvasText(ctx, groupName, maxTextWidth)
-  ctx.fillText(title, textX, avatarY + 24)
-
-  ctx.fillStyle = '#6b7280'
-  ctx.font = '14px "PingFang SC", system-ui'
-  const groupLabel = truncateCanvasText(ctx, `群号：${groupId}`, maxTextWidth)
-  ctx.fillText(groupLabel, textX, avatarY + 42)
-
-  // 绘制二维码
-  const qrSize = 248
-  const qrX = (canvas.width - qrSize) / 2
-  const qrY = contentAnchorY + avatarSize + 28
-  ctx.drawImage(baseCanvas, qrX, qrY, qrSize, qrSize)
-
-  // 提示文字
-  ctx.fillStyle = '#4b5563'
-  ctx.font = '15px "PingFang SC", system-ui'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'alphabetic'
-  ctx.fillText(t('home.chat_header.qr.tip'), QR_CARD_EXPORT_WIDTH / 2, qrY + qrSize + 34)
-
-  ctx.restore()
-  return canvas
-}
-
-const getGroupQrImageBytes = async (): Promise<{ bytes: Uint8Array; width: number; height: number } | null> => {
-  await nextTick()
-  const shareCanvas = await buildGroupQrShareCanvas()
-  if (!shareCanvas) return null
-  return await canvasToImageBytes(shareCanvas, {
-    type: 'image/webp'
-  })
-}
-
-const normalizeSavePath = (path: string) => path.replace(/\\/g, '/')
-
-const handleForwardGroupQr = async () => {
-  if (!groupQrValue.value) return
-  try {
-    const qrResult = await getGroupQrImageBytes()
-    if (!qrResult || !qrResult.bytes?.length) {
-      return
-    }
-    const { bytes, width, height } = qrResult
-
-    const canvas = getGroupQrCanvas()
-    const previewWidth = width || canvas?.width || QR_IMAGE_SIZE
-    const previewHeight = height || canvas?.height || QR_IMAGE_SIZE
-    const size = bytes.byteLength
-    const mimeType = 'image/webp'
-    const arrayBuffer = bytes.slice().buffer
-    const blob = new Blob([arrayBuffer], { type: mimeType })
-    const previewUrl = URL.createObjectURL(blob)
-    const roomId = currentSessionRoomId.value
-
-    if (!roomId) {
-      URL.revokeObjectURL(previewUrl)
-      return
-    }
-
-    const tempMsgId = `QR_${roomId}_${Date.now()}`
-    const selfInfo = groupStore.getUserInfo(userStore.userInfo!.uid)
-    const fromUser = {
-      uid: userStore.userInfo!.uid,
-      username: selfInfo?.name || userStore.userInfo!.name || '',
-      avatar: selfInfo?.avatar || userStore.userInfo!.avatar || '',
-      locPlace: selfInfo?.locPlace || ''
-    }
-
-    const tempMessage: MessageType = {
-      fromUser,
-      message: {
-        id: tempMsgId,
-        roomId,
-        sendTime: Date.now(),
-        status: MessageStatusEnum.PENDING,
-        type: MsgEnum.IMAGE,
-        body: {
-          url: previewUrl,
-          width: previewWidth,
-          height: previewHeight,
-          size
-        },
-        messageMarks: {}
-      },
-      sendTime: Date.now(),
-      loading: false,
-      isCheck: true
-    }
-
-    chatStore.clearMsgCheck()
-    await chatStore.pushMsg(tempMessage)
-
-    chatStore.setCustomForwardTask({
-      id: tempMsgId,
-      type: MsgEnum.IMAGE,
-      fileName: 'group-qr.png',
-      mimeType,
-      bytes,
-      previewUrl,
-      width: previewWidth,
-      height: previewHeight,
-      size
-    })
-
-    chatStore.setMsgMultiChoose(true, 'forward')
-    await nextTick()
-    useMitt.emit(MittEnum.MSG_MULTI_CHOOSE, {
-      action: 'open-forward',
-      mergeType: MergeMessageType.SINGLE
-    })
-  } catch (error) {
-    console.error('转发二维码失败:', error)
-  }
-}
-
-const handleCopyGroupId = async () => {
-  const groupId = activeItem.value?.account || currentSessionRoomId.value
-  if (!groupId) {
-    return
-  }
-  try {
-    await navigator.clipboard.writeText(groupId)
-    window.$message.success(t('home.chat_header.qr.toast.group_id_copied'))
-  } catch (error) {
-    console.error('复制群号失败:', error)
-  }
-}
-
-const handleSaveGroupQrImage = async () => {
-  if (!groupQrValue.value) return
-  try {
-    const qrResult = await getGroupQrImageBytes()
-    if (!qrResult) {
-      window.$message.error(t('home.chat_header.qr.toast.save_failed'))
-      return
-    }
-    const { bytes } = qrResult
-    const defaultName = `group-qr-${currentSessionRoomId.value || 'unknown'}.png`
-    const savePath = await save({
-      defaultPath: defaultName,
-      filters: [
-        {
-          name: 'PNG',
-          extensions: ['png']
-        }
-      ]
-    })
-    if (!savePath) return
-    await writeFile(normalizeSavePath(savePath), bytes)
-    window.$message.success(t('home.chat_header.qr.toast.save_success'))
-  } catch (error) {
-    console.error('保存二维码失败:', error)
-    window.$message.error(t('home.chat_header.qr.toast.save_failed'))
-  }
 }
 
 /** 处理创建群聊或邀请进群 */
@@ -1346,22 +610,6 @@ const handleShield = (value: boolean) => {
     .catch(() => {
       window.$message.error(t('home.chat_header.toast.action_failed'))
     })
-}
-
-const handleMessageSetting = (value: string) => {
-  const session = activeItem.value
-  if (!session) return
-  if (value === 'shield') {
-    // 设置为屏蔽消息
-    if (!session.shield) {
-      handleShield(true)
-    }
-  } else if (value === 'notification') {
-    // 设置为接收消息但不提醒
-    if (session.shield) {
-      handleShield(false)
-    }
-  }
 }
 
 /** 处理群名称修改失焦 */
@@ -1538,11 +786,6 @@ const startEditGroupName = () => {
 
   editingGroupName.value = activeItem.value?.name || ''
   isEditingGroupName.value = true
-
-  // 在下一个事件循环中聚焦输入框
-  nextTick(() => {
-    groupNameInputRef.value?.focus()
-  })
 }
 
 // 保存群名称
@@ -1597,7 +840,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('click', closeMenu, true)
   useMitt.off(WsResponseMessageType.VideoCallRequest, () => {})
-  revokeQrExportIcon()
 })
 </script>
 
@@ -1612,27 +854,6 @@ onUnmounted(() => {
 .loading-enter-from,
 .loading-leave-to {
   opacity: 0;
-}
-
-.avatar-wrapper {
-  cursor: pointer;
-
-  .avatar-hover {
-    opacity: 0;
-    transition: opacity 0.4s ease-in-out;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    top: 0;
-    left: 0;
-  }
-
-  &:hover .avatar-hover {
-    opacity: 1;
-  }
-}
-
-.QRcode-item {
-  @apply flex flex-1 flex-col items-center gap-10px cursor-pointer text-(12px [--chat-text-color]) p-8px rounded-12px transition-colors hover:bg-#e3e3e360 dark:hover:bg-#262626;
 }
 
 :deep(.n-scrollbar > .n-scrollbar-container > .n-scrollbar-content) {
