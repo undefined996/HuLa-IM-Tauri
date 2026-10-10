@@ -76,15 +76,14 @@ fn resolve_upload_path(
     path: &str,
     base_dir: Option<&str>,
 ) -> Result<PathBuf, String> {
-    let path_buf = PathBuf::from(path);
-    if path_buf.is_absolute() {
-        return Ok(path_buf);
+    // 禁止绝对路径：上传文件必须位于受控的应用目录内，防止读取任意本地文件
+    if PathBuf::from(path).is_absolute() {
+        return Err("Absolute paths are not allowed for upload".to_string());
     }
-
+    // 必须显式指定受控基础目录
     let Some(base_dir) = base_dir else {
-        return Ok(path_buf);
+        return Err("baseDir (AppCache/AppData) is required for upload".to_string());
     };
-
     let base_dir = match base_dir {
         "AppCache" | "appCache" | "app_cache" => BaseDirectory::AppCache,
         "AppData" | "appData" | "app_data" => BaseDirectory::AppData,
@@ -94,11 +93,25 @@ fn resolve_upload_path(
             ));
         }
     };
-
-    app_handle
+    let resolved = app_handle
         .path()
         .resolve(path, base_dir)
-        .map_err(|e| format!("Failed to resolve file path: {e}"))
+        .map_err(|e| format!("Failed to resolve file path: {e}"))?;
+    // 规范化并确认未逃出基础目录（防御 path 中的 ../）
+    let canon = resolved
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize upload path: {e}"))?;
+    let base_root = app_handle
+        .path()
+        .resolve(".", base_dir)
+        .map_err(|e| format!("Failed to resolve base dir: {e}"))?;
+    let base_canon = base_root
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize base dir: {e}"))?;
+    if !canon.starts_with(&base_canon) {
+        return Err("Upload path escapes the allowed base directory".to_string());
+    }
+    Ok(canon)
 }
 
 async fn upload_put(
@@ -138,6 +151,11 @@ async fn upload_put(
             Ok(Some((Bytes::from(buf), (file, transferred, on_progress))))
         },
     );
+
+    // 仅允许 https 上传目标，防止将本地文件外泄到任意/内网地址 (SSRF)
+    if !url.starts_with("https://") {
+        return Err("Upload destination must use https".to_string());
+    }
 
     let client = reqwest::Client::new();
     let mut request = client

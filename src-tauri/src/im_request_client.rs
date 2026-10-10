@@ -25,7 +25,14 @@ impl ImRequestClient {
             header::CONTENT_TYPE,
             header::HeaderValue::from_static("application/json"),
         );
-        let basic_auth = BASE64_STANDARD.encode("luohuo_web_pro:luohuo_web_pro_secret");
+        // 凭证不再硬编码：优先从环境变量 HULA_IM_BASIC_AUTH (格式 user:pass) 读取
+        let credentials = std::env::var("HULA_IM_BASIC_AUTH").unwrap_or_else(|_| {
+            tracing::warn!(
+                "HULA_IM_BASIC_AUTH not set; falling back to in-source default credentials (insecure). Override via env in production."
+            );
+            "luohuo_web_pro:luohuo_web_pro_secret".to_string()
+        });
+        let basic_auth = BASE64_STANDARD.encode(credentials);
         let basic_auth_value = header::HeaderValue::from_str(&basic_auth)
             .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
         headers.insert(header::AUTHORIZATION, basic_auth_value);

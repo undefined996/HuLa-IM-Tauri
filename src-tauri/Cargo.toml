@@ -185,3 +185,7 @@ default = ["custom-protocol"]
 # this feature is used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+# Opt-in SQLCipher encrypted local storage. When enabled, configuration.rs reads the
+# encryption key from the HULA_DB_KEY env var. Off by default to keep plaintext DB
+# compatibility; enabling requires a data migration (see security review notes).
+sqlcipher = []

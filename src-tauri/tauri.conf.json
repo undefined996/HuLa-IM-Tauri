@@ -46,7 +46,7 @@
     "withGlobalTauri": true,
     "windows": [],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: blob: https: http:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https: http: wss: ws:; media-src 'self' data: https: http: blob:; frame-src 'self' https: http: about:; worker-src 'self' blob:",
       "capabilities": [
         "default-capability",
         "mobile-capability",

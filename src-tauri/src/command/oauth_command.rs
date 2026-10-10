@@ -3,25 +3,35 @@ use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Runtime, State};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use uuid::Uuid;
 
 // 定义状态以管理 OAuth 服务器任务
 pub struct OauthServerState {
     pub handle: Mutex<Option<JoinHandle<()>>>,
+    // 每次启动生成的随机 secret，用于校验回调来源，防止本地恶意进程或跨站请求注入 token
+    pub expected_secret: Mutex<Option<String>>,
 }
 
 impl Default for OauthServerState {
     fn default() -> Self {
         Self {
             handle: Mutex::new(None),
+            expected_secret: Mutex::new(None),
         }
     }
+}
+
+#[derive(serde::Serialize)]
+pub struct OauthStartResult {
+    pub port: u16,
+    pub secret: String,
 }
 
 #[tauri::command]
 pub async fn start_oauth_server<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, OauthServerState>,
-) -> Result<u16, String> {
+) -> Result<OauthStartResult, String> {
     // 1. 尝试终止旧任务
     {
         let mut handle_lock = state.handle.lock().map_err(|e| e.to_string())?;
@@ -50,7 +60,15 @@ pub async fn start_oauth_server<R: Runtime>(
     let local_addr = listener.local_addr().map_err(|e| e.to_string())?;
     let port = local_addr.port();
 
-    // 3. 启动新任务
+    // 3. 生成本次会话的一次性 secret，用于校验回调，防止 token 注入
+    let secret = Uuid::new_v4().to_string();
+    {
+        let mut lock = state.expected_secret.lock().map_err(|e| e.to_string())?;
+        *lock = Some(secret.clone());
+    }
+    let local_secret = secret.clone();
+
+    // 4. 启动新任务
     let handle = tauri::async_runtime::spawn(async move {
         loop {
             if let Ok((mut stream, _)) = listener.accept().await {
@@ -58,6 +76,24 @@ pub async fn start_oauth_server<R: Runtime>(
                 if let Ok(n) = stream.read(&mut buffer).await {
                     let request = String::from_utf8_lossy(&buffer[..n]);
                     let mut emitted = false;
+
+                    // 校验回调必须携带正确的 secret，否则视为非法请求直接拒绝
+                    let mut provided_secret = String::new();
+                    if let Some(ss) = request.find("secret=") {
+                        let srest = &request[ss + 7..];
+                        let send_amp = srest.find('&').unwrap_or(srest.len());
+                        let send_space = srest.find(' ').unwrap_or(srest.len());
+                        let send = std::cmp::min(send_amp, send_space);
+                        provided_secret = srest[..send].to_string();
+                    }
+
+                    if provided_secret != local_secret {
+                        let response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ninvalid or missing secret";
+                        let _ = stream.write_all(response.as_bytes()).await;
+                        let _ = stream.flush().await;
+                        continue;
+                    }
+
                     if let Some(ts) = request.find("token=") {
                         let rest = &request[ts + 6..];
                         let end_amp = rest.find('&').unwrap_or(rest.len());
@@ -111,11 +147,11 @@ pub async fn start_oauth_server<R: Runtime>(
         }
     });
 
-    // 4. 保存新任务句柄
+    // 5. 保存新任务句柄
     {
         let mut handle_lock = state.handle.lock().map_err(|e| e.to_string())?;
         *handle_lock = Some(handle);
     }
 
-    Ok(port)
+    Ok(OauthStartResult { port, secret })
 }

@@ -15,17 +15,22 @@ fn process_image_url(url: &str, base_dir: &Path) -> String {
         return url.to_string();
     }
 
-    // 处理相对路径
-    let img_path = if url.starts_with("./") || url.starts_with("../") {
-        base_dir.join(url)
-    } else {
-        base_dir.join(url)
+    // 处理相对路径并限制在 base_dir 内，防止路径穿越读取任意文件
+    let img_path = base_dir.join(url);
+    let Ok(canon) = img_path.canonicalize() else {
+        return url.to_string();
     };
+    let base_canon = base_dir
+        .canonicalize()
+        .unwrap_or_else(|_| base_dir.to_path_buf());
+    if !canon.starts_with(&base_canon) {
+        return url.to_string();
+    }
 
     // 尝试读取图片文件并转换为 base64
-    if let Ok(img_data) = fs::read(&img_path) {
+    if let Ok(img_data) = fs::read(&canon) {
         // 根据文件扩展名确定 MIME 类型
-        let mime_type = match img_path.extension().and_then(|s| s.to_str()) {
+        let mime_type = match canon.extension().and_then(|s| s.to_str()) {
             Some("png") => "image/png",
             Some("jpg") | Some("jpeg") => "image/jpeg",
             Some("gif") => "image/gif",
@@ -79,6 +84,34 @@ pub async fn parse_markdown(app: AppHandle, file_path: String) -> Result<String,
             .find(|p| p.exists())
             .ok_or_else(|| format!("无法找到文件: {}", file_path))?
     };
+
+    // 路径穿越防护：规范化后必须位于应用允许的根目录内
+    {
+        let full_canon = full_path
+            .canonicalize()
+            .map_err(|e| format!("无法解析文件路径 {:?}: {}", full_path, e))?;
+        let mut allowed_roots: Vec<PathBuf> = vec![
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .to_path_buf(),
+        ];
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        if let Ok(r) = app.path().resource_dir() {
+            allowed_roots.push(r);
+        }
+        if let Ok(c) = app.path().app_config_dir() {
+            allowed_roots.push(c);
+        }
+        let allowed = allowed_roots.iter().any(|r| {
+            r.canonicalize()
+                .map(|rc| full_canon.starts_with(&rc))
+                .unwrap_or(false)
+        });
+        if !allowed {
+            return Err(format!("拒绝访问越界文件路径: {:?}", full_path));
+        }
+    }
 
     // 读取文件内容
     let markdown_content = fs::read_to_string(&full_path)

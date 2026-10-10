@@ -399,7 +399,16 @@ impl WebSocketClient {
         }
 
         let url_str = url.as_str();
-        info!("Connecting to WebSocket: {}", url_str);
+        // 不要在日志中输出鉴权 Token
+        let redacted = match url_str.find("Token=") {
+            Some(start) => {
+                let after = &url_str[start + 7..];
+                let end = after.find('&').unwrap_or(after.len());
+                format!("{}Token=***{}", &url_str[..start], &after[end..])
+            }
+            None => url_str.to_string(),
+        };
+        info!("Connecting to WebSocket: {}", redacted);
         self.update_state(ConnectionState::Connecting, false).await;
 
         // 建立连接

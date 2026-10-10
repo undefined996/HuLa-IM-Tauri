@@ -184,7 +184,8 @@ const loadingBarContainerStyle = {
 
 // README/Markdown 内容过滤：本地文件可信，尽量少改动布局；如未来需要过滤可扩展此方法
 const sanitizeMarkdown = (html: string, options?: { trustContent?: boolean }) => {
-  if (options?.trustContent ?? true) {
+  // 默认对内容做净化（防 XSS）；仅对明确可信的本地文件可传入 trustContent: true
+  if (options?.trustContent) {
     return html
   }
   return DOMPurify.sanitize(html, {
@@ -530,7 +531,7 @@ const loadReadme = async (recordHistory = false, resetHistory = false) => {
       language: currentLang.value
     })
     // README 来源可信，直接渲染以保留原有布局
-    renderedMarkdown.value = sanitizeMarkdown(html)
+    renderedMarkdown.value = sanitizeMarkdown(html, { trustContent: true })
     // 先更新视图状态, 确保 nextTick 时容器已挂载
     currentView.value = { type: 'readme' }
     isViewingLink.value = false
@@ -564,7 +565,7 @@ const loadMarkdownFile = async (filePath: string, recordHistory = true) => {
       filePath: filePath
     })
     // 本地 Markdown 可信，直接渲染以保留原有布局
-    renderedMarkdown.value = sanitizeMarkdown(html)
+    renderedMarkdown.value = sanitizeMarkdown(html, { trustContent: true })
 
     // 显示在 markdown 视图中,而不是 iframe
     isViewingLink.value = false
@@ -617,6 +618,18 @@ const handleLinkClick = async (event: Event) => {
 
   const href = (target as HTMLAnchorElement).getAttribute('href')
   if (!href) return
+
+  // 仅允许安全协议，阻断 javascript:/data:/file: 等可能造成 XSS/沙箱逃逸的注入
+  const schemeMatch = href.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/)
+  if (schemeMatch) {
+    const scheme = schemeMatch[1].toLowerCase()
+    if (scheme !== 'http' && scheme !== 'https') {
+      event.preventDefault()
+      event.stopPropagation()
+      console.warn('已阻止不安全的链接协议:', scheme)
+      return
+    }
+  }
 
   // 阻止默认行为
   event.preventDefault()

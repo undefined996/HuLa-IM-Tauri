@@ -476,8 +476,8 @@ export const useLogin = () => {
 
       await ensureAppStateReady()
 
-      const port: number = await invoke('start_oauth_server')
-      const redirectUri = `http://127.0.0.1:${port}/`
+      const { port, secret } = await invoke<{ port: number; secret: string }>('start_oauth_server')
+      const redirectUri = `http://127.0.0.1:${port}/?secret=${secret}`
 
       // 监听 OAuth 回调
       let isProcessing = false
@@ -597,8 +597,8 @@ export const useLogin = () => {
       const clientId = await getEnhancedFingerprint()
       localStorage.setItem('clientId', clientId)
       await ensureAppStateReady()
-      const port: number = await invoke('start_oauth_server')
-      const redirectUri = `http://127.0.0.1:${port}/`
+      const { port, secret } = await invoke<{ port: number; secret: string }>('start_oauth_server')
+      const redirectUri = `http://127.0.0.1:${port}/?secret=${secret}`
       let isProcessing = false
       const unlisten = await listen<string>('oauth-token', async (event) => {
         if (isProcessing) return
@@ -690,8 +690,8 @@ export const useLogin = () => {
       const clientId = await getEnhancedFingerprint()
       localStorage.setItem('clientId', clientId)
       await ensureAppStateReady()
-      const port: number = await invoke('start_oauth_server')
-      const redirectUri = `http://127.0.0.1:${port}/`
+      const { port, secret } = await invoke<{ port: number; secret: string }>('start_oauth_server')
+      const redirectUri = `http://127.0.0.1:${port}/?secret=${secret}`
       let isProcessing = false
       const unlisten = await listen<string>('oauth-token', async (event) => {
         if (isProcessing) return

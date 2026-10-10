@@ -73,7 +73,17 @@ impl DatabaseSettings {
     /// 否则使用默认的 `db.sqlite`
     fn get_db_filename(uid: Option<&str>) -> String {
         match uid {
-            Some(id) if !id.is_empty() => format!("db_{}.sqlite", id),
+            Some(id) if !id.is_empty() => {
+                // 仅允许安全字符，防止路径穿越 (如 "../../etc/passwd")
+                if id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+                {
+                    format!("db_{}.sqlite", id)
+                } else {
+                    "db.sqlite".to_string()
+                }
+            }
             _ => "db.sqlite".to_string(),
         }
     }
@@ -96,6 +106,13 @@ impl DatabaseSettings {
     ) -> Result<DatabaseConnection, CommonError> {
         let db_filename = Self::get_db_filename(uid);
         info!("Database filename: {}", db_filename);
+
+        // 可选的数据库加密密钥（SQLCipher）。当前未启用 sqlcipher 特性时恒为 None，
+        // 保持明文兼容；启用后从环境变量 HULA_DB_KEY 读取。
+        #[cfg(feature = "sqlcipher")]
+        let db_key: Option<String> = std::env::var("HULA_DB_KEY").ok().filter(|k| !k.is_empty());
+        #[cfg(not(feature = "sqlcipher"))]
+        let db_key: Option<String> = None;
 
         // 数据库路径配置：
         let db_path = if cfg!(debug_assertions) && cfg!(desktop) {
@@ -131,7 +148,9 @@ impl DatabaseSettings {
                 }
                 Err(_) => false,
             };
-            if need_repair {
+            // 仅在非加密模式下按明文头判定损坏；加密库无 "SQLite format 3" 头，
+            // 误删会导致数据丢失。
+            if db_key.is_none() && need_repair {
                 let backup = db_path.with_extension("corrupted");
                 let _ =
                     std::fs::rename(&db_path, &backup).or_else(|_| std::fs::remove_file(&db_path));
