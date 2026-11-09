@@ -256,6 +256,23 @@ pub fn get_configuration(app_handle: &AppHandle) -> Result<Settings, config::Con
 
         let config_path_buf = get_config_path_buf(app_handle, is_desktop_dev)?;
 
+        // 验证配置文件是否存在
+        if !config_path_buf.0.exists() {
+            tracing::error!("配置文件不存在: {:?}", config_path_buf.0);
+            return Err(config::ConfigError::Message(format!(
+                "配置文件不存在: {:?}",
+                config_path_buf.0
+            )));
+        }
+
+        if !config_path_buf.1.exists() {
+            tracing::error!("环境配置文件不存在: {:?}", config_path_buf.1);
+            return Err(config::ConfigError::Message(format!(
+                "环境配置文件不存在: {:?}。请确保 configuration 目录下存在对应的配置文件（如 local.yaml 或 production.yaml）",
+                config_path_buf.1
+            )));
+        }
+
         let settings = config::Config::builder()
             .add_source(config::File::from(config_path_buf.0))
             .add_source(config::File::from(config_path_buf.1))
@@ -266,7 +283,12 @@ pub fn get_configuration(app_handle: &AppHandle) -> Result<Settings, config::Con
             )
             .build()?;
 
-        settings.try_deserialize::<Settings>()
+        let settings = settings.try_deserialize::<Settings>()?;
+
+        // 验证配置完整性
+        validate_settings(&settings)?;
+
+        Ok(settings)
     }
 
     #[cfg(target_os = "android")]
@@ -309,7 +331,7 @@ pub fn get_configuration(app_handle: &AppHandle) -> Result<Settings, config::Con
             .map_err(|e| config::ConfigError::Message(e.to_string()))?;
 
         // 构建最终配置对象
-        config::Config::builder()
+        let settings = config::Config::builder()
             .add_source(config::File::from_str(
                 base_content,
                 config::FileFormat::Yaml,
@@ -324,8 +346,64 @@ pub fn get_configuration(app_handle: &AppHandle) -> Result<Settings, config::Con
                     .separator("__"),
             )
             .build()?
-            .try_deserialize::<Settings>()
+            .try_deserialize::<Settings>()?;
+
+        // 验证配置完整性
+        validate_settings(&settings)?;
+
+        Ok(settings)
     }
+}
+
+/// 验证配置完整性
+/// 确保所有必需的配置项都存在且有效
+fn validate_settings(settings: &Settings) -> Result<(), config::ConfigError> {
+    // 验证后端配置
+    if settings.backend.base_url.is_empty() {
+        return Err(config::ConfigError::Message(
+            "backend.base_url 配置不能为空".to_string(),
+        ));
+    }
+
+    if settings.backend.ws_url.is_empty() {
+        return Err(config::ConfigError::Message(
+            "backend.ws_url 配置不能为空".to_string(),
+        ));
+    }
+
+    // 验证 URL 格式
+    if !settings.backend.base_url.starts_with("http://")
+        && !settings.backend.base_url.starts_with("https://")
+    {
+        return Err(config::ConfigError::Message(format!(
+            "backend.base_url 必须以 http:// 或 https:// 开头，当前值: {}",
+            settings.backend.base_url
+        )));
+    }
+
+    if !settings.backend.ws_url.starts_with("ws://")
+        && !settings.backend.ws_url.starts_with("wss://")
+    {
+        return Err(config::ConfigError::Message(format!(
+            "backend.ws_url 必须以 ws:// 或 wss:// 开头，当前值: {}",
+            settings.backend.ws_url
+        )));
+    }
+
+    // 验证数据库配置
+    if settings.database.sqlite_file.is_empty() {
+        return Err(config::ConfigError::Message(
+            "database.sqlite_file 配置不能为空".to_string(),
+        ));
+    }
+
+    tracing::info!(
+        "配置验证通过 - base_url: {}, ws_url: {}",
+        settings.backend.base_url,
+        settings.backend.ws_url
+    );
+
+    Ok(())
 }
 
 fn get_config_path_buf(
@@ -365,6 +443,43 @@ fn get_config_path_buf(
 
     let active_config = base_config.get_string("active_config")?;
     println!("active_config: {:?}", active_config);
-    let active_config_path_buf = dir.clone().join(active_config);
-    Ok((base_path, active_config_path_buf))
+    let active_config_path_buf = dir.clone().join(format!("{}.yaml", active_config));
+
+    // 如果活动配置文件不存在，尝试使用示例文件或回退到 production.yaml
+    let final_config_path = if !active_config_path_buf.exists() {
+        tracing::warn!(
+            "配置文件 {:?} 不存在，尝试查找替代方案...",
+            active_config_path_buf
+        );
+
+        // 尝试使用 .example 文件
+        let example_path = dir.clone().join(format!("{}.yaml.example", active_config));
+        if example_path.exists() {
+            tracing::info!("使用示例配置文件: {:?}", example_path);
+            example_path
+        } else if active_config == "local" {
+            // 如果是 local 配置不存在，回退到 production.yaml
+            let production_path = dir.clone().join("production.yaml");
+            if production_path.exists() {
+                tracing::warn!(
+                    "local.yaml 不存在，回退到 production.yaml。建议从 local.yaml.example 复制创建 local.yaml"
+                );
+                production_path
+            } else {
+                return Err(config::ConfigError::Message(format!(
+                    "配置文件不存在: {:?}。请从 local.yaml.example 复制创建 local.yaml 或确保 production.yaml 存在",
+                    active_config_path_buf
+                )));
+            }
+        } else {
+            return Err(config::ConfigError::Message(format!(
+                "配置文件不存在: {:?}",
+                active_config_path_buf
+            )));
+        }
+    } else {
+        active_config_path_buf
+    };
+
+    Ok((base_path, final_config_path))
 }
